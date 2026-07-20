@@ -185,12 +185,12 @@ function EmpresaDetalhe() {
             <CardContent className="space-y-4">
               <p className="text-sm leading-relaxed">{insights.resumo}</p>
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <InfoLine icon={Phone} label="Telefone" value={empresa.telefone} />
-                <InfoLine icon={MessageCircle} label="WhatsApp" value={empresa.whatsapp} accent="emerald" />
-                <InfoLine icon={Mail} label="E-mail" value={empresa.email} />
-                <InfoLine icon={Globe} label="Site" value={empresa.site} />
-                <InfoLine icon={Instagram} label="Instagram" value={empresa.instagram} />
-                <InfoLine icon={MapPin} label="Endereço" value={empresa.endereco} />
+                <InfoLine icon={Phone} label="Telefone" value={empresa.telefone} href={telUrl(empresa.telefone)} />
+                <InfoLine icon={MessageCircle} label="WhatsApp" value={empresa.whatsapp} href={whatsappUrl(empresa.whatsapp)} accent="emerald" />
+                <InfoLine icon={Mail} label="E-mail" value={empresa.email} href={mailUrl(empresa.email)} />
+                <InfoLine icon={Globe} label="Site" value={empresa.site} href={siteUrl(empresa.site)} />
+                <InfoLine icon={Instagram} label="Instagram" value={empresa.instagram} href={instagramUrl(empresa.instagram)} />
+                <InfoLine icon={MapPin} label="Endereço" value={empresa.endereco} href={googleMapsUrl(`${empresa.endereco || ""} ${empresa.cidade}`.trim())} />
               </div>
               <Separator />
               <div>
