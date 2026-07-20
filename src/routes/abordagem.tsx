@@ -150,7 +150,7 @@ function AbordagemPage() {
                   setLoadingIA(true);
                   try {
                     const r = await gerarAbordagemIA({ data: { empresa: toCtx(empresa), canal, tom, foco } });
-                    setEditado(r.texto);
+                    setEditado(r);
                     toast.success("Mensagem gerada com IA");
                   } catch (e) {
                     toast.error((e as Error).message);
