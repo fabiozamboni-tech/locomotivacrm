@@ -9,38 +9,214 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PromptsRouteImport } from './routes/prompts'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as ImportarRouteImport } from './routes/importar'
+import { Route as EmpresasRouteImport } from './routes/empresas'
+import { Route as CrmRouteImport } from './routes/crm'
+import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
+import { Route as ComplianceRouteImport } from './routes/compliance'
+import { Route as AbordagemRouteImport } from './routes/abordagem'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as EmpresasIdRouteImport } from './routes/empresas.$id'
 
+const PromptsRoute = PromptsRouteImport.update({
+  id: '/prompts',
+  path: '/prompts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImportarRoute = ImportarRouteImport.update({
+  id: '/importar',
+  path: '/importar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmpresasRoute = EmpresasRouteImport.update({
+  id: '/empresas',
+  path: '/empresas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CrmRoute = CrmRouteImport.update({
+  id: '/crm',
+  path: '/crm',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConfiguracoesRoute = ConfiguracoesRouteImport.update({
+  id: '/configuracoes',
+  path: '/configuracoes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ComplianceRoute = ComplianceRouteImport.update({
+  id: '/compliance',
+  path: '/compliance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AbordagemRoute = AbordagemRouteImport.update({
+  id: '/abordagem',
+  path: '/abordagem',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EmpresasIdRoute = EmpresasIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => EmpresasRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/abordagem': typeof AbordagemRoute
+  '/compliance': typeof ComplianceRoute
+  '/configuracoes': typeof ConfiguracoesRoute
+  '/crm': typeof CrmRoute
+  '/empresas': typeof EmpresasRouteWithChildren
+  '/importar': typeof ImportarRoute
+  '/login': typeof LoginRoute
+  '/prompts': typeof PromptsRoute
+  '/empresas/$id': typeof EmpresasIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/abordagem': typeof AbordagemRoute
+  '/compliance': typeof ComplianceRoute
+  '/configuracoes': typeof ConfiguracoesRoute
+  '/crm': typeof CrmRoute
+  '/empresas': typeof EmpresasRouteWithChildren
+  '/importar': typeof ImportarRoute
+  '/login': typeof LoginRoute
+  '/prompts': typeof PromptsRoute
+  '/empresas/$id': typeof EmpresasIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/abordagem': typeof AbordagemRoute
+  '/compliance': typeof ComplianceRoute
+  '/configuracoes': typeof ConfiguracoesRoute
+  '/crm': typeof CrmRoute
+  '/empresas': typeof EmpresasRouteWithChildren
+  '/importar': typeof ImportarRoute
+  '/login': typeof LoginRoute
+  '/prompts': typeof PromptsRoute
+  '/empresas/$id': typeof EmpresasIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/abordagem'
+    | '/compliance'
+    | '/configuracoes'
+    | '/crm'
+    | '/empresas'
+    | '/importar'
+    | '/login'
+    | '/prompts'
+    | '/empresas/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/abordagem'
+    | '/compliance'
+    | '/configuracoes'
+    | '/crm'
+    | '/empresas'
+    | '/importar'
+    | '/login'
+    | '/prompts'
+    | '/empresas/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/abordagem'
+    | '/compliance'
+    | '/configuracoes'
+    | '/crm'
+    | '/empresas'
+    | '/importar'
+    | '/login'
+    | '/prompts'
+    | '/empresas/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AbordagemRoute: typeof AbordagemRoute
+  ComplianceRoute: typeof ComplianceRoute
+  ConfiguracoesRoute: typeof ConfiguracoesRoute
+  CrmRoute: typeof CrmRoute
+  EmpresasRoute: typeof EmpresasRouteWithChildren
+  ImportarRoute: typeof ImportarRoute
+  LoginRoute: typeof LoginRoute
+  PromptsRoute: typeof PromptsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/prompts': {
+      id: '/prompts'
+      path: '/prompts'
+      fullPath: '/prompts'
+      preLoaderRoute: typeof PromptsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/importar': {
+      id: '/importar'
+      path: '/importar'
+      fullPath: '/importar'
+      preLoaderRoute: typeof ImportarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/empresas': {
+      id: '/empresas'
+      path: '/empresas'
+      fullPath: '/empresas'
+      preLoaderRoute: typeof EmpresasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/crm': {
+      id: '/crm'
+      path: '/crm'
+      fullPath: '/crm'
+      preLoaderRoute: typeof CrmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/configuracoes': {
+      id: '/configuracoes'
+      path: '/configuracoes'
+      fullPath: '/configuracoes'
+      preLoaderRoute: typeof ConfiguracoesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compliance': {
+      id: '/compliance'
+      path: '/compliance'
+      fullPath: '/compliance'
+      preLoaderRoute: typeof ComplianceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/abordagem': {
+      id: '/abordagem'
+      path: '/abordagem'
+      fullPath: '/abordagem'
+      preLoaderRoute: typeof AbordagemRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +224,38 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/empresas/$id': {
+      id: '/empresas/$id'
+      path: '/$id'
+      fullPath: '/empresas/$id'
+      preLoaderRoute: typeof EmpresasIdRouteImport
+      parentRoute: typeof EmpresasRoute
+    }
   }
 }
 
+interface EmpresasRouteChildren {
+  EmpresasIdRoute: typeof EmpresasIdRoute
+}
+
+const EmpresasRouteChildren: EmpresasRouteChildren = {
+  EmpresasIdRoute: EmpresasIdRoute,
+}
+
+const EmpresasRouteWithChildren = EmpresasRoute._addFileChildren(
+  EmpresasRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AbordagemRoute: AbordagemRoute,
+  ComplianceRoute: ComplianceRoute,
+  ConfiguracoesRoute: ConfiguracoesRoute,
+  CrmRoute: CrmRoute,
+  EmpresasRoute: EmpresasRouteWithChildren,
+  ImportarRoute: ImportarRoute,
+  LoginRoute: LoginRoute,
+  PromptsRoute: PromptsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
