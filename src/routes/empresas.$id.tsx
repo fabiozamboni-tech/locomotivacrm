@@ -487,7 +487,6 @@ function EmpresaDetalhe() {
               </div>
             </CardContent>
           </Card>
-          </div>
         </TabsContent>
 
         <TabsContent value="historico" className="mt-4">
