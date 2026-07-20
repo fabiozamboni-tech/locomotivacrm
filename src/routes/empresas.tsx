@@ -16,6 +16,15 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScoreBadge, SiteBadge, InstagramBadge } from "@/components/badges";
 import { Globe, Instagram, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
+import {
+  siteUrl,
+  instagramUrl,
+  whatsappUrl,
+  telUrl,
+  mailUrl,
+  googleMapsUrl,
+  origemLink,
+} from "@/lib/links";
 
 export const Route = createFileRoute("/empresas")({
   component: EmpresasPage,
@@ -185,19 +194,60 @@ function EmpresasPage() {
                   </td>
                   <td className="py-3 px-2">
                     <div className="flex gap-1.5 text-muted-foreground">
-                      {e.telefone && <Phone className="h-3.5 w-3.5" aria-label="telefone" />}
-                      {e.whatsapp && <MessageCircle className="h-3.5 w-3.5 text-emerald-500" aria-label="whatsapp" />}
-                      {e.email && <Mail className="h-3.5 w-3.5" aria-label="email" />}
-                      {e.site && <Globe className="h-3.5 w-3.5" aria-label="site" />}
-                      {e.instagram && <Instagram className="h-3.5 w-3.5" aria-label="instagram" />}
+                      {e.telefone && (
+                        <a href={telUrl(e.telefone)} title={`Ligar para ${e.telefone}`} className="hover:text-primary">
+                          <Phone className="h-3.5 w-3.5" aria-label="telefone" />
+                        </a>
+                      )}
+                      {e.whatsapp && (
+                        <a href={whatsappUrl(e.whatsapp)} target="_blank" rel="noopener noreferrer" title={`WhatsApp ${e.whatsapp}`} className="text-emerald-500 hover:opacity-80">
+                          <MessageCircle className="h-3.5 w-3.5" aria-label="whatsapp" />
+                        </a>
+                      )}
+                      {e.email && (
+                        <a href={mailUrl(e.email)} title={e.email} className="hover:text-primary">
+                          <Mail className="h-3.5 w-3.5" aria-label="email" />
+                        </a>
+                      )}
+                      {e.site && (
+                        <a href={siteUrl(e.site)} target="_blank" rel="noopener noreferrer" title={e.site} className="hover:text-primary">
+                          <Globe className="h-3.5 w-3.5" aria-label="site" />
+                        </a>
+                      )}
+                      {e.instagram && (
+                        <a href={instagramUrl(e.instagram)} target="_blank" rel="noopener noreferrer" title={e.instagram} className="hover:text-primary">
+                          <Instagram className="h-3.5 w-3.5" aria-label="instagram" />
+                        </a>
+                      )}
+                      <a
+                        href={googleMapsUrl(`${e.nome} ${e.cidade}`)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Ver no Google Maps"
+                        className="hover:text-primary"
+                      >
+                        <MapPin className="h-3.5 w-3.5" aria-label="google maps" />
+                      </a>
                     </div>
                   </td>
                   <td className="py-3 px-2"><SiteBadge status={e.statusSite} /></td>
                   <td className="py-3 px-2"><InstagramBadge status={e.statusInstagram} /></td>
                   <td className="py-3 px-2">
-                    <Badge variant="secondary" className="text-[10px] font-normal">
-                      {e.origem.replace("_", " ")}
-                    </Badge>
+                    {(() => {
+                      const o = origemLink(e.origem, e.nome, e.cidade);
+                      const badge = (
+                        <Badge variant="secondary" className="text-[10px] font-normal">
+                          {o.label}
+                        </Badge>
+                      );
+                      return o.href ? (
+                        <a href={o.href} target="_blank" rel="noopener noreferrer" title="Abrir fonte">
+                          {badge}
+                        </a>
+                      ) : (
+                        badge
+                      );
+                    })()}
                   </td>
                   <td className="py-3 px-4 text-right"><ScoreBadge score={e.score} /></td>
                 </tr>

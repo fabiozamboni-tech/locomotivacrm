@@ -43,6 +43,15 @@ import {
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import {
+  siteUrl,
+  instagramUrl,
+  whatsappUrl,
+  telUrl,
+  mailUrl,
+  googleMapsUrl,
+  origemLink,
+} from "@/lib/links";
 
 export const Route = createFileRoute("/empresas/$id")({
   component: EmpresaDetalhe,
@@ -120,8 +129,25 @@ function EmpresaDetalhe() {
             </div>
             <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-x-3 gap-y-1">
               <span>{empresa.segmento}</span>
-              <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{empresa.cidade}{empresa.bairro ? ` · ${empresa.bairro}` : ""}</span>
-              <span>Origem: {empresa.origem.replace("_", " ")}</span>
+              <a
+                href={googleMapsUrl(`${empresa.endereco || ""} ${empresa.cidade}`.trim())}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 hover:text-primary hover:underline"
+              >
+                <MapPin className="h-3 w-3" />
+                {empresa.cidade}{empresa.bairro ? ` · ${empresa.bairro}` : ""}
+              </a>
+              {(() => {
+                const o = origemLink(empresa.origem, empresa.nome, empresa.cidade);
+                return o.href ? (
+                  <a href={o.href} target="_blank" rel="noopener noreferrer" className="hover:text-primary hover:underline">
+                    Origem: {o.label}
+                  </a>
+                ) : (
+                  <span>Origem: {o.label}</span>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -159,12 +185,12 @@ function EmpresaDetalhe() {
             <CardContent className="space-y-4">
               <p className="text-sm leading-relaxed">{insights.resumo}</p>
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <InfoLine icon={Phone} label="Telefone" value={empresa.telefone} />
-                <InfoLine icon={MessageCircle} label="WhatsApp" value={empresa.whatsapp} accent="emerald" />
-                <InfoLine icon={Mail} label="E-mail" value={empresa.email} />
-                <InfoLine icon={Globe} label="Site" value={empresa.site} />
-                <InfoLine icon={Instagram} label="Instagram" value={empresa.instagram} />
-                <InfoLine icon={MapPin} label="Endereço" value={empresa.endereco} />
+                <InfoLine icon={Phone} label="Telefone" value={empresa.telefone} href={telUrl(empresa.telefone)} />
+                <InfoLine icon={MessageCircle} label="WhatsApp" value={empresa.whatsapp} href={whatsappUrl(empresa.whatsapp)} accent="emerald" />
+                <InfoLine icon={Mail} label="E-mail" value={empresa.email} href={mailUrl(empresa.email)} />
+                <InfoLine icon={Globe} label="Site" value={empresa.site} href={siteUrl(empresa.site)} />
+                <InfoLine icon={Instagram} label="Instagram" value={empresa.instagram} href={instagramUrl(empresa.instagram)} />
+                <InfoLine icon={MapPin} label="Endereço" value={empresa.endereco} href={googleMapsUrl(`${empresa.endereco || ""} ${empresa.cidade}`.trim())} />
               </div>
               <Separator />
               <div>
@@ -414,19 +440,37 @@ function InfoLine({
   icon: Icon,
   label,
   value,
+  href,
   accent,
 }: {
   icon: typeof Globe;
   label: string;
   value?: string;
+  href?: string;
   accent?: "emerald";
 }) {
+  const content = value ? (
+    href ? (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-sm truncate block hover:text-primary hover:underline"
+      >
+        {value}
+      </a>
+    ) : (
+      <div className="text-sm truncate">{value}</div>
+    )
+  ) : (
+    <div className="text-sm truncate"><span className="text-muted-foreground italic">não informado</span></div>
+  );
   return (
     <div className="flex items-start gap-2">
       <Icon className={`h-4 w-4 mt-0.5 ${accent === "emerald" ? "text-emerald-500" : "text-muted-foreground"}`} />
       <div className="min-w-0">
         <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
-        <div className="text-sm truncate">{value || <span className="text-muted-foreground italic">não informado</span>}</div>
+        {content}
       </div>
     </div>
   );
