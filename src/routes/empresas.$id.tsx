@@ -242,6 +242,72 @@ function EmpresaDetalhe() {
               >
                 <Button className="w-full" size="sm" variant="outline">Gerar prompts de produção</Button>
               </Link>
+              <Separator />
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Análise real com IA</div>
+              <Button
+                className="w-full"
+                size="sm"
+                variant="secondary"
+                disabled={!empresa.site || loadingSite}
+                onClick={async () => {
+                  if (!empresa.site) return;
+                  setLoadingSite(true);
+                  try {
+                    const r = await analisarSiteIA({ data: { url: empresa.site, empresa: toCtx(empresa) } });
+                    updateEmpresa(empresa.id, {
+                      statusSite: r.statusSite,
+                      ultimaAnalise: new Date().toISOString(),
+                      diagnostico: {
+                        ...empresa.diagnostico,
+                        site: {
+                          ...empresa.diagnostico.site,
+                          responsivo: r.responsivo,
+                          ssl: r.ssl,
+                          cta: r.cta,
+                          formulario: r.formulario,
+                          whatsappBtn: r.whatsappBtn,
+                          seoBasico: r.seoBasico,
+                          identidadeConsistente: r.identidadeConsistente,
+                          qualidadePercebida: r.qualidadePercebida,
+                          velocidade: r.velocidade,
+                        },
+                      },
+                    });
+                    addHistorico(empresa.id, {
+                      data: new Date().toISOString(),
+                      tipo: "status",
+                      texto: `Site analisado com Firecrawl+IA: ${r.resumo}`,
+                    });
+                    toast.success("Site analisado com IA");
+                  } catch (e) {
+                    toast.error((e as Error).message);
+                  } finally {
+                    setLoadingSite(false);
+                  }
+                }}
+              >
+                {loadingSite ? "Analisando site..." : empresa.site ? "🔎 Analisar site com IA (Firecrawl)" : "Sem site para analisar"}
+              </Button>
+              <Button
+                className="w-full"
+                size="sm"
+                variant="secondary"
+                disabled={loadingIns}
+                onClick={async () => {
+                  setLoadingIns(true);
+                  try {
+                    const r = await gerarInsightsIA({ data: { empresa: toCtx(empresa) } });
+                    setIaInsights(r);
+                    toast.success("Insights IA gerados — veja a aba Oportunidades");
+                  } catch (e) {
+                    toast.error((e as Error).message);
+                  } finally {
+                    setLoadingIns(false);
+                  }
+                }}
+              >
+                {loadingIns ? "Gerando..." : "✨ Gerar insights com IA"}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
