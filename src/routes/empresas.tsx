@@ -16,6 +16,15 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScoreBadge, SiteBadge, InstagramBadge } from "@/components/badges";
 import { Globe, Instagram, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
+import {
+  siteUrl,
+  instagramUrl,
+  whatsappUrl,
+  telUrl,
+  mailUrl,
+  googleMapsUrl,
+  origemLink,
+} from "@/lib/links";
 
 export const Route = createFileRoute("/empresas")({
   component: EmpresasPage,
