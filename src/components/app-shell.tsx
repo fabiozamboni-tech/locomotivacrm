@@ -29,7 +29,8 @@ import {
   CommandList,
 } from "@/components/ui/command";
 
-const NAV = [
+type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean };
+const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/empresas", label: "Empresas", icon: Building2 },
   { to: "/crm", label: "Funil CRM", icon: Kanban },
@@ -38,7 +39,7 @@ const NAV = [
   { to: "/importar", label: "Importar / Exportar", icon: Upload },
   { to: "/configuracoes", label: "Configurações", icon: Settings },
   { to: "/compliance", label: "Compliance & LGPD", icon: ShieldCheck },
-] as const;
+];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
