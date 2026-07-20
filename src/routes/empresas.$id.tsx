@@ -43,6 +43,15 @@ import {
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import {
+  siteUrl,
+  instagramUrl,
+  whatsappUrl,
+  telUrl,
+  mailUrl,
+  googleMapsUrl,
+  origemLink,
+} from "@/lib/links";
 
 export const Route = createFileRoute("/empresas/$id")({
   component: EmpresaDetalhe,
