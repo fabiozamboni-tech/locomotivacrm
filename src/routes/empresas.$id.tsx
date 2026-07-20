@@ -129,8 +129,25 @@ function EmpresaDetalhe() {
             </div>
             <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-x-3 gap-y-1">
               <span>{empresa.segmento}</span>
-              <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{empresa.cidade}{empresa.bairro ? ` · ${empresa.bairro}` : ""}</span>
-              <span>Origem: {empresa.origem.replace("_", " ")}</span>
+              <a
+                href={googleMapsUrl(`${empresa.endereco || ""} ${empresa.cidade}`.trim())}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 hover:text-primary hover:underline"
+              >
+                <MapPin className="h-3 w-3" />
+                {empresa.cidade}{empresa.bairro ? ` · ${empresa.bairro}` : ""}
+              </a>
+              {(() => {
+                const o = origemLink(empresa.origem, empresa.nome, empresa.cidade);
+                return o.href ? (
+                  <a href={o.href} target="_blank" rel="noopener noreferrer" className="hover:text-primary hover:underline">
+                    Origem: {o.label}
+                  </a>
+                ) : (
+                  <span>Origem: {o.label}</span>
+                );
+              })()}
             </div>
           </div>
         </div>
