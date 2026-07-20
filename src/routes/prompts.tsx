@@ -14,7 +14,8 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { gerarPrompt, type TipoPrompt } from "@/lib/generators";
-import { Copy, Wand2 } from "lucide-react";
+import { gerarPromptIA, toCtx } from "@/lib/ai.functions";
+import { Copy, Wand2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/prompts")({
@@ -35,7 +36,11 @@ function PromptsPage() {
   const [selected, setSelected] = useState<string>(empresaId ?? empresas[0]?.id ?? "");
   const [tipo, setTipo] = useState<TipoPrompt>("site_novo");
   const empresa = empresas.find((e) => e.id === selected);
-  const texto = useMemo(() => (empresa ? gerarPrompt(empresa, tipo) : ""), [empresa, tipo]);
+  const textoBase = useMemo(() => (empresa ? gerarPrompt(empresa, tipo) : ""), [empresa, tipo]);
+  const [iaTexto, setIaTexto] = useState<Record<string, string>>({});
+  const [loadingIA, setLoadingIA] = useState(false);
+  const iaKey = `${selected}:${tipo}`;
+  const texto = iaTexto[iaKey] ?? textoBase;
 
   return (
     <div className="px-4 md:px-8 py-6 md:py-8 space-y-5 max-w-[1400px]">
@@ -76,15 +81,37 @@ function PromptsPage() {
                       <CardTitle className="text-base flex items-center gap-2"><Wand2 className="h-4 w-4 text-primary" />{t.label}</CardTitle>
                       <p className="text-xs text-muted-foreground mt-1">{t.desc}</p>
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        navigator.clipboard.writeText(texto);
-                        toast.success("Prompt copiado");
-                      }}
-                    >
-                      <Copy className="h-3.5 w-3.5 mr-1.5" /> Copiar
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={!empresa || loadingIA}
+                        onClick={async () => {
+                          if (!empresa) return;
+                          setLoadingIA(true);
+                          try {
+                            const r = await gerarPromptIA({ data: { empresa: toCtx(empresa), tipo } });
+                            setIaTexto((s) => ({ ...s, [iaKey]: r }));
+                            toast.success("Prompt gerado com IA");
+                          } catch (e) {
+                            toast.error((e as Error).message);
+                          } finally {
+                            setLoadingIA(false);
+                          }
+                        }}
+                      >
+                        <Sparkles className="h-3.5 w-3.5 mr-1.5" /> {loadingIA ? "Gerando..." : "Gerar com IA"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(texto);
+                          toast.success("Prompt copiado");
+                        }}
+                      >
+                        <Copy className="h-3.5 w-3.5 mr-1.5" /> Copiar
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <Textarea value={texto} readOnly rows={22} className="font-mono text-xs" />
