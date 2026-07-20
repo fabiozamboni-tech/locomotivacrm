@@ -43,6 +43,7 @@ import {
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { analisarSiteIA, gerarInsightsIA, toCtx, type AiInsights } from "@/lib/ai.functions";
 import {
   siteUrl,
   instagramUrl,
@@ -90,6 +91,9 @@ function EmpresaDetalhe() {
   const { empresas, weights, setStage, addHistorico, updateEmpresa } = useStore();
   const empresa = empresas.find((e) => e.id === id);
   const [nota, setNota] = useState("");
+  const [iaInsights, setIaInsights] = useState<AiInsights | null>(null);
+  const [loadingSite, setLoadingSite] = useState(false);
+  const [loadingIns, setLoadingIns] = useState(false);
 
   const detalhes = useMemo(() => (empresa ? calcularScore(empresa, weights) : null), [empresa, weights]);
   const insights = useMemo(() => (empresa ? gerarInsights(empresa) : null), [empresa]);
@@ -238,6 +242,72 @@ function EmpresaDetalhe() {
               >
                 <Button className="w-full" size="sm" variant="outline">Gerar prompts de produção</Button>
               </Link>
+              <Separator />
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Análise real com IA</div>
+              <Button
+                className="w-full"
+                size="sm"
+                variant="secondary"
+                disabled={!empresa.site || loadingSite}
+                onClick={async () => {
+                  if (!empresa.site) return;
+                  setLoadingSite(true);
+                  try {
+                    const r = await analisarSiteIA({ data: { url: empresa.site, empresa: toCtx(empresa) } });
+                    updateEmpresa(empresa.id, {
+                      statusSite: r.statusSite,
+                      ultimaAnalise: new Date().toISOString(),
+                      diagnostico: {
+                        ...empresa.diagnostico,
+                        site: {
+                          ...empresa.diagnostico.site,
+                          responsivo: r.responsivo,
+                          ssl: r.ssl,
+                          cta: r.cta,
+                          formulario: r.formulario,
+                          whatsappBtn: r.whatsappBtn,
+                          seoBasico: r.seoBasico,
+                          identidadeConsistente: r.identidadeConsistente,
+                          qualidadePercebida: r.qualidadePercebida,
+                          velocidade: r.velocidade,
+                        },
+                      },
+                    });
+                    addHistorico(empresa.id, {
+                      data: new Date().toISOString(),
+                      tipo: "status",
+                      texto: `Site analisado com Firecrawl+IA: ${r.resumo}`,
+                    });
+                    toast.success("Site analisado com IA");
+                  } catch (e) {
+                    toast.error((e as Error).message);
+                  } finally {
+                    setLoadingSite(false);
+                  }
+                }}
+              >
+                {loadingSite ? "Analisando site..." : empresa.site ? "🔎 Analisar site com IA (Firecrawl)" : "Sem site para analisar"}
+              </Button>
+              <Button
+                className="w-full"
+                size="sm"
+                variant="secondary"
+                disabled={loadingIns}
+                onClick={async () => {
+                  setLoadingIns(true);
+                  try {
+                    const r = await gerarInsightsIA({ data: { empresa: toCtx(empresa) } });
+                    setIaInsights(r);
+                    toast.success("Insights IA gerados — veja a aba Oportunidades");
+                  } catch (e) {
+                    toast.error((e as Error).message);
+                  } finally {
+                    setLoadingIns(false);
+                  }
+                }}
+              >
+                {loadingIns ? "Gerando..." : "✨ Gerar insights com IA"}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -331,7 +401,38 @@ function EmpresaDetalhe() {
           </CardContent></Card>
         </TabsContent>
 
-        <TabsContent value="oportunidades" className="mt-4 grid md:grid-cols-2 gap-4">
+        <TabsContent value="oportunidades" className="mt-4 space-y-4">
+          {iaInsights && (
+            <Card className="border-primary/40 bg-primary/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" /> Insights gerados por IA
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <p className="leading-relaxed">{iaInsights.resumo}</p>
+                <div className="grid md:grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-amber-500 mb-1">Falhas</div>
+                    <ul className="space-y-1">{iaInsights.falhas.map((x, i) => <li key={i} className="flex gap-2"><span className="text-amber-500">•</span>{x}</li>)}</ul>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-rose-500 mb-1">Riscos</div>
+                    <ul className="space-y-1">{iaInsights.riscos.map((x, i) => <li key={i} className="flex gap-2"><span className="text-rose-500">•</span>{x}</li>)}</ul>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-primary mb-1">Oportunidades</div>
+                    <ul className="space-y-1">{iaInsights.oportunidades.map((x, i) => <li key={i} className="flex gap-2"><span className="text-primary">•</span>{x}</li>)}</ul>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-emerald-500 mb-1">Argumentos</div>
+                    <ul className="space-y-1">{iaInsights.argumentos.map((x, i) => <li key={i} className="flex gap-2"><span className="text-emerald-500">•</span>{x}</li>)}</ul>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          <div className="grid md:grid-cols-2 gap-4">
           <Card className="border-border/60">
             <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-500" />Falhas identificadas</CardTitle></CardHeader>
             <CardContent><ul className="space-y-2 text-sm">{insights.falhas.map((x, i) => <li key={i} className="flex gap-2"><span className="text-amber-500 mt-0.5">•</span>{x}</li>)}</ul></CardContent>
@@ -348,6 +449,7 @@ function EmpresaDetalhe() {
             <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Target className="h-4 w-4 text-emerald-500" />Argumentos consultivos</CardTitle></CardHeader>
             <CardContent><ul className="space-y-2 text-sm">{insights.argumentos.map((x, i) => <li key={i} className="flex gap-2"><span className="text-emerald-500 mt-0.5">•</span>{x}</li>)}</ul></CardContent>
           </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="score" className="mt-4">

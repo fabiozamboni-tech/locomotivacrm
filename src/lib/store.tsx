@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { EMPRESAS_INICIAIS, type CrmStage, type Empresa } from "./mock-data";
+import { EMPRESAS_INICIAIS, EMPRESAS_DEMO, type CrmStage, type Empresa } from "./mock-data";
 import { DEFAULT_WEIGHTS, calcularScore, type ScoreWeights } from "./scoring";
 
 interface StoreValue {
@@ -10,26 +10,65 @@ interface StoreValue {
   setStage: (id: string, stage: CrmStage) => void;
   addHistorico: (id: string, item: Empresa["historico"][number]) => void;
   addEmpresa: (e: Empresa) => void;
+  resetPlataforma: () => void;
+  carregarDemo: () => void;
   theme: "light" | "dark";
   toggleTheme: () => void;
 }
 
 const StoreCtx = createContext<StoreValue | null>(null);
+const LS_KEY = "radar.empresas.v1";
+const LS_WEIGHTS = "radar.weights.v1";
 
 function recalcAll(list: Empresa[], w: ScoreWeights): Empresa[] {
   return list.map((e) => ({ ...e, score: calcularScore(e, w).score }));
 }
 
+function loadEmpresas(): Empresa[] {
+  if (typeof window === "undefined") return EMPRESAS_INICIAIS;
+  try {
+    const raw = window.localStorage.getItem(LS_KEY);
+    if (!raw) return EMPRESAS_INICIAIS;
+    return JSON.parse(raw) as Empresa[];
+  } catch {
+    return EMPRESAS_INICIAIS;
+  }
+}
+function loadWeights(): ScoreWeights {
+  if (typeof window === "undefined") return DEFAULT_WEIGHTS;
+  try {
+    const raw = window.localStorage.getItem(LS_WEIGHTS);
+    if (!raw) return DEFAULT_WEIGHTS;
+    return { ...DEFAULT_WEIGHTS, ...(JSON.parse(raw) as Partial<ScoreWeights>) };
+  } catch {
+    return DEFAULT_WEIGHTS;
+  }
+}
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [weights, setWeights] = useState<ScoreWeights>(DEFAULT_WEIGHTS);
-  const [empresas, setEmpresas] = useState<Empresa[]>(() =>
-    recalcAll(EMPRESAS_INICIAIS, DEFAULT_WEIGHTS),
-  );
+  const [empresas, setEmpresas] = useState<Empresa[]>(EMPRESAS_INICIAIS);
   const [theme, setTheme] = useState<"light" | "dark">("dark");
+  const [hydrated, setHydrated] = useState(false);
+
+  // Hidratação client-side (evita mismatch SSR)
+  useEffect(() => {
+    const w = loadWeights();
+    setWeights(w);
+    setEmpresas(recalcAll(loadEmpresas(), w));
+    setHydrated(true);
+  }, []);
 
   useEffect(() => {
+    if (!hydrated) return;
     setEmpresas((prev) => recalcAll(prev, weights));
-  }, [weights]);
+    try { window.localStorage.setItem(LS_WEIGHTS, JSON.stringify(weights)); } catch { /* noop */ }
+  }, [weights, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    try { window.localStorage.setItem(LS_KEY, JSON.stringify(empresas)); } catch { /* noop */ }
+  }, [empresas, hydrated]);
 
   useEffect(() => {
     if (typeof document !== "undefined") {
@@ -59,6 +98,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ),
         ),
       addEmpresa: (e) => setEmpresas((prev) => [{ ...e, score: calcularScore(e, weights).score }, ...prev]),
+      resetPlataforma: () => {
+        setEmpresas([]);
+        try { window.localStorage.removeItem(LS_KEY); } catch { /* noop */ }
+      },
+      carregarDemo: () => setEmpresas(recalcAll(EMPRESAS_DEMO, weights)),
     }),
     [empresas, weights, theme],
   );
