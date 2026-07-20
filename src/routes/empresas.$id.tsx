@@ -449,6 +449,7 @@ function EmpresaDetalhe() {
             <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Target className="h-4 w-4 text-emerald-500" />Argumentos consultivos</CardTitle></CardHeader>
             <CardContent><ul className="space-y-2 text-sm">{insights.argumentos.map((x, i) => <li key={i} className="flex gap-2"><span className="text-emerald-500 mt-0.5">•</span>{x}</li>)}</ul></CardContent>
           </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="score" className="mt-4">
