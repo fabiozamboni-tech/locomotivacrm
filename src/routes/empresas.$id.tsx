@@ -440,19 +440,37 @@ function InfoLine({
   icon: Icon,
   label,
   value,
+  href,
   accent,
 }: {
   icon: typeof Globe;
   label: string;
   value?: string;
+  href?: string;
   accent?: "emerald";
 }) {
+  const content = value ? (
+    href ? (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-sm truncate block hover:text-primary hover:underline"
+      >
+        {value}
+      </a>
+    ) : (
+      <div className="text-sm truncate">{value}</div>
+    )
+  ) : (
+    <div className="text-sm truncate"><span className="text-muted-foreground italic">não informado</span></div>
+  );
   return (
     <div className="flex items-start gap-2">
       <Icon className={`h-4 w-4 mt-0.5 ${accent === "emerald" ? "text-emerald-500" : "text-muted-foreground"}`} />
       <div className="min-w-0">
         <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
-        <div className="text-sm truncate">{value || <span className="text-muted-foreground italic">não informado</span>}</div>
+        {content}
       </div>
     </div>
   );
