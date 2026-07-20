@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { CIDADES_RS_FOCO, SEGMENTOS } from "@/lib/mock-data";
 import { DEFAULT_WEIGHTS, type ScoreWeights } from "@/lib/scoring";
 import { toast } from "sonner";
+import { AlertTriangle, Database, RotateCcw } from "lucide-react";
 
 export const Route = createFileRoute("/configuracoes")({
   component: ConfiguracoesPage,
@@ -29,7 +30,7 @@ const LABELS: Record<keyof ScoreWeights, string> = {
 };
 
 function ConfiguracoesPage() {
-  const { weights, setWeights } = useStore();
+  const { weights, setWeights, resetPlataforma, carregarDemo, empresas } = useStore();
 
   return (
     <div className="px-4 md:px-8 py-6 md:py-8 space-y-5 max-w-[1200px]">
@@ -39,6 +40,47 @@ function ConfiguracoesPage() {
           Pesos do score, cidades e segmentos prioritários, templates e regras.
         </p>
       </div>
+
+      <Card className="border-amber-500/40 bg-amber-500/5">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Database className="h-4 w-4 text-amber-500" /> Base de dados da plataforma
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="text-sm text-muted-foreground">
+            A plataforma inicia vazia. Popule com dados reais via Google Places (Importação),
+            Firecrawl (Analisar site com IA), CSV ou cadastro manual. Atualmente há{" "}
+            <span className="font-semibold text-foreground">{empresas.length}</span> empresa(s) na base.
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => {
+                if (!confirm("Isso apagará TODAS as empresas da base local. Continuar?")) return;
+                resetPlataforma();
+                toast.success("Plataforma zerada");
+              }}
+            >
+              <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Zerar plataforma
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                carregarDemo();
+                toast.success("Dados de demonstração carregados");
+              }}
+            >
+              <AlertTriangle className="h-3.5 w-3.5 mr-1.5" /> Carregar dados de demonstração
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Os dados de demonstração são fictícios e servem apenas para exploração da interface. Não representam empresas reais.
+          </p>
+        </CardContent>
+      </Card>
 
       <Card className="border-border/60">
         <CardHeader className="pb-2"><CardTitle className="text-base">Pesos do score de oportunidade</CardTitle></CardHeader>
