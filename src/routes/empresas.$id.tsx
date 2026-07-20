@@ -43,6 +43,7 @@ import {
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { analisarSiteIA, gerarInsightsIA, toCtx, type AiInsights } from "@/lib/ai.functions";
 import {
   siteUrl,
   instagramUrl,
@@ -90,6 +91,9 @@ function EmpresaDetalhe() {
   const { empresas, weights, setStage, addHistorico, updateEmpresa } = useStore();
   const empresa = empresas.find((e) => e.id === id);
   const [nota, setNota] = useState("");
+  const [iaInsights, setIaInsights] = useState<AiInsights | null>(null);
+  const [loadingSite, setLoadingSite] = useState(false);
+  const [loadingIns, setLoadingIns] = useState(false);
 
   const detalhes = useMemo(() => (empresa ? calcularScore(empresa, weights) : null), [empresa, weights]);
   const insights = useMemo(() => (empresa ? gerarInsights(empresa) : null), [empresa]);
