@@ -539,3 +539,43 @@ export const EMPRESAS_INICIAIS: Empresa[] = EMPRESAS_RAW.map((r, i) =>
 export const CIDADES_RS_FOCO = CIDADES_SERRA;
 
 export { SEGMENTOS };
+
+// Constrói uma Empresa a partir de um resultado bruto (ex.: Google Places).
+export function empresaFromRaw(input: {
+  nome: string;
+  segmento?: string;
+  cidade: string;
+  endereco: string;
+  telefone?: string;
+  site?: string;
+  instagram?: string;
+  origem?: OrigemDado;
+  externalId?: string;
+}): Empresa {
+  const id = `${slugify(input.nome)}-${(input.externalId ?? Date.now().toString(36)).slice(-8)}`;
+  const raw = {
+    nome: input.nome,
+    segmento: input.segmento ?? "Outros",
+    cidade: input.cidade || "—",
+    telefone: input.telefone,
+    site: input.site,
+    instagram: input.instagram,
+    statusSite: (input.site ? "desatualizado" : "sem_site") as StatusSite,
+    statusInstagram: (input.instagram ? "irregular" : "sem_perfil") as StatusInstagram,
+    origem: input.origem ?? "google_places",
+  };
+  const built = buildEmpresa(0, raw);
+  return {
+    ...built,
+    id,
+    endereco: input.endereco || built.endereco,
+    historico: [
+      {
+        data: new Date().toISOString(),
+        tipo: "status",
+        texto: `Empresa importada via ${raw.origem}.`,
+      },
+    ],
+  };
+}
+

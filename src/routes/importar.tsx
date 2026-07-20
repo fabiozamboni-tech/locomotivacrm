@@ -2,10 +2,16 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useStore } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Upload, Download, FileDown } from "lucide-react";
+import { Upload, Download, FileDown, MapPin, Search, Plus, ExternalLink, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { searchPlaces, type PlaceResult } from "@/lib/places.functions";
+import { empresaFromRaw } from "@/lib/mock-data";
+import { CIDADES_RS_FOCO } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/importar")({
   component: ImportarPage,
@@ -16,8 +22,69 @@ Padaria do Vale,Padaria artesanal,Bento Gonçalves,(54) 3055-0011,(54) 99988-776
 Metalúrgica Serrana,Metalurgia,Caxias do Sul,(54) 3221-9999,,contato@metalserrana.ind.br,metalserrana.ind.br,`;
 
 function ImportarPage() {
-  const { empresas } = useStore();
+  const { empresas, addEmpresa } = useStore();
   const [csv, setCsv] = useState(CSV_EXAMPLE);
+
+  const search = useServerFn(searchPlaces);
+  const [segmento, setSegmento] = useState("Restaurantes");
+  const [cidade, setCidade] = useState("Bento Gonçalves");
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState<PlaceResult[]>([]);
+  const [imported, setImported] = useState<Set<string>>(new Set());
+
+  const buscar = async () => {
+    const query = `${segmento} em ${cidade}, RS`.trim();
+    setLoading(true);
+    try {
+      const res = await search({ data: { query } });
+      setResults(res);
+      toast.success(`${res.length} resultado(s) do Google Places`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha na busca");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const importar = (p: PlaceResult) => {
+    if (imported.has(p.placeId)) return;
+    addEmpresa(
+      empresaFromRaw({
+        nome: p.nome,
+        segmento: p.segmento ?? segmento,
+        cidade: p.cidade || cidade,
+        endereco: p.endereco,
+        telefone: p.telefone,
+        site: p.site,
+        origem: "google_places",
+        externalId: p.placeId,
+      }),
+    );
+    setImported((s) => new Set(s).add(p.placeId));
+    toast.success(`${p.nome} adicionada ao radar`);
+  };
+
+  const importarTodas = () => {
+    let count = 0;
+    for (const p of results) {
+      if (imported.has(p.placeId)) continue;
+      addEmpresa(
+        empresaFromRaw({
+          nome: p.nome,
+          segmento: p.segmento ?? segmento,
+          cidade: p.cidade || cidade,
+          endereco: p.endereco,
+          telefone: p.telefone,
+          site: p.site,
+          origem: "google_places",
+          externalId: p.placeId,
+        }),
+      );
+      count++;
+    }
+    setImported(new Set(results.map((r) => r.placeId)));
+    toast.success(`${count} empresa(s) adicionada(s)`);
+  };
 
   const exportarEmpresas = () => {
     const header = "nome;segmento;cidade;telefone;whatsapp;email;site;instagram;score;statusSite;statusInstagram;etapaCRM";
@@ -33,11 +100,134 @@ function ImportarPage() {
   return (
     <div className="px-4 md:px-8 py-6 md:py-8 space-y-5 max-w-[1200px]">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Importação e exportação</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Descobrir, importar e exportar</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Entradas via CSV, exportações de empresas, diagnósticos, abordagens e prompts.
+          Prospecção via Google Places, importação CSV e exportações do pipeline.
         </p>
       </div>
+
+      {/* Google Places */}
+      <Card className="border-border/60">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-primary" />
+            Descoberta via Google Places
+            <Badge variant="secondary" className="ml-2 text-[10px] font-normal">dados reais</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid md:grid-cols-[1fr_1fr_auto] gap-2">
+            <div>
+              <label className="text-xs text-muted-foreground">Segmento / termo</label>
+              <Input
+                value={segmento}
+                onChange={(e) => setSegmento(e.target.value)}
+                placeholder="Ex: vinícolas, pousadas, metalurgia"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Cidade (RS)</label>
+              <Input
+                list="cidades-rs"
+                value={cidade}
+                onChange={(e) => setCidade(e.target.value)}
+                placeholder="Ex: Bento Gonçalves"
+              />
+              <datalist id="cidades-rs">
+                {CIDADES_RS_FOCO.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+            </div>
+            <div className="flex items-end">
+              <Button onClick={buscar} disabled={loading} className="w-full md:w-auto">
+                {loading ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Search className="h-4 w-4 mr-1.5" />}
+                Buscar
+              </Button>
+            </div>
+          </div>
+
+          {results.length > 0 && (
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-muted-foreground">
+                {results.length} resultado(s) · fonte: Google Places API (New)
+              </div>
+              <Button size="sm" variant="outline" onClick={importarTodas}>
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                Adicionar todas
+              </Button>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {results.map((p) => {
+              const done = imported.has(p.placeId);
+              return (
+                <div
+                  key={p.placeId}
+                  className="rounded-md border border-border/60 p-3 flex flex-col md:flex-row md:items-center gap-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="font-medium truncate">{p.nome}</div>
+                      {p.segmento && (
+                        <Badge variant="outline" className="text-[10px] font-normal">{p.segmento}</Badge>
+                      )}
+                      {typeof p.rating === "number" && (
+                        <Badge variant="secondary" className="text-[10px] font-normal">
+                          ★ {p.rating.toFixed(1)} ({p.totalRatings ?? 0})
+                        </Badge>
+                      )}
+                      {p.businessStatus && p.businessStatus !== "OPERATIONAL" && (
+                        <Badge variant="destructive" className="text-[10px] font-normal">{p.businessStatus}</Badge>
+                      )}
+                      {!p.site && (
+                        <Badge className="text-[10px] font-normal bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/15">
+                          sem site
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground truncate">{p.endereco}</div>
+                    <div className="text-xs text-muted-foreground flex items-center gap-3 flex-wrap mt-0.5">
+                      {p.telefone && <span>📞 {p.telefone}</span>}
+                      {p.site && (
+                        <a href={p.site} target="_blank" rel="noreferrer" className="hover:underline inline-flex items-center gap-1">
+                          <ExternalLink className="h-3 w-3" />{p.site.replace(/^https?:\/\//, "")}
+                        </a>
+                      )}
+                      {p.googleMapsUri && (
+                        <a href={p.googleMapsUri} target="_blank" rel="noreferrer" className="hover:underline inline-flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />Google Maps
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={done ? "secondary" : "default"}
+                    disabled={done}
+                    onClick={() => importar(p)}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    {done ? "Adicionada" : "Adicionar"}
+                  </Button>
+                </div>
+              );
+            })}
+            {!loading && results.length === 0 && (
+              <div className="text-xs text-muted-foreground text-center py-6 border border-dashed border-border/60 rounded-md">
+                Escolha segmento + cidade e clique em Buscar para trazer empresas reais do Google.
+              </div>
+            )}
+          </div>
+
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            ⚠️ Compliance: dados vindos de fonte pública (Google Places). Antes de qualquer
+            abordagem, revise a base legal LGPD aplicável (legítimo interesse comercial B2B) e
+            respeite pedidos de "não contatar".
+          </p>
+        </CardContent>
+      </Card>
 
       <div className="grid md:grid-cols-2 gap-4">
         <Card className="border-border/60">
@@ -45,9 +235,8 @@ function ImportarPage() {
           <CardContent className="space-y-3">
             <p className="text-xs text-muted-foreground">
               Cole abaixo um CSV com as colunas: nome, segmento, cidade, telefone, whatsapp, email, site, instagram.
-              A importação simulada valida cabeçalhos e adiciona registros à base atual.
             </p>
-            <Textarea rows={10} value={csv} onChange={(e) => setCsv(e.target.value)} className="font-mono text-xs" />
+            <Textarea rows={8} value={csv} onChange={(e) => setCsv(e.target.value)} className="font-mono text-xs" />
             <Button
               onClick={() => {
                 const [head, ...rest] = csv.trim().split(/\r?\n/);
