@@ -532,9 +532,13 @@ function buildEmpresa(idx: number, raw: (typeof EMPRESAS_RAW)[number]): Empresa 
   };
 }
 
-export const EMPRESAS_INICIAIS: Empresa[] = EMPRESAS_RAW.map((r, i) =>
+// Plataforma inicia vazia — dados reais vêm via Google Places, Firecrawl,
+// importação CSV ou cadastro manual. O dataset de demonstração permanece
+// disponível via `EMPRESAS_DEMO` para quem quiser popular novamente.
+export const EMPRESAS_DEMO: Empresa[] = EMPRESAS_RAW.map((r, i) =>
   buildEmpresa(i, r),
 );
+export const EMPRESAS_INICIAIS: Empresa[] = [];
 
 export const CIDADES_RS_FOCO = CIDADES_SERRA;
 
