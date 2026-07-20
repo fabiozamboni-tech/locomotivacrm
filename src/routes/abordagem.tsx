@@ -13,7 +13,8 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { gerarAbordagem, type Canal, type Foco, type Tom } from "@/lib/generators";
-import { Copy, RefreshCw, MessageCircle, Mail, Instagram, Phone, Type } from "lucide-react";
+import { gerarAbordagemIA, toCtx } from "@/lib/ai.functions";
+import { Copy, RefreshCw, MessageCircle, Mail, Instagram, Phone, Type, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -46,6 +47,7 @@ function AbordagemPage() {
     [empresa, canal, tom, foco, seed],
   );
   const [editado, setEditado] = useState(texto);
+  const [loadingIA, setLoadingIA] = useState(false);
   const finalTxt = editado || texto;
 
   const regen = () => {
@@ -138,6 +140,26 @@ function AbordagemPage() {
             <div className="flex gap-2">
               <Button size="sm" variant="outline" onClick={regen}>
                 <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Regenerar
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={!empresa || loadingIA}
+                onClick={async () => {
+                  if (!empresa) return;
+                  setLoadingIA(true);
+                  try {
+                    const r = await gerarAbordagemIA({ data: { empresa: toCtx(empresa), canal, tom, foco } });
+                    setEditado(r.texto);
+                    toast.success("Mensagem gerada com IA");
+                  } catch (e) {
+                    toast.error((e as Error).message);
+                  } finally {
+                    setLoadingIA(false);
+                  }
+                }}
+              >
+                <Sparkles className="h-3.5 w-3.5 mr-1.5" /> {loadingIA ? "Gerando..." : "Gerar com IA"}
               </Button>
               <Button
                 size="sm"
