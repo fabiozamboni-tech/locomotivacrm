@@ -401,7 +401,38 @@ function EmpresaDetalhe() {
           </CardContent></Card>
         </TabsContent>
 
-        <TabsContent value="oportunidades" className="mt-4 grid md:grid-cols-2 gap-4">
+        <TabsContent value="oportunidades" className="mt-4 space-y-4">
+          {iaInsights && (
+            <Card className="border-primary/40 bg-primary/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" /> Insights gerados por IA
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <p className="leading-relaxed">{iaInsights.resumo}</p>
+                <div className="grid md:grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-amber-500 mb-1">Falhas</div>
+                    <ul className="space-y-1">{iaInsights.falhas.map((x, i) => <li key={i} className="flex gap-2"><span className="text-amber-500">•</span>{x}</li>)}</ul>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-rose-500 mb-1">Riscos</div>
+                    <ul className="space-y-1">{iaInsights.riscos.map((x, i) => <li key={i} className="flex gap-2"><span className="text-rose-500">•</span>{x}</li>)}</ul>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-primary mb-1">Oportunidades</div>
+                    <ul className="space-y-1">{iaInsights.oportunidades.map((x, i) => <li key={i} className="flex gap-2"><span className="text-primary">•</span>{x}</li>)}</ul>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-emerald-500 mb-1">Argumentos</div>
+                    <ul className="space-y-1">{iaInsights.argumentos.map((x, i) => <li key={i} className="flex gap-2"><span className="text-emerald-500">•</span>{x}</li>)}</ul>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          <div className="grid md:grid-cols-2 gap-4">
           <Card className="border-border/60">
             <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-500" />Falhas identificadas</CardTitle></CardHeader>
             <CardContent><ul className="space-y-2 text-sm">{insights.falhas.map((x, i) => <li key={i} className="flex gap-2"><span className="text-amber-500 mt-0.5">•</span>{x}</li>)}</ul></CardContent>
@@ -455,6 +486,7 @@ function EmpresaDetalhe() {
               </div>
             </CardContent>
           </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="historico" className="mt-4">
