@@ -10,7 +10,19 @@ import {
   Copy,
   Check,
   ArrowUpRight,
+  GripVertical,
 } from "lucide-react";
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDraggable,
+  useDroppable,
+  DragOverlay,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
 import { useStore } from "@/lib/store";
 import {
   CRM_STAGE_LABEL,
