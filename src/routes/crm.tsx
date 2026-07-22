@@ -55,7 +55,9 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { instagramUrl, siteUrl, googleMapsUrl } from "@/lib/links";
-import { gerarAbordagem, type Canal, type Tom, type Foco } from "@/lib/generators";
+import { gerarAbordagem, gerarPrompt, type Canal, type Tom, type Foco, type TipoPrompt } from "@/lib/generators";
+import { gerarPromptIA, toCtx } from "@/lib/ai.functions";
+import { Textarea } from "@/components/ui/textarea";
 import type { Empresa, CrmStage } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
