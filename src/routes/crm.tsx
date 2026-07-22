@@ -11,6 +11,8 @@ import {
   Check,
   ArrowUpRight,
   GripVertical,
+  Wand2,
+  Save,
 } from "lucide-react";
 import {
   DndContext,
