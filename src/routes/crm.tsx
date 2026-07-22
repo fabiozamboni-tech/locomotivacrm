@@ -86,9 +86,15 @@ const STAGE_ACCENT: Record<CrmStage, string> = {
 function CrmPage() {
   const { empresas, setStage } = useStore();
   const [openId, setOpenId] = useState<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [overStage, setOverStage] = useState<CrmStage | null>(null);
   const openEmpresa = useMemo(
     () => empresas.find((e) => e.id === openId) ?? null,
     [empresas, openId],
+  );
+  const draggingEmpresa = useMemo(
+    () => empresas.find((e) => e.id === draggingId) ?? null,
+    [empresas, draggingId],
   );
 
   const grouped = useMemo(() => {
@@ -98,13 +104,32 @@ function CrmPage() {
     return map;
   }, [empresas]);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+  );
+
+  const handleDragStart = (ev: DragStartEvent) => {
+    setDraggingId(String(ev.active.id));
+  };
+  const handleDragEnd = (ev: DragEndEvent) => {
+    const id = String(ev.active.id);
+    const over = ev.over?.id ? String(ev.over.id) : null;
+    setDraggingId(null);
+    setOverStage(null);
+    if (!over) return;
+    const stage = over as CrmStage;
+    if (!CRM_STAGES_ORDER.includes(stage)) return;
+    const empresa = empresas.find((e) => e.id === id);
+    if (empresa && empresa.crmStage !== stage) setStage(id, stage);
+  };
+
   return (
     <div className="px-4 md:px-8 py-6 md:py-8 space-y-5 max-w-full">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Funil de prospecção</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Kanban comercial — cards com contatos diretos e modal de abordagem por empresa.
+            Kanban comercial — arraste os cards entre etapas ou use o modal de abordagem.
           </p>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -121,45 +146,44 @@ function CrmPage() {
           </p>
         </Card>
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 md:-mx-8 md:px-8">
-          {CRM_STAGES_ORDER.map((stage) => {
-            const items = grouped.get(stage) ?? [];
-            return (
-              <div key={stage} className="w-[300px] shrink-0">
-                <div
-                  className={cn(
-                    "rounded-t-lg border-t border-x bg-gradient-to-b px-3 py-2.5",
-                    STAGE_ACCENT[stage],
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="text-[11px] font-semibold uppercase tracking-wider">
-                      {CRM_STAGE_LABEL[stage]}
-                    </div>
-                    <Badge variant="secondary" className="text-[10px] h-5 px-1.5 tabular-nums">
-                      {items.length}
-                    </Badge>
-                  </div>
-                </div>
-                <div className="rounded-b-lg border-b border-x border-border/60 bg-muted/20 p-2 space-y-2 min-h-[140px]">
-                  {items.map((e) => (
-                    <KanbanCard
-                      key={e.id}
-                      empresa={e}
-                      onOpen={() => setOpenId(e.id)}
-                      onChangeStage={(s) => setStage(e.id, s)}
-                    />
-                  ))}
-                  {items.length === 0 && (
-                    <div className="text-xs text-muted-foreground/70 border border-dashed border-border/50 rounded-md p-4 text-center">
-                      Vazio
-                    </div>
-                  )}
-                </div>
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragOver={(ev) => setOverStage(ev.over?.id ? (String(ev.over.id) as CrmStage) : null)}
+          onDragCancel={() => {
+            setDraggingId(null);
+            setOverStage(null);
+          }}
+        >
+          <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 md:-mx-8 md:px-8">
+            {CRM_STAGES_ORDER.map((stage) => {
+              const items = grouped.get(stage) ?? [];
+              return (
+                <KanbanColumn
+                  key={stage}
+                  stage={stage}
+                  items={items}
+                  isOver={overStage === stage}
+                  onOpen={setOpenId}
+                  onChangeStage={setStage}
+                />
+              );
+            })}
+          </div>
+          <DragOverlay>
+            {draggingEmpresa ? (
+              <div className="w-[284px] rotate-2 opacity-95">
+                <KanbanCard
+                  empresa={draggingEmpresa}
+                  onOpen={() => {}}
+                  onChangeStage={() => {}}
+                  overlay
+                />
               </div>
-            );
-          })}
-        </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       )}
 
       <EmpresaModal
@@ -170,6 +194,63 @@ function CrmPage() {
     </div>
   );
 }
+
+function KanbanColumn({
+  stage,
+  items,
+  isOver,
+  onOpen,
+  onChangeStage,
+}: {
+  stage: CrmStage;
+  items: Empresa[];
+  isOver: boolean;
+  onOpen: (id: string) => void;
+  onChangeStage: (id: string, s: CrmStage) => void;
+}) {
+  const { setNodeRef } = useDroppable({ id: stage });
+  return (
+    <div className="w-[300px] shrink-0">
+      <div
+        className={cn(
+          "rounded-t-lg border-t border-x bg-gradient-to-b px-3 py-2.5",
+          STAGE_ACCENT[stage],
+        )}
+      >
+        <div className="flex items-center justify-between">
+          <div className="text-[11px] font-semibold uppercase tracking-wider">
+            {CRM_STAGE_LABEL[stage]}
+          </div>
+          <Badge variant="secondary" className="text-[10px] h-5 px-1.5 tabular-nums">
+            {items.length}
+          </Badge>
+        </div>
+      </div>
+      <div
+        ref={setNodeRef}
+        className={cn(
+          "rounded-b-lg border-b border-x border-border/60 bg-muted/20 p-2 space-y-2 min-h-[140px] transition-colors",
+          isOver && "bg-primary/10 border-primary/50",
+        )}
+      >
+        {items.map((e) => (
+          <KanbanCard
+            key={e.id}
+            empresa={e}
+            onOpen={() => onOpen(e.id)}
+            onChangeStage={(s) => onChangeStage(e.id, s)}
+          />
+        ))}
+        {items.length === 0 && (
+          <div className="text-xs text-muted-foreground/70 border border-dashed border-border/50 rounded-md p-4 text-center">
+            {isOver ? "Solte aqui" : "Vazio"}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 function KanbanCard({
   empresa,
