@@ -6,12 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Upload, Download, FileDown, MapPin, Search, Plus, ExternalLink, Loader2 } from "lucide-react";
+import { Upload, Download, FileDown, MapPin, Search, Plus, ExternalLink, Loader2, UserPlus, Globe, Instagram, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { searchPlaces, type PlaceResult } from "@/lib/places.functions";
+import { lookupEmpresa, type LookupResult } from "@/lib/lookup.functions";
 import { empresaFromRaw } from "@/lib/mock-data";
-import { CIDADES_RS_FOCO } from "@/lib/mock-data";
+import { CIDADES_RS_FOCO, SEGMENTOS } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/importar")({
   component: ImportarPage,
