@@ -256,18 +256,42 @@ function KanbanCard({
   empresa,
   onOpen,
   onChangeStage,
+  overlay,
 }: {
   empresa: Empresa;
   onOpen: () => void;
   onChangeStage: (s: CrmStage) => void;
+  overlay?: boolean;
 }) {
   const site = siteUrl(empresa.site);
   const ig = instagramUrl(empresa.instagram);
   const maps = googleMapsUrl(`${empresa.nome} ${empresa.cidade}`);
 
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: empresa.id,
+    disabled: overlay,
+  });
+
   return (
-    <Card className="group p-3 border-border/60 hover:border-primary/40 hover:shadow-md transition-all bg-card">
+    <Card
+      ref={overlay ? undefined : setNodeRef}
+      className={cn(
+        "group p-3 border-border/60 hover:border-primary/40 hover:shadow-md transition-all bg-card",
+        isDragging && !overlay && "opacity-40",
+        overlay && "shadow-2xl border-primary/50 ring-2 ring-primary/30",
+      )}
+    >
       <div className="flex items-start justify-between gap-2">
+        <button
+          type="button"
+          {...(overlay ? {} : attributes)}
+          {...(overlay ? {} : listeners)}
+          title="Arraste para mover"
+          className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/60 hover:text-primary -ml-1 mt-0.5"
+          onClick={(e) => e.preventDefault()}
+        >
+          <GripVertical className="size-4" />
+        </button>
         <button
           onClick={onOpen}
           className="text-sm font-semibold leading-tight text-left hover:text-primary line-clamp-2 flex-1"
@@ -325,6 +349,7 @@ function KanbanCard({
     </Card>
   );
 }
+
 
 function IconLink({
   href,
