@@ -342,6 +342,17 @@ function KanbanCard({
           <MapPin className="size-3.5" />
         </IconLink>
         <div className="flex-1" />
+        {onPrompts && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-2 text-[11px] gap-1"
+            onClick={onPrompts}
+            title="Gerar prompts com IA"
+          >
+            <Wand2 className="size-3" /> Prompts
+          </Button>
+        )}
         <Button
           size="sm"
           variant="secondary"
