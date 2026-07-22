@@ -175,6 +175,7 @@ function CrmPage() {
                   items={items}
                   isOver={overStage === stage}
                   onOpen={setOpenId}
+                  onPrompts={setPromptsId}
                   onChangeStage={setStage}
                 />
               );
@@ -186,6 +187,7 @@ function CrmPage() {
                 <KanbanCard
                   empresa={draggingEmpresa}
                   onOpen={() => {}}
+                  onPrompts={() => {}}
                   onChangeStage={() => {}}
                   overlay
                 />
@@ -199,6 +201,11 @@ function CrmPage() {
         empresa={openEmpresa}
         open={!!openEmpresa}
         onOpenChange={(o) => !o && setOpenId(null)}
+      />
+      <PromptsModal
+        empresa={promptsEmpresa}
+        open={!!promptsEmpresa}
+        onOpenChange={(o) => !o && setPromptsId(null)}
       />
     </div>
   );
