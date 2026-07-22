@@ -90,8 +90,13 @@ const STAGE_ACCENT: Record<CrmStage, string> = {
 function CrmPage() {
   const { empresas, setStage } = useStore();
   const [openId, setOpenId] = useState<string | null>(null);
+  const [promptsId, setPromptsId] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overStage, setOverStage] = useState<CrmStage | null>(null);
+  const promptsEmpresa = useMemo(
+    () => empresas.find((e) => e.id === promptsId) ?? null,
+    [empresas, promptsId],
+  );
   const openEmpresa = useMemo(
     () => empresas.find((e) => e.id === openId) ?? null,
     [empresas, openId],
