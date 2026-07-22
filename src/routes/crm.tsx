@@ -274,11 +274,13 @@ function KanbanColumn({
 function KanbanCard({
   empresa,
   onOpen,
+  onPrompts,
   onChangeStage,
   overlay,
 }: {
   empresa: Empresa;
   onOpen: () => void;
+  onPrompts?: () => void;
   onChangeStage: (s: CrmStage) => void;
   overlay?: boolean;
 }) {
