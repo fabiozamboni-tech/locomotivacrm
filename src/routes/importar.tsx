@@ -535,3 +535,29 @@ function downloadFile(name: string, content: string, type: string) {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+  list,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  list?: string;
+}) {
+  return (
+    <div>
+      <label className="text-xs text-muted-foreground">{label}</label>
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        list={list}
+      />
+    </div>
+  );
+}
