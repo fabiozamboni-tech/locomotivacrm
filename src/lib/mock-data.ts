@@ -544,35 +544,43 @@ export const CIDADES_RS_FOCO = CIDADES_SERRA;
 
 export { SEGMENTOS };
 
-// Constrói uma Empresa a partir de um resultado bruto (ex.: Google Places).
+// Constrói uma Empresa a partir de um resultado bruto (Google Places, manual, lookup web).
 export function empresaFromRaw(input: {
   nome: string;
   segmento?: string;
   cidade: string;
+  bairro?: string;
   endereco: string;
   telefone?: string;
+  whatsapp?: string;
+  email?: string;
   site?: string;
   instagram?: string;
   origem?: OrigemDado;
   externalId?: string;
+  observacoes?: string;
 }): Empresa {
   const id = `${slugify(input.nome)}-${(input.externalId ?? Date.now().toString(36)).slice(-8)}`;
   const raw = {
     nome: input.nome,
     segmento: input.segmento ?? "Outros",
     cidade: input.cidade || "—",
+    bairro: input.bairro,
     telefone: input.telefone,
+    whatsapp: input.whatsapp,
+    email: input.email,
     site: input.site,
     instagram: input.instagram,
     statusSite: (input.site ? "desatualizado" : "sem_site") as StatusSite,
     statusInstagram: (input.instagram ? "irregular" : "sem_perfil") as StatusInstagram,
-    origem: input.origem ?? "google_places",
+    origem: input.origem ?? "manual",
   };
   const built = buildEmpresa(0, raw);
   return {
     ...built,
     id,
     endereco: input.endereco || built.endereco,
+    observacoes: input.observacoes,
     historico: [
       {
         data: new Date().toISOString(),
