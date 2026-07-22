@@ -27,11 +27,98 @@ function ImportarPage() {
   const [csv, setCsv] = useState(CSV_EXAMPLE);
 
   const search = useServerFn(searchPlaces);
+  const lookup = useServerFn(lookupEmpresa);
   const [segmento, setSegmento] = useState("Restaurantes");
   const [cidade, setCidade] = useState("Bento Gonçalves");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<PlaceResult[]>([]);
   const [imported, setImported] = useState<Set<string>>(new Set());
+
+  // Lookup por site / instagram
+  const [lookupInput, setLookupInput] = useState("");
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupResult, setLookupResult] = useState<LookupResult | null>(null);
+
+  // Cadastro manual
+  const emptyForm = {
+    nome: "",
+    segmento: "",
+    cidade: "",
+    bairro: "",
+    endereco: "",
+    telefone: "",
+    whatsapp: "",
+    email: "",
+    site: "",
+    instagram: "",
+    observacoes: "",
+  };
+  const [form, setForm] = useState(emptyForm);
+  const setF = (k: keyof typeof emptyForm, v: string) =>
+    setForm((f) => ({ ...f, [k]: v }));
+
+  const buscarLookup = async () => {
+    if (!lookupInput.trim()) return toast.error("Informe um site ou @instagram");
+    setLookupLoading(true);
+    setLookupResult(null);
+    try {
+      const res = await lookup({ data: { input: lookupInput.trim() } });
+      setLookupResult(res);
+      toast.success(`Dados coletados de ${res.fonte === "instagram" ? "Instagram" : "site"}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha na busca");
+    } finally {
+      setLookupLoading(false);
+    }
+  };
+
+  const importarLookup = () => {
+    if (!lookupResult) return;
+    addEmpresa(
+      empresaFromRaw({
+        nome: lookupResult.nome,
+        segmento: lookupResult.segmento,
+        cidade: lookupResult.cidade || "—",
+        bairro: lookupResult.bairro,
+        endereco: lookupResult.endereco,
+        telefone: lookupResult.telefone,
+        whatsapp: lookupResult.whatsapp,
+        email: lookupResult.email,
+        site: lookupResult.site,
+        instagram: lookupResult.instagram,
+        origem: "enriquecimento",
+        observacoes: lookupResult.resumo
+          ? `Coletado de ${lookupResult.urlAnalisada}\n\n${lookupResult.resumo}`
+          : `Coletado de ${lookupResult.urlAnalisada}`,
+      }),
+    );
+    toast.success(`${lookupResult.nome} adicionada ao radar`);
+    setLookupResult(null);
+    setLookupInput("");
+  };
+
+  const salvarManual = () => {
+    if (!form.nome.trim()) return toast.error("Nome é obrigatório");
+    if (!form.cidade.trim()) return toast.error("Cidade é obrigatória");
+    addEmpresa(
+      empresaFromRaw({
+        nome: form.nome.trim(),
+        segmento: form.segmento.trim() || "Outros",
+        cidade: form.cidade.trim(),
+        bairro: form.bairro.trim() || undefined,
+        endereco: form.endereco.trim(),
+        telefone: form.telefone.trim() || undefined,
+        whatsapp: form.whatsapp.trim() || undefined,
+        email: form.email.trim() || undefined,
+        site: form.site.trim() || undefined,
+        instagram: form.instagram.trim() || undefined,
+        observacoes: form.observacoes.trim() || undefined,
+        origem: "manual",
+      }),
+    );
+    toast.success(`${form.nome} adicionada ao radar`);
+    setForm(emptyForm);
+  };
 
   const buscar = async () => {
     const query = `${segmento} em ${cidade}, RS`.trim();
