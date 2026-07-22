@@ -216,12 +216,14 @@ function KanbanColumn({
   items,
   isOver,
   onOpen,
+  onPrompts,
   onChangeStage,
 }: {
   stage: CrmStage;
   items: Empresa[];
   isOver: boolean;
   onOpen: (id: string) => void;
+  onPrompts: (id: string) => void;
   onChangeStage: (id: string, s: CrmStage) => void;
 }) {
   const { setNodeRef } = useDroppable({ id: stage });
@@ -254,6 +256,7 @@ function KanbanColumn({
             key={e.id}
             empresa={e}
             onOpen={() => onOpen(e.id)}
+            onPrompts={() => onPrompts(e.id)}
             onChangeStage={(s) => onChangeStage(e.id, s)}
           />
         ))}
