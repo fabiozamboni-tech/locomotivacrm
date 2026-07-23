@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UnlockRouteImport } from './routes/unlock'
 import { Route as PromptsRouteImport } from './routes/prompts'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ImportarRouteImport } from './routes/importar'
@@ -20,6 +21,11 @@ import { Route as AbordagemRouteImport } from './routes/abordagem'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as EmpresasIdRouteImport } from './routes/empresas.$id'
 
+const UnlockRoute = UnlockRouteImport.update({
+  id: '/unlock',
+  path: '/unlock',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PromptsRoute = PromptsRouteImport.update({
   id: '/prompts',
   path: '/prompts',
@@ -81,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/importar': typeof ImportarRoute
   '/login': typeof LoginRoute
   '/prompts': typeof PromptsRoute
+  '/unlock': typeof UnlockRoute
   '/empresas/$id': typeof EmpresasIdRoute
 }
 export interface FileRoutesByTo {
@@ -93,6 +100,7 @@ export interface FileRoutesByTo {
   '/importar': typeof ImportarRoute
   '/login': typeof LoginRoute
   '/prompts': typeof PromptsRoute
+  '/unlock': typeof UnlockRoute
   '/empresas/$id': typeof EmpresasIdRoute
 }
 export interface FileRoutesById {
@@ -106,6 +114,7 @@ export interface FileRoutesById {
   '/importar': typeof ImportarRoute
   '/login': typeof LoginRoute
   '/prompts': typeof PromptsRoute
+  '/unlock': typeof UnlockRoute
   '/empresas/$id': typeof EmpresasIdRoute
 }
 export interface FileRouteTypes {
@@ -120,6 +129,7 @@ export interface FileRouteTypes {
     | '/importar'
     | '/login'
     | '/prompts'
+    | '/unlock'
     | '/empresas/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -132,6 +142,7 @@ export interface FileRouteTypes {
     | '/importar'
     | '/login'
     | '/prompts'
+    | '/unlock'
     | '/empresas/$id'
   id:
     | '__root__'
@@ -144,6 +155,7 @@ export interface FileRouteTypes {
     | '/importar'
     | '/login'
     | '/prompts'
+    | '/unlock'
     | '/empresas/$id'
   fileRoutesById: FileRoutesById
 }
@@ -157,10 +169,18 @@ export interface RootRouteChildren {
   ImportarRoute: typeof ImportarRoute
   LoginRoute: typeof LoginRoute
   PromptsRoute: typeof PromptsRoute
+  UnlockRoute: typeof UnlockRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/unlock': {
+      id: '/unlock'
+      path: '/unlock'
+      fullPath: '/unlock'
+      preLoaderRoute: typeof UnlockRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/prompts': {
       id: '/prompts'
       path: '/prompts'
@@ -256,17 +276,8 @@ const rootRouteChildren: RootRouteChildren = {
   ImportarRoute: ImportarRoute,
   LoginRoute: LoginRoute,
   PromptsRoute: PromptsRoute,
+  UnlockRoute: UnlockRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
