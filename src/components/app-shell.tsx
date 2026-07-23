@@ -1,4 +1,5 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useRouter, useRouterState } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import {
   LayoutDashboard,
   Building2,
@@ -12,7 +13,9 @@ import {
   Moon,
   Sun,
   Search,
+  LogOut,
 } from "lucide-react";
+import { lockSite } from "@/lib/gate.functions";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
