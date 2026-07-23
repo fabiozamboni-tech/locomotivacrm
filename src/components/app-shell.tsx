@@ -1,4 +1,5 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useRouter, useRouterState } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import {
   LayoutDashboard,
   Building2,
@@ -12,7 +13,9 @@ import {
   Moon,
   Sun,
   Search,
+  LogOut,
 } from "lucide-react";
+import { lockSite } from "@/lib/gate.functions";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -43,10 +46,18 @@ const NAV: NavItem[] = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const router = useRouter();
+  const lock = useServerFn(lockSite);
   const { theme, toggleTheme, empresas } = useStore();
   const [openSearch, setOpenSearch] = useState(false);
 
-  if (pathname === "/login") return <>{children}</>;
+  if (pathname === "/login" || pathname === "/unlock") return <>{children}</>;
+
+  async function handleLock() {
+    await lock();
+    await router.invalidate();
+    await router.navigate({ to: "/unlock" });
+  }
 
   return (
     <div className="flex min-h-screen w-full bg-background text-foreground">
@@ -105,6 +116,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Badge>
           <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Alternar tema">
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
+          <Button variant="ghost" size="icon" onClick={handleLock} aria-label="Sair" title="Sair">
+            <LogOut className="h-4 w-4" />
           </Button>
         </header>
 
