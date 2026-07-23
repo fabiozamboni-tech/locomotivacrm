@@ -96,14 +96,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "Plataforma interna de prospecção comercial e diagnóstico de presença digital para empresas do Rio Grande do Sul, com foco na Serra Gaúcha.",
       },
       { name: "author", content: "Radar de Presença Digital" },
-      { property: "og:title", content: "Radar de Presença Digital" },
+      { property: "og:title", content: "Radar de Presença Digital · Inteligência de prospecção RS" },
       {
         property: "og:description",
         content:
-          "Identifique empresas com baixa maturidade digital, gere diagnósticos e abordagens comerciais.",
+          "Plataforma interna de prospecção comercial e diagnóstico de presença digital para empresas do Rio Grande do Sul, com foco na Serra Gaúcha.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Radar de Presença Digital · Inteligência de prospecção RS" },
+      { name: "twitter:description", content: "Plataforma interna de prospecção comercial e diagnóstico de presença digital para empresas do Rio Grande do Sul, com foco na Serra Gaúcha." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/901d62c4-c977-4b0c-b7c4-1b0800b02c70/id-preview-0052b9d3--727eea5c-b737-4a4d-82ef-bb0b2d8e971b.lovable.app-1784811519292.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/901d62c4-c977-4b0c-b7c4-1b0800b02c70/id-preview-0052b9d3--727eea5c-b737-4a4d-82ef-bb0b2d8e971b.lovable.app-1784811519292.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
