@@ -46,10 +46,18 @@ const NAV: NavItem[] = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const router = useRouter();
+  const lock = useServerFn(lockSite);
   const { theme, toggleTheme, empresas } = useStore();
   const [openSearch, setOpenSearch] = useState(false);
 
-  if (pathname === "/login") return <>{children}</>;
+  if (pathname === "/login" || pathname === "/unlock") return <>{children}</>;
+
+  async function handleLock() {
+    await lock();
+    await router.invalidate();
+    await router.navigate({ to: "/unlock" });
+  }
 
   return (
     <div className="flex min-h-screen w-full bg-background text-foreground">
