@@ -117,6 +117,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Alternar tema">
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
+          <Button variant="ghost" size="icon" onClick={handleLock} aria-label="Sair" title="Sair">
+            <LogOut className="h-4 w-4" />
+          </Button>
         </header>
 
         <main className="flex-1 min-w-0">{children}</main>
