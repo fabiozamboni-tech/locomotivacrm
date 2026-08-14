@@ -598,6 +598,10 @@ function EmpresaModal({
               </ScrollArea>
             )}
           </TabsContent>
+
+          <TabsContent value="orcamento" className="m-0 p-5">
+            <OrcamentoTab empresa={empresa} />
+          </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>
