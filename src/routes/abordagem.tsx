@@ -65,6 +65,10 @@ function AbordagemPage() {
   const [tom, setTom] = useState<Tom>("consultivo");
   const [foco, setFoco] = useState<Foco>("geral");
   const [seed, setSeed] = useState(0);
+  const [elegancia, setElegancia] = useState<Elegancia>("elegante");
+  const [qtd, setQtd] = useState(5);
+  const [variacoes, setVariacoes] = useState<VariacaoAbordagem[]>([]);
+  const [loadingVar, setLoadingVar] = useState(false);
 
   const empresa = empresas.find((e) => e.id === selected);
   const texto = useMemo(
@@ -75,6 +79,24 @@ function AbordagemPage() {
   const [editado, setEditado] = useState(texto);
   const [loadingIA, setLoadingIA] = useState(false);
   const finalTxt = editado || texto;
+  const waNumero = empresa?.whatsapp || empresa?.telefone;
+  const waFinal = waSendUrl(waNumero, finalTxt);
+
+  const gerarOpcoes = async () => {
+    if (!empresa) return;
+    setLoadingVar(true);
+    try {
+      const r = await gerarVariacoesAbordagemIA({
+        data: { empresa: toCtx(empresa), canal, foco, elegancia, quantidade: qtd },
+      });
+      setVariacoes(r);
+      toast.success(`${r.length} opções geradas com ChatGPT`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setLoadingVar(false);
+    }
+  };
 
   const regen = () => {
     setSeed((s) => s + 1);
