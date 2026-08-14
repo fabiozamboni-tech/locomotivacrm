@@ -13,7 +13,9 @@ import { searchPlaces, type PlaceResult } from "@/lib/places.functions";
 import { lookupEmpresa, type LookupResult } from "@/lib/lookup.functions";
 import { empresaFromRaw } from "@/lib/mock-data";
 import { CIDADES_RS_FOCO, SEGMENTOS } from "@/lib/mock-data";
-import { PAISES, ESTADOS_BR, CIDADES_POR_UF } from "@/lib/geo";
+import { PAISES, REGIOES, estadosDoPais, nomePais, nomeEstado, carregarCidades } from "@/lib/geo";
+import { Combobox, type ComboboxOption } from "@/components/combobox";
+import { useEffect, useMemo } from "react";
 import {
   Select,
   SelectContent,
