@@ -112,10 +112,17 @@ export function Combobox({
               <CommandGroup key={group || "geral"} heading={group || undefined}>
                 {list.map((o) => (
                   <CommandItem key={o.value} value={`${o.label} ${o.value}`} onSelect={() => select(o.value)}>
-                    <Check className={cn("mr-2 h-4 w-4", value === o.value ? "opacity-100" : "opacity-0")} />
+                    <Check className={cn("mr-2 h-4 w-4 shrink-0", value === o.value ? "opacity-100" : "opacity-0")} />
+                    <TrendIcon trend={o.trend} />
                     <span className="truncate">{o.label}</span>
+                    {o.detail && (
+                      <span className="ml-auto pl-2 text-[11px] text-muted-foreground whitespace-nowrap">
+                        {o.detail}
+                      </span>
+                    )}
                   </CommandItem>
                 ))}
+
               </CommandGroup>
             ))}
           </CommandList>
