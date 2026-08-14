@@ -13,6 +13,14 @@ import { searchPlaces, type PlaceResult } from "@/lib/places.functions";
 import { lookupEmpresa, type LookupResult } from "@/lib/lookup.functions";
 import { empresaFromRaw } from "@/lib/mock-data";
 import { CIDADES_RS_FOCO, SEGMENTOS } from "@/lib/mock-data";
+import { PAISES, ESTADOS_BR, CIDADES_POR_UF } from "@/lib/geo";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Route = createFileRoute("/importar")({
   component: ImportarPage,
@@ -29,7 +37,20 @@ function ImportarPage() {
   const search = useServerFn(searchPlaces);
   const lookup = useServerFn(lookupEmpresa);
   const [segmento, setSegmento] = useState("Restaurantes");
+  const [pais, setPais] = useState("BR");
+  const [estado, setEstado] = useState("RS");
   const [cidade, setCidade] = useState("Bento Gonçalves");
+  const cidadesSugeridas =
+    pais === "BR"
+      ? estado === "RS"
+        ? [...CIDADES_RS_FOCO]
+        : (CIDADES_POR_UF[estado] ?? [])
+      : [];
+  const localizacao = [cidade, estado, PAISES.find((p) => p.code === pais)?.nome ?? ""]
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join(", ");
+  const queryPreview = [segmento.trim(), localizacao].filter(Boolean).join(" em ");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<PlaceResult[]>([]);
   const [imported, setImported] = useState<Set<string>>(new Set());
@@ -121,7 +142,11 @@ function ImportarPage() {
   };
 
   const buscar = async () => {
-    const query = `${segmento} em ${cidade}, RS`.trim();
+    const query = queryPreview;
+    if (!query) {
+      toast.error("Informe ao menos o segmento ou a cidade");
+      return;
+    }
     setLoading(true);
     try {
       const res = await search({ data: { query } });
@@ -204,36 +229,76 @@ function ImportarPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid md:grid-cols-[1fr_1fr_auto] gap-2">
+          <div className="grid md:grid-cols-4 gap-2">
             <div>
-              <label className="text-xs text-muted-foreground">Segmento / termo</label>
-              <Input
-                value={segmento}
-                onChange={(e) => setSegmento(e.target.value)}
-                placeholder="Ex: vinícolas, pousadas, metalurgia"
-              />
+              <label className="text-xs text-muted-foreground">País</label>
+              <Select value={pais} onValueChange={(v) => { setPais(v); if (v !== "BR") setEstado(""); }}>
+                <SelectTrigger><SelectValue placeholder="País" /></SelectTrigger>
+                <SelectContent>
+                  {PAISES.map((p) => (
+                    <SelectItem key={p.code} value={p.code}>{p.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Cidade (RS)</label>
+              <label className="text-xs text-muted-foreground">Estado / região</label>
+              {pais === "BR" ? (
+                <Select value={estado} onValueChange={(v) => { setEstado(v); setCidade(""); }}>
+                  <SelectTrigger><SelectValue placeholder="Selecione o estado" /></SelectTrigger>
+                  <SelectContent>
+                    {ESTADOS_BR.map((e) => (
+                      <SelectItem key={e.uf} value={e.uf}>{e.nome} ({e.uf})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  value={estado}
+                  onChange={(e) => setEstado(e.target.value)}
+                  placeholder="Ex: Norte, Andalucía…"
+                />
+              )}
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Cidade</label>
               <Input
-                list="cidades-rs"
+                list="cidades-sugestoes"
                 value={cidade}
                 onChange={(e) => setCidade(e.target.value)}
                 placeholder="Ex: Bento Gonçalves"
               />
-              <datalist id="cidades-rs">
-                {CIDADES_RS_FOCO.map((c) => (
+              <datalist id="cidades-sugestoes">
+                {cidadesSugeridas.map((c) => (
                   <option key={c} value={c} />
                 ))}
               </datalist>
             </div>
-            <div className="flex items-end">
-              <Button onClick={buscar} disabled={loading} className="w-full md:w-auto">
-                {loading ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Search className="h-4 w-4 mr-1.5" />}
-                Buscar
-              </Button>
+            <div>
+              <label className="text-xs text-muted-foreground">Segmento / termo</label>
+              <Input
+                list="segmentos-sugestoes"
+                value={segmento}
+                onChange={(e) => setSegmento(e.target.value)}
+                placeholder="Ex: vinícolas, pousadas, metalurgia"
+              />
+              <datalist id="segmentos-sugestoes">
+                {SEGMENTOS.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
             </div>
           </div>
+          <div className="flex items-center gap-3">
+            <Button onClick={buscar} disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Search className="h-4 w-4 mr-1.5" />}
+              Buscar
+            </Button>
+            <span className="text-xs text-muted-foreground truncate">
+              Consulta: <span className="font-mono">{queryPreview || "—"}</span>
+            </span>
+          </div>
+
 
           {results.length > 0 && (
             <div className="flex items-center justify-between">
