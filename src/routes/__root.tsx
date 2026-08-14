@@ -82,7 +82,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     if (location.pathname === "/unlock") return;
     const { unlocked } = await isUnlocked();
     if (!unlocked) {
-      throw redirect({ to: "/unlock" });
+      const next = `${location.pathname}${location.searchStr}${location.hash}`;
+      throw redirect({ to: "/unlock", search: { next } });
     }
   },
   head: () => ({

@@ -1,6 +1,7 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
+import { z } from "zod";
 import { Radar, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,9 @@ import { Card } from "@/components/ui/card";
 import { unlockSite } from "@/lib/gate.functions";
 
 export const Route = createFileRoute("/unlock")({
+  validateSearch: z.object({
+    next: z.string().optional().catch(undefined),
+  }),
   component: UnlockPage,
   head: () => ({
     meta: [
@@ -19,24 +23,26 @@ export const Route = createFileRoute("/unlock")({
 });
 
 function UnlockPage() {
-  const router = useRouter();
+  const { next } = Route.useSearch();
   const unlock = useServerFn(unlockSite);
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(false);
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
-    setError(false);
+    setError("");
     try {
       const { ok } = await unlock({ data: { password } });
       if (ok) {
-        await router.invalidate();
-        await router.navigate({ to: "/" });
+        const destination = next?.startsWith("/") && !next.startsWith("//") ? next : "/";
+        window.location.assign(destination);
       } else {
-        setError(true);
+        setError("Palavra-passe incorreta. Tente novamente.");
       }
+    } catch {
+      setError("Não foi possível iniciar a sessão. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -82,13 +88,11 @@ function UnlockPage() {
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
-                  if (error) setError(false);
+                  if (error) setError("");
                 }}
               />
             </div>
-            {error && (
-              <p className="text-xs text-destructive">Palavra-passe incorreta. Tente novamente.</p>
-            )}
+            {error && <p className="text-xs text-destructive">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading || !password}>
               {loading ? "A validar..." : "Entrar"}
             </Button>
