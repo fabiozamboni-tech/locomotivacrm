@@ -47,7 +47,11 @@ function ImportarPage() {
   );
   const [estado, setEstado] = useState(RS_CODE);
   const [cidade, setCidade] = useState("Bento Gonçalves");
-  const [cidadesSugeridas, setCidadesSugeridas] = useState<string[]>([...CIDADES_RS_FOCO]);
+  const [cidadesSugeridas, setCidadesSugeridas] = useState<CidadeInfo[]>(
+    CIDADES_RS_FOCO.map((nome) => ({ nome })),
+  );
+  const [limite, setLimite] = useState("20");
+  const [filtroSite, setFiltroSite] = useState<"todos" | "com" | "sem">("todos");
 
   const paisesFiltrados = useMemo(
     () => (regiao ? PAISES.filter((p) => p.regiao === regiao) : PAISES),
@@ -63,28 +67,51 @@ function ImportarPage() {
     }
     carregarCidades(pais, estado).then((lista) => {
       if (!ativo) return;
-      const extra = pais === "BR" && estado === RS_CODE ? CIDADES_RS_FOCO : [];
-      setCidadesSugeridas([...new Set([...extra, ...lista])]);
+      setCidadesSugeridas(lista);
     });
     return () => {
       ativo = false;
     };
-  }, [pais, estado, RS_CODE]);
+  }, [pais, estado]);
 
   const regioesOptions: ComboboxOption[] = REGIOES.map((r) => ({ value: r.id, label: r.nome }));
   const paisesOptions: ComboboxOption[] = paisesFiltrados.map((p) => ({ value: p.code, label: p.nome }));
-  const estadosOptions: ComboboxOption[] = estados.map((e) => ({ value: e.code, label: e.nome }));
-  const cidadesOptions: ComboboxOption[] = cidadesSugeridas.map((c) => ({ value: c, label: c }));
-  const segmentosOptions: ComboboxOption[] = SEGMENTOS.map((s) => ({ value: s, label: s }));
+  const estadosOptions: ComboboxOption[] = [
+    { value: "", label: "Todos os estados" },
+    ...estados.map((e) => ({ value: e.code, label: e.nome })),
+  ];
+  const cidadesOptions: ComboboxOption[] = [
+    { value: "", label: "Todas as cidades" },
+    ...cidadesSugeridas.map((c) => ({
+      value: c.nome,
+      label: c.nome,
+      detail: detalheCidade(c),
+      trend: c.forca,
+    })),
+  ];
+  const segmentosOptions: ComboboxOption[] = [
+    { value: "", label: "Todos os segmentos" },
+    ...SEGMENTOS.map((s) => ({ value: s, label: s })),
+  ];
+  const cidadeSelecionada = cidadesSugeridas.find((c) => c.nome === cidade);
 
   const localizacao = [cidade, estado ? nomeEstado(pais, estado) : "", nomePais(pais)]
     .map((s) => s.trim())
     .filter(Boolean)
     .join(", ");
-  const queryPreview = [segmento.trim(), localizacao].filter(Boolean).join(" em ");
+  const termo = segmento.trim() || "empresas";
+  const queryPreview = [termo, localizacao].filter(Boolean).join(" em ");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<PlaceResult[]>([]);
   const [imported, setImported] = useState<Set<string>>(new Set());
+  const resultsFiltrados = useMemo(
+    () =>
+      results.filter((p) =>
+        filtroSite === "com" ? !!p.site : filtroSite === "sem" ? !p.site : true,
+      ),
+    [results, filtroSite],
+  );
+
 
   // Lookup por site / instagram
   const [lookupInput, setLookupInput] = useState("");
