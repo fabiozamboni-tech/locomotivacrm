@@ -204,36 +204,76 @@ function ImportarPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid md:grid-cols-[1fr_1fr_auto] gap-2">
+          <div className="grid md:grid-cols-4 gap-2">
             <div>
-              <label className="text-xs text-muted-foreground">Segmento / termo</label>
-              <Input
-                value={segmento}
-                onChange={(e) => setSegmento(e.target.value)}
-                placeholder="Ex: vinícolas, pousadas, metalurgia"
-              />
+              <label className="text-xs text-muted-foreground">País</label>
+              <Select value={pais} onValueChange={(v) => { setPais(v); if (v !== "BR") setEstado(""); }}>
+                <SelectTrigger><SelectValue placeholder="País" /></SelectTrigger>
+                <SelectContent>
+                  {PAISES.map((p) => (
+                    <SelectItem key={p.code} value={p.code}>{p.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Cidade (RS)</label>
+              <label className="text-xs text-muted-foreground">Estado / região</label>
+              {pais === "BR" ? (
+                <Select value={estado} onValueChange={(v) => { setEstado(v); setCidade(""); }}>
+                  <SelectTrigger><SelectValue placeholder="Selecione o estado" /></SelectTrigger>
+                  <SelectContent>
+                    {ESTADOS_BR.map((e) => (
+                      <SelectItem key={e.uf} value={e.uf}>{e.nome} ({e.uf})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  value={estado}
+                  onChange={(e) => setEstado(e.target.value)}
+                  placeholder="Ex: Norte, Andalucía…"
+                />
+              )}
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Cidade</label>
               <Input
-                list="cidades-rs"
+                list="cidades-sugestoes"
                 value={cidade}
                 onChange={(e) => setCidade(e.target.value)}
                 placeholder="Ex: Bento Gonçalves"
               />
-              <datalist id="cidades-rs">
-                {CIDADES_RS_FOCO.map((c) => (
+              <datalist id="cidades-sugestoes">
+                {cidadesSugeridas.map((c) => (
                   <option key={c} value={c} />
                 ))}
               </datalist>
             </div>
-            <div className="flex items-end">
-              <Button onClick={buscar} disabled={loading} className="w-full md:w-auto">
-                {loading ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Search className="h-4 w-4 mr-1.5" />}
-                Buscar
-              </Button>
+            <div>
+              <label className="text-xs text-muted-foreground">Segmento / termo</label>
+              <Input
+                list="segmentos-sugestoes"
+                value={segmento}
+                onChange={(e) => setSegmento(e.target.value)}
+                placeholder="Ex: vinícolas, pousadas, metalurgia"
+              />
+              <datalist id="segmentos-sugestoes">
+                {SEGMENTOS.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
             </div>
           </div>
+          <div className="flex items-center gap-3">
+            <Button onClick={buscar} disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Search className="h-4 w-4 mr-1.5" />}
+              Buscar
+            </Button>
+            <span className="text-xs text-muted-foreground truncate">
+              Consulta: <span className="font-mono">{queryPreview || "—"}</span>
+            </span>
+          </div>
+
 
           {results.length > 0 && (
             <div className="flex items-center justify-between">
