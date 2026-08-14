@@ -13,10 +13,36 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { gerarAbordagem, type Canal, type Foco, type Tom } from "@/lib/generators";
-import { gerarAbordagemIA, toCtx } from "@/lib/ai.functions";
-import { Copy, RefreshCw, MessageCircle, Mail, Instagram, Phone, Type, Sparkles } from "lucide-react";
+import {
+  gerarAbordagemIA,
+  gerarVariacoesAbordagemIA,
+  toCtx,
+  type VariacaoAbordagem,
+} from "@/lib/ai.functions";
+import { whatsappUrl } from "@/lib/links";
+import {
+  Copy,
+  RefreshCw,
+  MessageCircle,
+  Mail,
+  Instagram,
+  Phone,
+  Type,
+  Sparkles,
+  Wand2,
+  Send,
+  Check,
+} from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
+
+type Elegancia = "sutil" | "elegante" | "equilibrado" | "direto";
+
+function waSendUrl(numero: string | undefined, texto: string): string | undefined {
+  const base = whatsappUrl(numero);
+  if (!base) return undefined;
+  return `${base}?text=${encodeURIComponent(texto)}`;
+}
 
 export const Route = createFileRoute("/abordagem")({
   validateSearch: z.object({ empresa: z.string().optional() }),
@@ -39,6 +65,10 @@ function AbordagemPage() {
   const [tom, setTom] = useState<Tom>("consultivo");
   const [foco, setFoco] = useState<Foco>("geral");
   const [seed, setSeed] = useState(0);
+  const [elegancia, setElegancia] = useState<Elegancia>("elegante");
+  const [qtd, setQtd] = useState(5);
+  const [variacoes, setVariacoes] = useState<VariacaoAbordagem[]>([]);
+  const [loadingVar, setLoadingVar] = useState(false);
 
   const empresa = empresas.find((e) => e.id === selected);
   const texto = useMemo(
@@ -49,6 +79,24 @@ function AbordagemPage() {
   const [editado, setEditado] = useState(texto);
   const [loadingIA, setLoadingIA] = useState(false);
   const finalTxt = editado || texto;
+  const waNumero = empresa?.whatsapp || empresa?.telefone;
+  const waFinal = waSendUrl(waNumero, finalTxt);
+
+  const gerarOpcoes = async () => {
+    if (!empresa) return;
+    setLoadingVar(true);
+    try {
+      const r = await gerarVariacoesAbordagemIA({
+        data: { empresa: toCtx(empresa), canal, foco, elegancia, quantidade: qtd },
+      });
+      setVariacoes(r);
+      toast.success(`${r.length} opções geradas com ChatGPT`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setLoadingVar(false);
+    }
+  };
 
   const regen = () => {
     setSeed((s) => s + 1);
@@ -124,6 +172,33 @@ function AbordagemPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label>Elegância / sutileza</Label>
+              <Select value={elegancia} onValueChange={(v) => setElegancia(v as Elegancia)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sutil">Muito sutil (sem vender)</SelectItem>
+                  <SelectItem value="elegante">Elegante e sofisticado</SelectItem>
+                  <SelectItem value="equilibrado">Equilibrado</SelectItem>
+                  <SelectItem value="direto">Direto e respeitoso</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Quantidade de opções</Label>
+              <Select value={String(qtd)} onValueChange={(v) => setQtd(Number(v))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {[3, 4, 5, 6, 8].map((n) => (
+                    <SelectItem key={n} value={String(n)}>{n} opções</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button className="w-full" disabled={!empresa || loadingVar} onClick={gerarOpcoes}>
+              <Wand2 className="h-3.5 w-3.5 mr-1.5" />
+              {loadingVar ? "Escrevendo opções..." : "Gerar opções com ChatGPT"}
+            </Button>
             {empresa && (
               <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-xs space-y-1">
                 <div className="font-medium">{empresa.nome}</div>
@@ -163,6 +238,15 @@ function AbordagemPage() {
               </Button>
               <Button
                 size="sm"
+                variant="outline"
+                disabled={!waFinal}
+                title={waFinal ? "Abrir WhatsApp com esta mensagem" : "Empresa sem WhatsApp/telefone"}
+                onClick={() => waFinal && window.open(waFinal, "_blank", "noopener")}
+              >
+                <Send className="h-3.5 w-3.5 mr-1.5" /> WhatsApp
+              </Button>
+              <Button
+                size="sm"
                 onClick={() => {
                   navigator.clipboard.writeText(finalTxt);
                   toast.success("Mensagem copiada");
@@ -184,6 +268,71 @@ function AbordagemPage() {
             </p>
           </CardContent>
         </Card>
+
+        {variacoes.length > 0 && (
+          <div className="lg:col-start-2 space-y-3">
+            <h2 className="text-sm font-semibold tracking-tight">
+              Opções geradas com ChatGPT ({variacoes.length})
+            </h2>
+            <div className="grid md:grid-cols-2 gap-3">
+              {variacoes.map((v, i) => {
+                const wa = waSendUrl(waNumero, v.texto);
+                return (
+                  <Card key={i} className="border-border/60 flex flex-col">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Badge variant="secondary" className="text-[10px]">{i + 1}</Badge>
+                        {v.estilo}
+                      </CardTitle>
+                      <p className="text-xs text-muted-foreground mt-1">{v.resumo}</p>
+                      {v.assunto && (
+                        <p className="text-xs mt-1">
+                          <span className="text-muted-foreground">Assunto: </span>
+                          {v.assunto}
+                        </p>
+                      )}
+                    </CardHeader>
+                    <CardContent className="flex-1 flex flex-col gap-2">
+                      <p className="text-sm whitespace-pre-wrap rounded-md border border-border/60 bg-muted/30 p-3 flex-1">
+                        {v.texto}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setEditado(v.assunto ? `Assunto: ${v.assunto}\n\n${v.texto}` : v.texto);
+                            toast.success("Opção aplicada no editor");
+                          }}
+                        >
+                          <Check className="h-3.5 w-3.5 mr-1.5" /> Usar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            navigator.clipboard.writeText(v.texto);
+                            toast.success("Texto copiado");
+                          }}
+                        >
+                          <Copy className="h-3.5 w-3.5 mr-1.5" /> Copiar
+                        </Button>
+                        <Button
+                          size="sm"
+                          disabled={!wa}
+                          title={wa ? "Abrir WhatsApp com esta mensagem" : "Empresa sem WhatsApp/telefone"}
+                          onClick={() => wa && window.open(wa, "_blank", "noopener")}
+                        >
+                          <Send className="h-3.5 w-3.5 mr-1.5" /> Enviar no WhatsApp
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
