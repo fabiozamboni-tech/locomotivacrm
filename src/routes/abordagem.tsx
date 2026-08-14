@@ -13,10 +13,36 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { gerarAbordagem, type Canal, type Foco, type Tom } from "@/lib/generators";
-import { gerarAbordagemIA, toCtx } from "@/lib/ai.functions";
-import { Copy, RefreshCw, MessageCircle, Mail, Instagram, Phone, Type, Sparkles } from "lucide-react";
+import {
+  gerarAbordagemIA,
+  gerarVariacoesAbordagemIA,
+  toCtx,
+  type VariacaoAbordagem,
+} from "@/lib/ai.functions";
+import { whatsappUrl } from "@/lib/links";
+import {
+  Copy,
+  RefreshCw,
+  MessageCircle,
+  Mail,
+  Instagram,
+  Phone,
+  Type,
+  Sparkles,
+  Wand2,
+  Send,
+  Check,
+} from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
+
+type Elegancia = "sutil" | "elegante" | "equilibrado" | "direto";
+
+function waSendUrl(numero: string | undefined, texto: string): string | undefined {
+  const base = whatsappUrl(numero);
+  if (!base) return undefined;
+  return `${base}?text=${encodeURIComponent(texto)}`;
+}
 
 export const Route = createFileRoute("/abordagem")({
   validateSearch: z.object({ empresa: z.string().optional() }),
