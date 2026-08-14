@@ -46,11 +46,12 @@ function extractCidade(components?: Array<{ longText?: string; types?: string[] 
 }
 
 export const searchPlaces = createServerFn({ method: "POST" })
-  .inputValidator((data: { query: string; regionCode?: string }) => {
+  .inputValidator((data: { query: string; regionCode?: string; limit?: number }) => {
     const query = String(data?.query ?? "").trim();
     if (!query || query.length < 2) throw new Error("Consulta muito curta");
     if (query.length > 200) throw new Error("Consulta muito longa");
-    return { query, regionCode: data?.regionCode ?? "BR" };
+    const limit = Math.min(Math.max(Number(data?.limit) || 20, 1), 100);
+    return { query, regionCode: data?.regionCode ?? "BR", limit };
   })
   .handler(async ({ data }): Promise<PlaceResult[]> => {
     const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
@@ -60,48 +61,60 @@ export const searchPlaces = createServerFn({ method: "POST" })
     }
 
     const url = "https://connector-gateway.lovable.dev/google_maps/places/v1/places:searchText";
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "X-Connection-Api-Key": GOOGLE_MAPS_API_KEY,
-        "Content-Type": "application/json",
-        "X-Goog-FieldMask": FIELD_MASK,
-      },
-      body: JSON.stringify({
-        textQuery: data.query,
-        regionCode: data.regionCode,
-        languageCode: "pt-BR",
-        maxResultCount: 20,
-      }),
-    });
 
-    if (!response.ok) {
-      const body = await response.text();
-      console.error(`Places searchText failed [${response.status}]: ${body}`);
-      throw new Error(`Falha ao consultar Google Places (${response.status})`);
-    }
-
-    const json = (await response.json()) as {
-      places?: Array<{
-        id: string;
-        displayName?: { text?: string };
-        formattedAddress?: string;
-        addressComponents?: Array<{ longText?: string; types?: string[] }>;
-        nationalPhoneNumber?: string;
-        internationalPhoneNumber?: string;
-        websiteUri?: string;
-        googleMapsUri?: string;
-        primaryTypeDisplayName?: { text?: string };
-        types?: string[];
-        rating?: number;
-        userRatingCount?: number;
-        location?: { latitude?: number; longitude?: number };
-        businessStatus?: string;
-      }>;
+    type RawPlace = {
+      id: string;
+      displayName?: { text?: string };
+      formattedAddress?: string;
+      addressComponents?: Array<{ longText?: string; types?: string[] }>;
+      nationalPhoneNumber?: string;
+      internationalPhoneNumber?: string;
+      websiteUri?: string;
+      googleMapsUri?: string;
+      primaryTypeDisplayName?: { text?: string };
+      types?: string[];
+      rating?: number;
+      userRatingCount?: number;
+      location?: { latitude?: number; longitude?: number };
+      businessStatus?: string;
     };
 
-    return (json.places ?? []).map((p) => ({
+    const coletados: RawPlace[] = [];
+    let pageToken: string | undefined;
+
+    // Places (New) devolve no máximo 20 por página — paginamos até atingir o limite pedido.
+    while (coletados.length < data.limit) {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "X-Connection-Api-Key": GOOGLE_MAPS_API_KEY,
+          "Content-Type": "application/json",
+          "X-Goog-FieldMask": FIELD_MASK,
+        },
+        body: JSON.stringify({
+          textQuery: data.query,
+          regionCode: data.regionCode,
+          languageCode: "pt-BR",
+          maxResultCount: Math.min(20, data.limit - coletados.length),
+          ...(pageToken ? { pageToken } : {}),
+        }),
+      });
+
+      if (!response.ok) {
+        const body = await response.text();
+        console.error(`Places searchText failed [${response.status}]: ${body}`);
+        if (coletados.length > 0) break;
+        throw new Error(`Falha ao consultar Google Places (${response.status})`);
+      }
+
+      const json = (await response.json()) as { places?: RawPlace[]; nextPageToken?: string };
+      coletados.push(...(json.places ?? []));
+      pageToken = json.nextPageToken;
+      if (!pageToken || !(json.places ?? []).length) break;
+    }
+
+    return coletados.slice(0, data.limit).map((p) => ({
       placeId: p.id,
       nome: p.displayName?.text ?? "(sem nome)",
       endereco: p.formattedAddress ?? "",
@@ -117,3 +130,4 @@ export const searchPlaces = createServerFn({ method: "POST" })
       businessStatus: p.businessStatus,
     }));
   });
+
