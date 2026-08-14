@@ -127,6 +127,107 @@ Devolva APENAS o texto da mensagem, sem explicações, sem markdown.`;
     ]);
   });
 
+// -------- VARIAÇÕES DE ABORDAGEM (ChatGPT) --------
+export interface VariacaoAbordagem {
+  estilo: string;
+  resumo: string;
+  texto: string;
+  assunto: string | null;
+}
+
+export const gerarVariacoesAbordagemIA = createServerFn({ method: "POST" })
+  .inputValidator(
+    (data: {
+      empresa: EmpresaCtx;
+      canal: "whatsapp" | "email" | "instagram" | "ligacao" | "curta";
+      foco: "site" | "instagram" | "atendimento" | "geral";
+      elegancia: "sutil" | "elegante" | "equilibrado" | "direto";
+      quantidade?: number;
+      nomeAgencia?: string;
+    }) => data,
+  )
+  .handler(async ({ data }): Promise<VariacaoAbordagem[]> => {
+    const { openaiJSON } = await import("./ai-gateway.server");
+    const qtd = Math.min(Math.max(data.quantidade ?? 5, 3), 8);
+
+    const canalTxt: Record<string, string> = {
+      whatsapp: "mensagem de WhatsApp (curta, no máximo 6 linhas, sem emojis exagerados)",
+      email: "e-mail (assunto + corpo curto e escaneável)",
+      instagram: "direct de Instagram (coloquial, 3-5 linhas)",
+      ligacao: "roteiro de ligação (5 passos numerados, com fala sugerida)",
+      curta: "mensagem muito curta (2-3 frases apenas)",
+    };
+    const focoTxt: Record<string, string> = {
+      site: "foco em site / presença web",
+      instagram: "foco em Instagram / conteúdo",
+      atendimento: "foco em atendimento e comunicação",
+      geral: "diagnóstico geral (site + Instagram + atendimento)",
+    };
+    const eleganciaTxt: Record<string, string> = {
+      sutil:
+        "extremamente sutil: nada de vender, apenas curiosidade genuína e um elogio verdadeiro. O pedido no final é mínimo (uma pergunta simples de sim/não).",
+      elegante:
+        "elegante e sofisticado: vocabulário refinado mas natural, frases curtas, elegância sem formalidade engessada.",
+      equilibrado: "equilibrado: consultivo, claro, cordial, com um convite leve para conversa.",
+      direto: "direto e respeitoso: vai ao ponto em poucas linhas, sem rodeios, mantendo educação.",
+    };
+    const agencia = data.nomeAgencia?.trim() || "[Nome da sua agência]";
+
+    const sys =
+      "Você é redator sênior de prospecção B2B consultiva para uma agência de design, comunicação e desenvolvimento web da Serra Gaúcha (RS). Escreve em português do Brasil, como humano, sem clichês de vendas ('oferta imperdível', 'aproveite agora'), sem promessas de resultado, sem tom agressivo e sem soar automatizado. Cada variação deve ser genuinamente diferente em ângulo e abertura — nunca reescritas da mesma frase.";
+
+    const user = `Gere ${qtd} variações de PRIMEIRA abordagem no formato: ${canalTxt[data.canal]}.
+Registro desejado: ${eleganciaTxt[data.elegancia]}
+Ângulo: ${focoTxt[data.foco]}
+Assine como "${agencia}". Se precisar citar a pessoa, use "[Nome do contato]".
+
+Cada variação deve usar um ângulo distinto, por exemplo: elogio observacional, pergunta curiosa, observação técnica discreta, prova social local, oportunidade sazonal da região, comparação sutil com concorrência, valor entregue antes de pedir algo.
+
+Empresa:
+${ctxTxt(data.empresa)}
+
+Regras de saída:
+- "estilo": nome curto do ângulo (ex.: "Elogio observacional").
+- "resumo": uma linha explicando quando usar essa variação.
+- "texto": a mensagem pronta para enviar, sem markdown, com quebras de linha reais.
+- "assunto": apenas para e-mail; nos outros canais use null.
+- Mensagens de WhatsApp/direct/curta: no máximo 600 caracteres.`;
+
+    const schema = {
+      type: "object",
+      additionalProperties: false,
+      required: ["variacoes"],
+      properties: {
+        variacoes: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["estilo", "resumo", "texto", "assunto"],
+            properties: {
+              estilo: { type: "string" },
+              resumo: { type: "string" },
+              texto: { type: "string" },
+              assunto: { type: ["string", "null"] },
+            },
+          },
+        },
+      },
+    } as Record<string, unknown>;
+
+    const out = await openaiJSON<{ variacoes: VariacaoAbordagem[] }>({
+      input: [
+        { role: "system", content: sys },
+        { role: "user", content: user },
+      ],
+      schemaName: "variacoes_abordagem",
+      schema,
+      reasoning: "low",
+    });
+
+    return (out.variacoes ?? []).slice(0, qtd);
+  });
+
 // -------- PROMPT (briefing) --------
 export const gerarPromptIA = createServerFn({ method: "POST" })
   .inputValidator(
