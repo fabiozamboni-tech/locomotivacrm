@@ -238,6 +238,15 @@ function AbordagemPage() {
               </Button>
               <Button
                 size="sm"
+                variant="outline"
+                disabled={!waFinal}
+                title={waFinal ? "Abrir WhatsApp com esta mensagem" : "Empresa sem WhatsApp/telefone"}
+                onClick={() => waFinal && window.open(waFinal, "_blank", "noopener")}
+              >
+                <Send className="h-3.5 w-3.5 mr-1.5" /> WhatsApp
+              </Button>
+              <Button
+                size="sm"
                 onClick={() => {
                   navigator.clipboard.writeText(finalTxt);
                   toast.success("Mensagem copiada");
@@ -259,6 +268,71 @@ function AbordagemPage() {
             </p>
           </CardContent>
         </Card>
+
+        {variacoes.length > 0 && (
+          <div className="lg:col-start-2 space-y-3">
+            <h2 className="text-sm font-semibold tracking-tight">
+              Opções geradas com ChatGPT ({variacoes.length})
+            </h2>
+            <div className="grid md:grid-cols-2 gap-3">
+              {variacoes.map((v, i) => {
+                const wa = waSendUrl(waNumero, v.texto);
+                return (
+                  <Card key={i} className="border-border/60 flex flex-col">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Badge variant="secondary" className="text-[10px]">{i + 1}</Badge>
+                        {v.estilo}
+                      </CardTitle>
+                      <p className="text-xs text-muted-foreground mt-1">{v.resumo}</p>
+                      {v.assunto && (
+                        <p className="text-xs mt-1">
+                          <span className="text-muted-foreground">Assunto: </span>
+                          {v.assunto}
+                        </p>
+                      )}
+                    </CardHeader>
+                    <CardContent className="flex-1 flex flex-col gap-2">
+                      <p className="text-sm whitespace-pre-wrap rounded-md border border-border/60 bg-muted/30 p-3 flex-1">
+                        {v.texto}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setEditado(v.assunto ? `Assunto: ${v.assunto}\n\n${v.texto}` : v.texto);
+                            toast.success("Opção aplicada no editor");
+                          }}
+                        >
+                          <Check className="h-3.5 w-3.5 mr-1.5" /> Usar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            navigator.clipboard.writeText(v.texto);
+                            toast.success("Texto copiado");
+                          }}
+                        >
+                          <Copy className="h-3.5 w-3.5 mr-1.5" /> Copiar
+                        </Button>
+                        <Button
+                          size="sm"
+                          disabled={!wa}
+                          title={wa ? "Abrir WhatsApp com esta mensagem" : "Empresa sem WhatsApp/telefone"}
+                          onClick={() => wa && window.open(wa, "_blank", "noopener")}
+                        >
+                          <Send className="h-3.5 w-3.5 mr-1.5" /> Enviar no WhatsApp
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
