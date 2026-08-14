@@ -16,7 +16,12 @@ export interface ComboboxOption {
   value: string;
   label: string;
   group?: string;
+  /** Texto auxiliar mostrado à direita do rótulo (ex: habitantes, PIB). */
+  detail?: string;
+  /** Força económica: 0 = fraca, 1 = média, 2 = forte. Mostra seta visual. */
+  trend?: number;
 }
+
 
 interface ComboboxProps {
   options: ComboboxOption[];
