@@ -242,7 +242,7 @@ function ImportarPage() {
     }
     setLoading(true);
     try {
-      const res = await search({ data: { query, regionCode: pais || "BR" } });
+      const res = await search({ data: { query, regionCode: pais || "BR", limit: Number(limite) } });
       setResults(res);
       toast.success(`${res.length} resultado(s) do Google Places`);
     } catch (err) {
