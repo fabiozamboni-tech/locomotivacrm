@@ -363,7 +363,7 @@ function ImportarPage() {
                   setEstado(v);
                   setCidade("");
                 }}
-                placeholder={estadosOptions.length ? "Selecione o estado" : "Sem divisões"}
+                placeholder={estados.length ? "Todos os estados" : "Sem divisões"}
                 searchPlaceholder="Buscar estado…"
                 allowCustom
               />
@@ -374,7 +374,7 @@ function ImportarPage() {
                 options={cidadesOptions}
                 value={cidade}
                 onChange={setCidade}
-                placeholder="Selecione a cidade"
+                placeholder="Todas as cidades"
                 searchPlaceholder="Buscar cidade…"
                 emptyText="Digite para usar outra cidade"
                 allowCustom
@@ -386,28 +386,83 @@ function ImportarPage() {
                 options={segmentosOptions}
                 value={segmento}
                 onChange={setSegmento}
-                placeholder="Ex: vinícolas, pousadas"
+                placeholder="Todos os segmentos"
                 searchPlaceholder="Buscar ou digitar…"
                 emptyText="Digite um termo livre"
                 allowCustom
               />
             </div>
           </div>
-          <div className="flex items-center gap-3">
+
+          {cidadeSelecionada && (cidadeSelecionada.populacao || cidadeSelecionada.pib) && (
+            <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+              <span className="inline-flex items-center gap-1.5 font-medium">
+                <TrendIcon trend={cidadeSelecionada.forca} />
+                {cidadeSelecionada.nome}
+              </span>
+              {cidadeSelecionada.populacao && (
+                <span className="inline-flex items-center gap-1 text-muted-foreground">
+                  <Users className="h-3 w-3" />
+                  {fmtPop(cidadeSelecionada.populacao)}
+                </span>
+              )}
+              {cidadeSelecionada.setor && (
+                <span className="text-muted-foreground">Setor: {cidadeSelecionada.setor}</span>
+              )}
+              {cidadeSelecionada.pib && (
+                <span className="inline-flex items-center gap-1 text-muted-foreground">
+                  <TrendingUp className="h-3 w-3" />
+                  {fmtPib(cidadeSelecionada.pib)}
+                </span>
+              )}
+              {cidadeSelecionada.forca !== undefined && (
+                <Badge variant="outline" className="text-[10px] font-normal">
+                  {FORCA_LABEL[cidadeSelecionada.forca] ?? ""}
+                </Badge>
+              )}
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-end gap-3">
             <Button onClick={buscar} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Search className="h-4 w-4 mr-1.5" />}
               Buscar
             </Button>
+            <div>
+              <label className="text-xs text-muted-foreground block">Resultados</label>
+              <Select value={limite} onValueChange={setLimite}>
+                <SelectTrigger className="w-[110px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {["20", "30", "40", "50", "100"].map((n) => (
+                    <SelectItem key={n} value={n}>{n} empresas</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block">Site</label>
+              <Select value={filtroSite} onValueChange={(v) => setFiltroSite(v as typeof filtroSite)}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="com">Com site</SelectItem>
+                  <SelectItem value="sem">Sem site</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <span className="text-xs text-muted-foreground truncate">
               Consulta: <span className="font-mono">{queryPreview || "—"}</span>
             </span>
           </div>
 
-
           {results.length > 0 && (
             <div className="flex items-center justify-between">
               <div className="text-xs text-muted-foreground">
-                {results.length} resultado(s) · fonte: Google Places API (New)
+                {resultsFiltrados.length} de {results.length} resultado(s) · fonte: Google Places API (New)
               </div>
               <Button size="sm" variant="outline" onClick={importarTodas}>
                 <Plus className="h-3.5 w-3.5 mr-1.5" />
@@ -417,8 +472,9 @@ function ImportarPage() {
           )}
 
           <div className="space-y-2">
-            {results.map((p) => {
+            {resultsFiltrados.map((p) => {
               const done = imported.has(p.placeId);
+              const social = socialDoSite(p.site);
               return (
                 <div
                   key={p.placeId}
@@ -442,6 +498,22 @@ function ImportarPage() {
                         <Badge className="text-[10px] font-normal bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/15">
                           sem site
                         </Badge>
+                      )}
+                      {social && (
+                        <a
+                          href={social.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 rounded-md border border-border/60 px-1.5 py-0.5 text-[10px] hover:underline"
+                        >
+                          {social.rede === "instagram" ? (
+                            <Instagram className="h-3 w-3 text-pink-500" />
+                          ) : (
+                            <Facebook className="h-3 w-3 text-sky-500" />
+                          )}
+                          <AtSign className="h-2.5 w-2.5" />
+                          {social.handle}
+                        </a>
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground truncate">{p.endereco}</div>
@@ -476,7 +548,13 @@ function ImportarPage() {
                 Escolha segmento + cidade e clique em Buscar para trazer empresas reais do Google.
               </div>
             )}
+            {!loading && results.length > 0 && resultsFiltrados.length === 0 && (
+              <div className="text-xs text-muted-foreground text-center py-6 border border-dashed border-border/60 rounded-md">
+                Nenhum resultado com este filtro de site.
+              </div>
+            )}
           </div>
+
 
           <p className="text-[11px] text-muted-foreground leading-relaxed">
             ⚠️ Compliance: dados vindos de fonte pública (Google Places). Antes de qualquer
