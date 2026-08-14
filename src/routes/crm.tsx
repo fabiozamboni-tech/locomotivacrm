@@ -13,6 +13,10 @@ import {
   GripVertical,
   Wand2,
   Save,
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
+  Minus,
 } from "lucide-react";
 import {
   DndContext,
