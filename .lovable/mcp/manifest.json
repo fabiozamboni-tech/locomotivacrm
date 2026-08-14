@@ -1,0 +1,235 @@
+{
+  "version": 1,
+  "sdk_version": "0.26.2",
+  "path": "/mcp",
+  "auth": {
+    "type": "none"
+  },
+  "mcp": {
+    "server": {
+      "name": "locomotivacrm",
+      "version": "0.1.0",
+      "title": "Locomotivacrm"
+    },
+    "tools": [
+      {
+        "name": "buscar_empresas",
+        "title": "Buscar empresas (Google Places)",
+        "description": "Busca empresas reais no Google Places por termo livre (ex: 'vinícolas em Bento Gonçalves RS'). Retorna nome, segmento, cidade, endereço, telefone, site, link do Google Maps e avaliação.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": true
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "consulta": {
+              "type": "string",
+              "description": "Termo de busca, ex: 'restaurantes em Gramado RS' ou 'metalúrgicas Caxias do Sul'"
+            },
+            "limite": {
+              "description": "Máximo de resultados (1-20, padrão 10)",
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "consulta"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "analisar_presenca_digital",
+        "title": "Analisar presença digital",
+        "description": "Lê o conteúdo público de um site ou perfil de Instagram e devolve um diagnóstico comercial: dados da empresa, pontos fracos, pontos positivos e oportunidades de melhoria.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": true
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "alvo": {
+              "type": "string",
+              "description": "URL do site (ex: exemplo.com.br) ou perfil do Instagram (ex: @minhaempresa)"
+            }
+          },
+          "required": [
+            "alvo"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "gerar_insights",
+        "title": "Gerar insights de prospecção",
+        "description": "Produz insights comerciais sobre uma empresa: resumo da situação digital, falhas, riscos para o negócio, oportunidades e argumentos de venda consultiva.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "nome": {
+              "type": "string",
+              "description": "Nome da empresa"
+            },
+            "segmento": {
+              "type": "string"
+            },
+            "cidade": {
+              "type": "string"
+            },
+            "site": {
+              "type": "string"
+            },
+            "instagram": {
+              "type": "string"
+            },
+            "observacoes": {
+              "description": "Contexto coletado do site/perfil",
+              "type": "string"
+            }
+          },
+          "required": [
+            "nome"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "gerar_abordagem",
+        "title": "Gerar abordagem comercial",
+        "description": "Gera o texto de primeira abordagem comercial consultiva para uma empresa, no canal, tom e foco escolhidos (WhatsApp, e-mail, direct, roteiro de ligação ou mensagem curta).",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "nome": {
+              "type": "string",
+              "description": "Nome da empresa"
+            },
+            "segmento": {
+              "description": "Segmento / atividade da empresa",
+              "type": "string"
+            },
+            "cidade": {
+              "description": "Cidade da empresa (RS)",
+              "type": "string"
+            },
+            "site": {
+              "description": "Site da empresa, se houver",
+              "type": "string"
+            },
+            "instagram": {
+              "description": "Instagram da empresa, se houver",
+              "type": "string"
+            },
+            "observacoes": {
+              "description": "Contexto adicional ou gaps já identificados",
+              "type": "string"
+            },
+            "canal": {
+              "type": "string",
+              "enum": [
+                "whatsapp",
+                "email",
+                "instagram",
+                "ligacao",
+                "curta"
+              ],
+              "description": "Canal da abordagem"
+            },
+            "tom": {
+              "type": "string",
+              "enum": [
+                "consultivo",
+                "formal",
+                "amistoso",
+                "direto"
+              ]
+            },
+            "foco": {
+              "type": "string",
+              "enum": [
+                "site",
+                "instagram",
+                "atendimento",
+                "geral"
+              ]
+            },
+            "nomeAgencia": {
+              "description": "Nome da agência para assinar a mensagem",
+              "type": "string"
+            }
+          },
+          "required": [
+            "nome",
+            "canal"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "gerar_briefing",
+        "title": "Gerar briefing / prompt de produção",
+        "description": "Gera um briefing completo em markdown para produção: site novo, redesign de site, estratégia de Instagram ou calendário de posts, adaptado à empresa e à Serra Gaúcha.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "nome": {
+              "type": "string",
+              "description": "Nome da empresa"
+            },
+            "segmento": {
+              "type": "string"
+            },
+            "cidade": {
+              "type": "string"
+            },
+            "site": {
+              "type": "string"
+            },
+            "instagram": {
+              "type": "string"
+            },
+            "observacoes": {
+              "description": "Diagnóstico ou contexto adicional",
+              "type": "string"
+            },
+            "tipo": {
+              "type": "string",
+              "enum": [
+                "site_novo",
+                "site_redesign",
+                "ig_estrategia",
+                "ig_posts"
+              ],
+              "description": "Tipo de briefing desejado"
+            }
+          },
+          "required": [
+            "nome",
+            "tipo"
+          ]
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
