@@ -6,15 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Upload, Download, FileDown, MapPin, Search, Plus, ExternalLink, Loader2, UserPlus, Globe, Instagram, Sparkles } from "lucide-react";
+import { Upload, Download, FileDown, MapPin, Search, Plus, ExternalLink, Loader2, UserPlus, Globe, Instagram, Sparkles, AtSign, Facebook, Users, TrendingUp } from "lucide-react";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { searchPlaces, type PlaceResult } from "@/lib/places.functions";
 import { lookupEmpresa, type LookupResult } from "@/lib/lookup.functions";
 import { empresaFromRaw } from "@/lib/mock-data";
 import { CIDADES_RS_FOCO, SEGMENTOS } from "@/lib/mock-data";
-import { PAISES, REGIOES, estadosDoPais, nomePais, nomeEstado, carregarCidades } from "@/lib/geo";
-import { Combobox, type ComboboxOption } from "@/components/combobox";
+import { PAISES, REGIOES, estadosDoPais, nomePais, nomeEstado, carregarCidades, type CidadeInfo } from "@/lib/geo";
+import { Combobox, TrendIcon, type ComboboxOption } from "@/components/combobox";
 import { useEffect, useMemo } from "react";
 import {
   Select,
@@ -27,6 +27,41 @@ import {
 export const Route = createFileRoute("/importar")({
   component: ImportarPage,
 });
+
+/** Formata população: 1.388.794 → "1,39 mi hab." */
+function fmtPop(n?: number): string {
+  if (!n) return "";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} mi hab.`;
+  if (n >= 1_000) return `${(n / 1_000).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} mil hab.`;
+  return `${n.toLocaleString("pt-BR")} hab.`;
+}
+
+/** PIB vem em mil R$ (IBGE). */
+function fmtPib(milReais?: number): string {
+  if (!milReais) return "";
+  const reais = milReais * 1000;
+  if (reais >= 1e9) return `PIB R$ ${(reais / 1e9).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} bi`;
+  if (reais >= 1e6) return `PIB R$ ${(reais / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} mi`;
+  return `PIB R$ ${reais.toLocaleString("pt-BR")}`;
+}
+
+function detalheCidade(c: CidadeInfo): string {
+  return [fmtPop(c.populacao), c.setor, fmtPib(c.pib)].filter(Boolean).join(" · ");
+}
+
+const FORCA_LABEL = ["economia local fraca", "economia local média", "economia local forte"];
+
+/** Extrai @handle de Instagram/Facebook a partir de uma URL, quando aplicável. */
+function socialDoSite(url?: string): { rede: "instagram" | "facebook"; handle: string; url: string } | null {
+  if (!url) return null;
+  const m = url.match(/(?:https?:\/\/)?(?:www\.)?(instagram|facebook)\.com\/([A-Za-z0-9._-]+)/i);
+  if (!m) return null;
+  const rede = m[1].toLowerCase() as "instagram" | "facebook";
+  const handle = m[2].replace(/\/$/, "");
+  if (!handle || ["p", "pages", "profile.php", "reel", "explore"].includes(handle)) return null;
+  return { rede, handle, url };
+}
+
 
 const CSV_EXAMPLE = `nome,segmento,cidade,telefone,whatsapp,email,site,instagram
 Padaria do Vale,Padaria artesanal,Bento Gonçalves,(54) 3055-0011,(54) 99988-7766,,,@padariadovale
