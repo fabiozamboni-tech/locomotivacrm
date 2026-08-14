@@ -172,6 +172,33 @@ function AbordagemPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label>Elegância / sutileza</Label>
+              <Select value={elegancia} onValueChange={(v) => setElegancia(v as Elegancia)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sutil">Muito sutil (sem vender)</SelectItem>
+                  <SelectItem value="elegante">Elegante e sofisticado</SelectItem>
+                  <SelectItem value="equilibrado">Equilibrado</SelectItem>
+                  <SelectItem value="direto">Direto e respeitoso</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Quantidade de opções</Label>
+              <Select value={String(qtd)} onValueChange={(v) => setQtd(Number(v))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {[3, 4, 5, 6, 8].map((n) => (
+                    <SelectItem key={n} value={String(n)}>{n} opções</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button className="w-full" disabled={!empresa || loadingVar} onClick={gerarOpcoes}>
+              <Wand2 className="h-3.5 w-3.5 mr-1.5" />
+              {loadingVar ? "Escrevendo opções..." : "Gerar opções com ChatGPT"}
+            </Button>
             {empresa && (
               <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-xs space-y-1">
                 <div className="font-medium">{empresa.nome}</div>
