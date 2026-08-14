@@ -854,3 +854,184 @@ function PromptsModal({
     </Dialog>
   );
 }
+
+function brl(n: number): string {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    maximumFractionDigits: 0,
+  }).format(Number.isFinite(n) ? n : 0);
+}
+
+const NIVEL_UI: Record<string, { label: string; cls: string; Icon: typeof TrendingUp }> = {
+  alto: { label: "Potencial alto", cls: "text-emerald-500", Icon: TrendingUp },
+  medio: { label: "Potencial médio", cls: "text-amber-500", Icon: Minus },
+  baixo: { label: "Potencial baixo", cls: "text-rose-500", Icon: TrendingDown },
+};
+
+const PORTES = [
+  { value: "auto", label: "Inferir com IA" },
+  { value: "microempresa (1-9 colaboradores)", label: "Microempresa" },
+  { value: "pequena empresa (10-49 colaboradores)", label: "Pequena" },
+  { value: "média empresa (50-249 colaboradores)", label: "Média" },
+  { value: "grande empresa (250+ colaboradores)", label: "Grande" },
+];
+
+function OrcamentoTab({ empresa }: { empresa: Empresa }) {
+  const { addHistorico } = useStore();
+  const [porte, setPorte] = useState("auto");
+  const [loading, setLoading] = useState(false);
+  const [orc, setOrc] = useState<OrcamentoIA | null>(null);
+
+  const estimar = async () => {
+    setLoading(true);
+    try {
+      const r = await estimarValorIA({
+        data: {
+          empresa: toCtx(empresa),
+          porteManual: porte === "auto" ? undefined : porte,
+          contextoExtra: empresa.observacoes,
+        },
+      });
+      setOrc(r);
+      toast.success("Estimativa gerada");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const salvar = () => {
+    if (!orc) return;
+    const linhas = orc.opcoes
+      .filter((o) => o.aplicavel)
+      .map((o) => `${o.titulo}: ${brl(o.minimo)}–${brl(o.maximo)} (sugerido ${brl(o.recomendado)})`)
+      .join(" · ");
+    addHistorico(empresa.id, {
+      data: new Date().toISOString().slice(0, 10),
+      tipo: "nota",
+      texto: `Estimativa de valor (IA) — ${orc.porteEstimado}. ${linhas}. Potencial: ${orc.potencialInvestimento.nivel}.`,
+    });
+    toast.success("Estimativa salva no histórico");
+  };
+
+  const nivel = orc ? NIVEL_UI[orc.potencialInvestimento.nivel] ?? NIVEL_UI.medio : null;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="w-48">
+          <PromptSelect
+            label="Porte da empresa"
+            value={porte}
+            onValueChange={setPorte}
+            options={PORTES}
+          />
+        </div>
+        <Button size="sm" onClick={estimar} disabled={loading} className="gap-1.5">
+          <Sparkles className="size-3.5" />
+          {loading ? "Calculando..." : orc ? "Recalcular" : "Estimar valor com IA"}
+        </Button>
+        {orc && (
+          <Button size="sm" variant="outline" onClick={salvar} className="gap-1.5">
+            <Save className="size-3.5" /> Salvar no histórico
+          </Button>
+        )}
+      </div>
+
+      {!orc && !loading && (
+        <div className="text-sm text-muted-foreground border border-dashed rounded-lg p-8 text-center">
+          Gere uma estimativa de investimento considerando porte, cidade e média de preços da
+          região — com opções de site estático, site com CRM e loja virtual.
+        </div>
+      )}
+
+      {orc && (
+        <ScrollArea className="max-h-[420px] pr-2">
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
+              <div className="text-xs font-semibold">Porte estimado</div>
+              <p className="text-sm text-muted-foreground">{orc.porteEstimado}</p>
+              <div className="text-xs font-semibold pt-1">Referência de mercado</div>
+              <p className="text-sm text-muted-foreground">{orc.referenciaMercado}</p>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-3">
+              {orc.opcoes.map((o) => (
+                <Card
+                  key={o.tipo}
+                  className={cn(
+                    "p-3 space-y-2",
+                    !o.aplicavel && "opacity-55 border-dashed",
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-xs font-semibold leading-tight">{o.titulo}</div>
+                    {!o.aplicavel && (
+                      <Badge variant="outline" className="text-[10px] h-4 px-1">
+                        n/a
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="text-lg font-bold tabular-nums">{brl(o.recomendado)}</div>
+                  <div className="text-[11px] text-muted-foreground tabular-nums">
+                    faixa {brl(o.minimo)} – {brl(o.maximo)}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">Prazo: {o.prazo}</div>
+                  <ul className="text-[11px] text-muted-foreground space-y-0.5 list-disc pl-4">
+                    {o.escopo?.slice(0, 6).map((s, i) => (
+                      <li key={i}>{s}</li>
+                    ))}
+                  </ul>
+                  <p className="text-[11px] italic text-muted-foreground/80">{o.justificativa}</p>
+                </Card>
+              ))}
+            </div>
+
+            {orc.mensalidadeSugerida && (
+              <div className="rounded-lg border p-3 text-sm">
+                <span className="font-semibold">Mensalidade sugerida: </span>
+                <span className="tabular-nums">
+                  {brl(orc.mensalidadeSugerida.minimo)} – {brl(orc.mensalidadeSugerida.maximo)}
+                </span>
+                <span className="text-muted-foreground"> · {orc.mensalidadeSugerida.descricao}</span>
+              </div>
+            )}
+
+            <div className="rounded-lg border bg-card p-3 space-y-2">
+              {nivel && (
+                <div className={cn("flex items-center gap-1.5 text-sm font-semibold", nivel.cls)}>
+                  <nivel.Icon className="size-4" /> {nivel.label} de investimento
+                </div>
+              )}
+              <p className="text-sm leading-relaxed">{orc.potencialInvestimento.resumo}</p>
+              {orc.potencialInvestimento.sinais?.length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold mt-2">Sinais públicos</div>
+                  <ul className="text-[12px] text-muted-foreground list-disc pl-4 space-y-0.5">
+                    {orc.potencialInvestimento.sinais.map((s, i) => (
+                      <li key={i}>{s}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {orc.potencialInvestimento.riscos?.length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold mt-2">Riscos / objeções</div>
+                  <ul className="text-[12px] text-muted-foreground list-disc pl-4 space-y-0.5">
+                    {orc.potencialInvestimento.riscos.map((s, i) => (
+                      <li key={i}>{s}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <p className="text-[11px] text-muted-foreground">{orc.observacoes}</p>
+          </div>
+        </ScrollArea>
+      )}
+    </div>
+  );
+}
