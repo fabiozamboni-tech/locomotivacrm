@@ -272,7 +272,7 @@ function ImportarPage() {
 
   const importarTodas = () => {
     let count = 0;
-    for (const p of results) {
+    for (const p of resultsFiltrados) {
       if (imported.has(p.placeId)) continue;
       addEmpresa(
         empresaFromRaw({
@@ -288,7 +288,8 @@ function ImportarPage() {
       );
       count++;
     }
-    setImported(new Set(results.map((r) => r.placeId)));
+    setImported((s) => new Set([...s, ...resultsFiltrados.map((r) => r.placeId)]));
+
     toast.success(`${count} empresa(s) adicionada(s)`);
   };
 
