@@ -39,16 +39,45 @@ function ImportarPage() {
   const search = useServerFn(searchPlaces);
   const lookup = useServerFn(lookupEmpresa);
   const [segmento, setSegmento] = useState("Restaurantes");
+  const [regiao, setRegiao] = useState("South America");
   const [pais, setPais] = useState("BR");
-  const [estado, setEstado] = useState("RS");
+  const RS_CODE = useMemo(
+    () => estadosDoPais("BR").find((e) => e.nome.startsWith("Rio Grande do Sul"))?.code ?? "",
+    [],
+  );
+  const [estado, setEstado] = useState(RS_CODE);
   const [cidade, setCidade] = useState("Bento Gonçalves");
-  const cidadesSugeridas =
-    pais === "BR"
-      ? estado === "RS"
-        ? [...CIDADES_RS_FOCO]
-        : (CIDADES_POR_UF[estado] ?? [])
-      : [];
-  const localizacao = [cidade, estado, PAISES.find((p) => p.code === pais)?.nome ?? ""]
+  const [cidadesSugeridas, setCidadesSugeridas] = useState<string[]>([...CIDADES_RS_FOCO]);
+
+  const paisesFiltrados = useMemo(
+    () => (regiao ? PAISES.filter((p) => p.regiao === regiao) : PAISES),
+    [regiao],
+  );
+  const estados = useMemo(() => estadosDoPais(pais), [pais]);
+
+  useEffect(() => {
+    let ativo = true;
+    if (!estado) {
+      setCidadesSugeridas([]);
+      return;
+    }
+    carregarCidades(pais, estado).then((lista) => {
+      if (!ativo) return;
+      const extra = pais === "BR" && estado === RS_CODE ? CIDADES_RS_FOCO : [];
+      setCidadesSugeridas([...new Set([...extra, ...lista])]);
+    });
+    return () => {
+      ativo = false;
+    };
+  }, [pais, estado, RS_CODE]);
+
+  const regioesOptions: ComboboxOption[] = REGIOES.map((r) => ({ value: r.id, label: r.nome }));
+  const paisesOptions: ComboboxOption[] = paisesFiltrados.map((p) => ({ value: p.code, label: p.nome }));
+  const estadosOptions: ComboboxOption[] = estados.map((e) => ({ value: e.code, label: e.nome }));
+  const cidadesOptions: ComboboxOption[] = cidadesSugeridas.map((c) => ({ value: c, label: c }));
+  const segmentosOptions: ComboboxOption[] = SEGMENTOS.map((s) => ({ value: s, label: s }));
+
+  const localizacao = [cidade, estado ? nomeEstado(pais, estado) : "", nomePais(pais)]
     .map((s) => s.trim())
     .filter(Boolean)
     .join(", ");
