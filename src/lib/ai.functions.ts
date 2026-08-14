@@ -293,19 +293,30 @@ export interface OrcamentoIA {
 
 export const estimarValorIA = createServerFn({ method: "POST" })
   .inputValidator(
-    (data: { empresa: EmpresaCtx; contextoExtra?: string; porteManual?: string }) => data,
+    (data: {
+      empresa: EmpresaCtx;
+      contextoExtra?: string;
+      porteManual?: string;
+      pais?: string;
+      uf?: string;
+    }) => data,
   )
   .handler(async ({ data }): Promise<OrcamentoIA> => {
     const { chatJSON } = await import("./ai-gateway.server");
+    const { lookupLocalidade, localidadeTxt } = await import("./geo-lookup.server");
+    const loc = lookupLocalidade(data.empresa.cidade, { uf: data.uf, pais: data.pais });
     const sys =
-      "Você é gestor comercial de uma agência de design, comunicação e desenvolvimento web da Serra Gaúcha (RS). Estima orçamentos realistas em reais (BRL) para PMEs brasileiras, usando a média de mercado praticada por agências regionais no Rio Grande do Sul. Seja conservador e coerente com o porte e a cidade da empresa. Nunca invente dados privados — use apenas o que é público/inferível.";
+      "Você é gestor comercial de uma agência de design, comunicação e desenvolvimento web. Estima orçamentos realistas de sites SEMPRE calibrados pela localidade da empresa (país, estado/UF e cidade): usa a média de preços praticada por agências naquele mercado local, o poder económico do município (população, PIB, PIB per capita, setor dominante) e a moeda do país. Uma empresa numa capital ou município de economia forte suporta preços mais altos; num município pequeno/economia fraca os valores devem cair proporcionalmente. Seja conservador e nunca invente dados privados.";
     const user = `Estime o valor de um projeto de site para a empresa abaixo e avalie o potencial de investimento dela.
 
 ${ctxTxt(data.empresa)}
 ${data.porteManual ? `Porte informado pelo comercial: ${data.porteManual}` : ""}
+
+LOCALIDADE (base obrigatória de cálculo):
+${localidadeTxt(loc)}
 ${data.contextoExtra ? `\nContexto público coletado:\n${data.contextoExtra.slice(0, 4000)}` : ""}
 
-Considere: porte/tamanho aparente da empresa, segmento, cidade e região (poder económico local e média de preços praticada ali), maturidade digital atual (score ${data.empresa.score}/100) e necessidade real de e-commerce.
+A BASE DE CÁLCULO é a comparação com o mercado do local onde a empresa está instalada (país → estado/UF → cidade). Ancore os valores na média praticada nessa cidade/região e ajuste depois por porte da empresa, segmento, maturidade digital atual (score ${data.empresa.score}/100) e necessidade real de e-commerce. Explique em "referenciaMercado" a média local usada e o efeito do poder económico do município.
 
 Devolva JSON EXATO:
 {
