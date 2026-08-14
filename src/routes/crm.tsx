@@ -532,6 +532,9 @@ function EmpresaModal({
                 {empresa.historico.length}
               </Badge>
             </TabsTrigger>
+            <TabsTrigger value="orcamento" className="gap-1.5">
+              <DollarSign className="size-3.5" /> Orçamento
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="abordagem" className="m-0 p-5 space-y-3">
