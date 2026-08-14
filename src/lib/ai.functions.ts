@@ -262,3 +262,94 @@ Regras:
       { role: "user", content: user },
     ]);
   });
+
+// -------- ESTIMATIVA DE VALOR (orçamento) --------
+export interface OpcaoOrcamento {
+  tipo: "site_estatico" | "site_crm" | "loja_virtual";
+  titulo: string;
+  minimo: number;
+  maximo: number;
+  recomendado: number;
+  prazo: string;
+  escopo: string[];
+  aplicavel: boolean;
+  justificativa: string;
+}
+
+export interface OrcamentoIA {
+  porteEstimado: string;
+  referenciaMercado: string;
+  moeda: string;
+  opcoes: OpcaoOrcamento[];
+  mensalidadeSugerida?: { minimo: number; maximo: number; descricao: string };
+  potencialInvestimento: {
+    nivel: "alto" | "medio" | "baixo";
+    resumo: string;
+    sinais: string[];
+    riscos: string[];
+  };
+  observacoes: string;
+}
+
+export const estimarValorIA = createServerFn({ method: "POST" })
+  .inputValidator(
+    (data: { empresa: EmpresaCtx; contextoExtra?: string; porteManual?: string }) => data,
+  )
+  .handler(async ({ data }): Promise<OrcamentoIA> => {
+    const { chatJSON } = await import("./ai-gateway.server");
+    const sys =
+      "Você é gestor comercial de uma agência de design, comunicação e desenvolvimento web da Serra Gaúcha (RS). Estima orçamentos realistas em reais (BRL) para PMEs brasileiras, usando a média de mercado praticada por agências regionais no Rio Grande do Sul. Seja conservador e coerente com o porte e a cidade da empresa. Nunca invente dados privados — use apenas o que é público/inferível.";
+    const user = `Estime o valor de um projeto de site para a empresa abaixo e avalie o potencial de investimento dela.
+
+${ctxTxt(data.empresa)}
+${data.porteManual ? `Porte informado pelo comercial: ${data.porteManual}` : ""}
+${data.contextoExtra ? `\nContexto público coletado:\n${data.contextoExtra.slice(0, 4000)}` : ""}
+
+Considere: porte/tamanho aparente da empresa, segmento, cidade e região (poder económico local e média de preços praticada ali), maturidade digital atual (score ${data.empresa.score}/100) e necessidade real de e-commerce.
+
+Devolva JSON EXATO:
+{
+  "porteEstimado": "microempresa | pequena | média | grande (com 1 frase de justificação)",
+  "referenciaMercado": "1-2 frases sobre a média de preços de sites para empresas deste porte nesta cidade/região",
+  "moeda": "BRL",
+  "opcoes": [
+    {
+      "tipo": "site_estatico",
+      "titulo": "Site institucional (sem CRM)",
+      "minimo": 0, "maximo": 0, "recomendado": 0,
+      "prazo": "ex: 3 a 5 semanas",
+      "escopo": ["4-6 itens de escopo"],
+      "aplicavel": true,
+      "justificativa": "1 frase"
+    },
+    {
+      "tipo": "site_crm",
+      "titulo": "Site com CRM/área de gestão",
+      "minimo": 0, "maximo": 0, "recomendado": 0,
+      "prazo": "...", "escopo": ["..."], "aplicavel": true, "justificativa": "..."
+    },
+    {
+      "tipo": "loja_virtual",
+      "titulo": "Loja virtual (e-commerce)",
+      "minimo": 0, "maximo": 0, "recomendado": 0,
+      "prazo": "...", "escopo": ["..."],
+      "aplicavel": false,
+      "justificativa": "Marque aplicavel=true APENAS se o segmento vender produtos passíveis de venda online"
+    }
+  ],
+  "mensalidadeSugerida": { "minimo": 0, "maximo": 0, "descricao": "manutenção/hospedagem ou gestão mensal" },
+  "potencialInvestimento": {
+    "nivel": "alto" | "medio" | "baixo",
+    "resumo": "3-4 frases sobre a capacidade e a disposição da empresa para investir",
+    "sinais": ["3-5 sinais públicos observados"],
+    "riscos": ["2-4 riscos ou objeções esperadas"]
+  },
+  "observacoes": "1-2 frases de ressalva (estimativa, sujeita a levantamento)"
+}
+
+Regras: valores numéricos inteiros em reais, sem texto; minimo < recomendado < maximo; nunca retorne null.`;
+    return await chatJSON<OrcamentoIA>([
+      { role: "system", content: sys },
+      { role: "user", content: user },
+    ]);
+  });
