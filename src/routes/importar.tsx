@@ -13,7 +13,9 @@ import { searchPlaces, type PlaceResult } from "@/lib/places.functions";
 import { lookupEmpresa, type LookupResult } from "@/lib/lookup.functions";
 import { empresaFromRaw } from "@/lib/mock-data";
 import { CIDADES_RS_FOCO, SEGMENTOS } from "@/lib/mock-data";
-import { PAISES, ESTADOS_BR, CIDADES_POR_UF } from "@/lib/geo";
+import { PAISES, REGIOES, estadosDoPais, nomePais, nomeEstado, carregarCidades } from "@/lib/geo";
+import { Combobox, type ComboboxOption } from "@/components/combobox";
+import { useEffect, useMemo } from "react";
 import {
   Select,
   SelectContent,
@@ -37,16 +39,45 @@ function ImportarPage() {
   const search = useServerFn(searchPlaces);
   const lookup = useServerFn(lookupEmpresa);
   const [segmento, setSegmento] = useState("Restaurantes");
+  const [regiao, setRegiao] = useState("South America");
   const [pais, setPais] = useState("BR");
-  const [estado, setEstado] = useState("RS");
+  const RS_CODE = useMemo(
+    () => estadosDoPais("BR").find((e) => e.nome.startsWith("Rio Grande do Sul"))?.code ?? "",
+    [],
+  );
+  const [estado, setEstado] = useState(RS_CODE);
   const [cidade, setCidade] = useState("Bento Gonçalves");
-  const cidadesSugeridas =
-    pais === "BR"
-      ? estado === "RS"
-        ? [...CIDADES_RS_FOCO]
-        : (CIDADES_POR_UF[estado] ?? [])
-      : [];
-  const localizacao = [cidade, estado, PAISES.find((p) => p.code === pais)?.nome ?? ""]
+  const [cidadesSugeridas, setCidadesSugeridas] = useState<string[]>([...CIDADES_RS_FOCO]);
+
+  const paisesFiltrados = useMemo(
+    () => (regiao ? PAISES.filter((p) => p.regiao === regiao) : PAISES),
+    [regiao],
+  );
+  const estados = useMemo(() => estadosDoPais(pais), [pais]);
+
+  useEffect(() => {
+    let ativo = true;
+    if (!estado) {
+      setCidadesSugeridas([]);
+      return;
+    }
+    carregarCidades(pais, estado).then((lista) => {
+      if (!ativo) return;
+      const extra = pais === "BR" && estado === RS_CODE ? CIDADES_RS_FOCO : [];
+      setCidadesSugeridas([...new Set([...extra, ...lista])]);
+    });
+    return () => {
+      ativo = false;
+    };
+  }, [pais, estado, RS_CODE]);
+
+  const regioesOptions: ComboboxOption[] = REGIOES.map((r) => ({ value: r.id, label: r.nome }));
+  const paisesOptions: ComboboxOption[] = paisesFiltrados.map((p) => ({ value: p.code, label: p.nome }));
+  const estadosOptions: ComboboxOption[] = estados.map((e) => ({ value: e.code, label: e.nome }));
+  const cidadesOptions: ComboboxOption[] = cidadesSugeridas.map((c) => ({ value: c, label: c }));
+  const segmentosOptions: ComboboxOption[] = SEGMENTOS.map((s) => ({ value: s, label: s }));
+
+  const localizacao = [cidade, estado ? nomeEstado(pais, estado) : "", nomePais(pais)]
     .map((s) => s.trim())
     .filter(Boolean)
     .join(", ");
@@ -149,7 +180,7 @@ function ImportarPage() {
     }
     setLoading(true);
     try {
-      const res = await search({ data: { query } });
+      const res = await search({ data: { query, regionCode: pais || "BR" } });
       setResults(res);
       toast.success(`${res.length} resultado(s) do Google Places`);
     } catch (err) {
@@ -229,64 +260,74 @@ function ImportarPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid md:grid-cols-4 gap-2">
+          <div className="grid md:grid-cols-5 gap-2">
+            <div>
+              <label className="text-xs text-muted-foreground">Continente / região</label>
+              <Combobox
+                options={regioesOptions}
+                value={regiao}
+                onChange={(v) => {
+                  setRegiao(v);
+                  const primeiro = PAISES.find((p) => p.regiao === v);
+                  setPais(primeiro?.code ?? "");
+                  setEstado("");
+                  setCidade("");
+                }}
+                placeholder="Todos"
+                searchPlaceholder="Buscar região…"
+              />
+            </div>
             <div>
               <label className="text-xs text-muted-foreground">País</label>
-              <Select value={pais} onValueChange={(v) => { setPais(v); if (v !== "BR") setEstado(""); }}>
-                <SelectTrigger><SelectValue placeholder="País" /></SelectTrigger>
-                <SelectContent>
-                  {PAISES.map((p) => (
-                    <SelectItem key={p.code} value={p.code}>{p.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                options={paisesOptions}
+                value={pais}
+                onChange={(v) => {
+                  setPais(v);
+                  setEstado("");
+                  setCidade("");
+                }}
+                placeholder="País"
+                searchPlaceholder="Buscar país…"
+              />
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Estado / região</label>
-              {pais === "BR" ? (
-                <Select value={estado} onValueChange={(v) => { setEstado(v); setCidade(""); }}>
-                  <SelectTrigger><SelectValue placeholder="Selecione o estado" /></SelectTrigger>
-                  <SelectContent>
-                    {ESTADOS_BR.map((e) => (
-                      <SelectItem key={e.uf} value={e.uf}>{e.nome} ({e.uf})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input
-                  value={estado}
-                  onChange={(e) => setEstado(e.target.value)}
-                  placeholder="Ex: Norte, Andalucía…"
-                />
-              )}
+              <Combobox
+                options={estadosOptions}
+                value={estado}
+                onChange={(v) => {
+                  setEstado(v);
+                  setCidade("");
+                }}
+                placeholder={estadosOptions.length ? "Selecione o estado" : "Sem divisões"}
+                searchPlaceholder="Buscar estado…"
+                allowCustom
+              />
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Cidade</label>
-              <Input
-                list="cidades-sugestoes"
+              <Combobox
+                options={cidadesOptions}
                 value={cidade}
-                onChange={(e) => setCidade(e.target.value)}
-                placeholder="Ex: Bento Gonçalves"
+                onChange={setCidade}
+                placeholder="Selecione a cidade"
+                searchPlaceholder="Buscar cidade…"
+                emptyText="Digite para usar outra cidade"
+                allowCustom
               />
-              <datalist id="cidades-sugestoes">
-                {cidadesSugeridas.map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Segmento / termo</label>
-              <Input
-                list="segmentos-sugestoes"
+              <Combobox
+                options={segmentosOptions}
                 value={segmento}
-                onChange={(e) => setSegmento(e.target.value)}
-                placeholder="Ex: vinícolas, pousadas, metalurgia"
+                onChange={setSegmento}
+                placeholder="Ex: vinícolas, pousadas"
+                searchPlaceholder="Buscar ou digitar…"
+                emptyText="Digite um termo livre"
+                allowCustom
               />
-              <datalist id="segmentos-sugestoes">
-                {SEGMENTOS.map((s) => (
-                  <option key={s} value={s} />
-                ))}
-              </datalist>
             </div>
           </div>
           <div className="flex items-center gap-3">
