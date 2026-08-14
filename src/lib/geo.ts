@@ -16,8 +16,33 @@ export function estadosDoPais(code: string): Estado[] {
 export function nomeEstado(pais: string, code: string): string {
   return estadosDoPais(pais).find((e) => e.code === code)?.nome ?? code;
 }
-export async function carregarCidades(pais: string, estadoCode: string): Promise<string[]> {
+export interface CidadeInfo {
+  nome: string;
+  populacao?: number;
+  /** PIB municipal em mil R$ (apenas Brasil / IBGE). */
+  pib?: number;
+  /** Setor económico principal (apenas Brasil / IBGE). */
+  setor?: string;
+  /** Força da economia local: 0 = fraca, 1 = média, 2 = forte. */
+  forca?: number;
+}
+
+export async function carregarCidades(pais: string, estadoCode: string): Promise<CidadeInfo[]> {
   if (!pais || !estadoCode) return [];
+  if (pais === "BR") {
+    const uf = BR_ADMIN1_TO_UF[estadoCode] ?? estadoCode;
+    const { MUNICIPIOS_BR } = await import("./geo-br");
+    return (MUNICIPIOS_BR[uf] ?? []).map(([nome, populacao, pib, setor, forca]) => ({
+      nome,
+      populacao,
+      pib,
+      setor,
+      forca,
+    }));
+  }
   const { CIDADES_POR_ESTADO } = await import("./geo-cities");
-  return CIDADES_POR_ESTADO[`${pais}.${estadoCode}`] ?? [];
+  return (CIDADES_POR_ESTADO[`${pais}.${estadoCode}`] ?? []).map(([nome, populacao]) => ({
+    nome,
+    populacao,
+  }));
 }
