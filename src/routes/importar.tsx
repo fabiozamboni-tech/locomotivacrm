@@ -37,7 +37,20 @@ function ImportarPage() {
   const search = useServerFn(searchPlaces);
   const lookup = useServerFn(lookupEmpresa);
   const [segmento, setSegmento] = useState("Restaurantes");
+  const [pais, setPais] = useState("BR");
+  const [estado, setEstado] = useState("RS");
   const [cidade, setCidade] = useState("Bento Gonçalves");
+  const cidadesSugeridas =
+    pais === "BR"
+      ? estado === "RS"
+        ? [...CIDADES_RS_FOCO]
+        : (CIDADES_POR_UF[estado] ?? [])
+      : [];
+  const localizacao = [cidade, estado, PAISES.find((p) => p.code === pais)?.nome ?? ""]
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join(", ");
+  const queryPreview = [segmento.trim(), localizacao].filter(Boolean).join(" em ");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<PlaceResult[]>([]);
   const [imported, setImported] = useState<Set<string>>(new Set());
