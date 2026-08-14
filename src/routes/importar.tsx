@@ -142,7 +142,11 @@ function ImportarPage() {
   };
 
   const buscar = async () => {
-    const query = `${segmento} em ${cidade}, RS`.trim();
+    const query = queryPreview;
+    if (!query) {
+      toast.error("Informe ao menos o segmento ou a cidade");
+      return;
+    }
     setLoading(true);
     try {
       const res = await search({ data: { query } });
