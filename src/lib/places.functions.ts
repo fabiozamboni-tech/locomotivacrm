@@ -17,6 +17,7 @@ export interface PlaceResult {
 }
 
 const FIELD_MASK = [
+  "nextPageToken",
   "places.id",
   "places.displayName",
   "places.formattedAddress",
@@ -32,6 +33,7 @@ const FIELD_MASK = [
   "places.location",
   "places.businessStatus",
 ].join(",");
+
 
 function extractCidade(components?: Array<{ longText?: string; types?: string[] }>): string {
   if (!components) return "";
