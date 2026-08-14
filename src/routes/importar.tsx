@@ -260,64 +260,74 @@ function ImportarPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid md:grid-cols-4 gap-2">
+          <div className="grid md:grid-cols-5 gap-2">
+            <div>
+              <label className="text-xs text-muted-foreground">Continente / região</label>
+              <Combobox
+                options={regioesOptions}
+                value={regiao}
+                onChange={(v) => {
+                  setRegiao(v);
+                  const primeiro = PAISES.find((p) => p.regiao === v);
+                  setPais(primeiro?.code ?? "");
+                  setEstado("");
+                  setCidade("");
+                }}
+                placeholder="Todos"
+                searchPlaceholder="Buscar região…"
+              />
+            </div>
             <div>
               <label className="text-xs text-muted-foreground">País</label>
-              <Select value={pais} onValueChange={(v) => { setPais(v); if (v !== "BR") setEstado(""); }}>
-                <SelectTrigger><SelectValue placeholder="País" /></SelectTrigger>
-                <SelectContent>
-                  {PAISES.map((p) => (
-                    <SelectItem key={p.code} value={p.code}>{p.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                options={paisesOptions}
+                value={pais}
+                onChange={(v) => {
+                  setPais(v);
+                  setEstado("");
+                  setCidade("");
+                }}
+                placeholder="País"
+                searchPlaceholder="Buscar país…"
+              />
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Estado / região</label>
-              {pais === "BR" ? (
-                <Select value={estado} onValueChange={(v) => { setEstado(v); setCidade(""); }}>
-                  <SelectTrigger><SelectValue placeholder="Selecione o estado" /></SelectTrigger>
-                  <SelectContent>
-                    {ESTADOS_BR.map((e) => (
-                      <SelectItem key={e.uf} value={e.uf}>{e.nome} ({e.uf})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input
-                  value={estado}
-                  onChange={(e) => setEstado(e.target.value)}
-                  placeholder="Ex: Norte, Andalucía…"
-                />
-              )}
+              <Combobox
+                options={estadosOptions}
+                value={estado}
+                onChange={(v) => {
+                  setEstado(v);
+                  setCidade("");
+                }}
+                placeholder={estadosOptions.length ? "Selecione o estado" : "Sem divisões"}
+                searchPlaceholder="Buscar estado…"
+                allowCustom
+              />
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Cidade</label>
-              <Input
-                list="cidades-sugestoes"
+              <Combobox
+                options={cidadesOptions}
                 value={cidade}
-                onChange={(e) => setCidade(e.target.value)}
-                placeholder="Ex: Bento Gonçalves"
+                onChange={setCidade}
+                placeholder="Selecione a cidade"
+                searchPlaceholder="Buscar cidade…"
+                emptyText="Digite para usar outra cidade"
+                allowCustom
               />
-              <datalist id="cidades-sugestoes">
-                {cidadesSugeridas.map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Segmento / termo</label>
-              <Input
-                list="segmentos-sugestoes"
+              <Combobox
+                options={segmentosOptions}
                 value={segmento}
-                onChange={(e) => setSegmento(e.target.value)}
-                placeholder="Ex: vinícolas, pousadas, metalurgia"
+                onChange={setSegmento}
+                placeholder="Ex: vinícolas, pousadas"
+                searchPlaceholder="Buscar ou digitar…"
+                emptyText="Digite um termo livre"
+                allowCustom
               />
-              <datalist id="segmentos-sugestoes">
-                {SEGMENTOS.map((s) => (
-                  <option key={s} value={s} />
-                ))}
-              </datalist>
             </div>
           </div>
           <div className="flex items-center gap-3">
