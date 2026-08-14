@@ -6,15 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Upload, Download, FileDown, MapPin, Search, Plus, ExternalLink, Loader2, UserPlus, Globe, Instagram, Sparkles } from "lucide-react";
+import { Upload, Download, FileDown, MapPin, Search, Plus, ExternalLink, Loader2, UserPlus, Globe, Instagram, Sparkles, AtSign, Facebook, Users, TrendingUp } from "lucide-react";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { searchPlaces, type PlaceResult } from "@/lib/places.functions";
 import { lookupEmpresa, type LookupResult } from "@/lib/lookup.functions";
 import { empresaFromRaw } from "@/lib/mock-data";
 import { CIDADES_RS_FOCO, SEGMENTOS } from "@/lib/mock-data";
-import { PAISES, REGIOES, estadosDoPais, nomePais, nomeEstado, carregarCidades } from "@/lib/geo";
-import { Combobox, type ComboboxOption } from "@/components/combobox";
+import { PAISES, REGIOES, estadosDoPais, nomePais, nomeEstado, carregarCidades, type CidadeInfo } from "@/lib/geo";
+import { Combobox, TrendIcon, type ComboboxOption } from "@/components/combobox";
 import { useEffect, useMemo } from "react";
 import {
   Select,
@@ -27,6 +27,41 @@ import {
 export const Route = createFileRoute("/importar")({
   component: ImportarPage,
 });
+
+/** Formata população: 1.388.794 → "1,39 mi hab." */
+function fmtPop(n?: number): string {
+  if (!n) return "";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} mi hab.`;
+  if (n >= 1_000) return `${(n / 1_000).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} mil hab.`;
+  return `${n.toLocaleString("pt-BR")} hab.`;
+}
+
+/** PIB vem em mil R$ (IBGE). */
+function fmtPib(milReais?: number): string {
+  if (!milReais) return "";
+  const reais = milReais * 1000;
+  if (reais >= 1e9) return `PIB R$ ${(reais / 1e9).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} bi`;
+  if (reais >= 1e6) return `PIB R$ ${(reais / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} mi`;
+  return `PIB R$ ${reais.toLocaleString("pt-BR")}`;
+}
+
+function detalheCidade(c: CidadeInfo): string {
+  return [fmtPop(c.populacao), c.setor, fmtPib(c.pib)].filter(Boolean).join(" · ");
+}
+
+const FORCA_LABEL = ["economia local fraca", "economia local média", "economia local forte"];
+
+/** Extrai @handle de Instagram/Facebook a partir de uma URL, quando aplicável. */
+function socialDoSite(url?: string): { rede: "instagram" | "facebook"; handle: string; url: string } | null {
+  if (!url) return null;
+  const m = url.match(/(?:https?:\/\/)?(?:www\.)?(instagram|facebook)\.com\/([A-Za-z0-9._-]+)/i);
+  if (!m) return null;
+  const rede = m[1].toLowerCase() as "instagram" | "facebook";
+  const handle = m[2].replace(/\/$/, "");
+  if (!handle || ["p", "pages", "profile.php", "reel", "explore"].includes(handle)) return null;
+  return { rede, handle, url };
+}
+
 
 const CSV_EXAMPLE = `nome,segmento,cidade,telefone,whatsapp,email,site,instagram
 Padaria do Vale,Padaria artesanal,Bento Gonçalves,(54) 3055-0011,(54) 99988-7766,,,@padariadovale
@@ -47,7 +82,11 @@ function ImportarPage() {
   );
   const [estado, setEstado] = useState(RS_CODE);
   const [cidade, setCidade] = useState("Bento Gonçalves");
-  const [cidadesSugeridas, setCidadesSugeridas] = useState<string[]>([...CIDADES_RS_FOCO]);
+  const [cidadesSugeridas, setCidadesSugeridas] = useState<CidadeInfo[]>(
+    CIDADES_RS_FOCO.map((nome) => ({ nome })),
+  );
+  const [limite, setLimite] = useState("20");
+  const [filtroSite, setFiltroSite] = useState<"todos" | "com" | "sem">("todos");
 
   const paisesFiltrados = useMemo(
     () => (regiao ? PAISES.filter((p) => p.regiao === regiao) : PAISES),
@@ -63,28 +102,51 @@ function ImportarPage() {
     }
     carregarCidades(pais, estado).then((lista) => {
       if (!ativo) return;
-      const extra = pais === "BR" && estado === RS_CODE ? CIDADES_RS_FOCO : [];
-      setCidadesSugeridas([...new Set([...extra, ...lista])]);
+      setCidadesSugeridas(lista);
     });
     return () => {
       ativo = false;
     };
-  }, [pais, estado, RS_CODE]);
+  }, [pais, estado]);
 
   const regioesOptions: ComboboxOption[] = REGIOES.map((r) => ({ value: r.id, label: r.nome }));
   const paisesOptions: ComboboxOption[] = paisesFiltrados.map((p) => ({ value: p.code, label: p.nome }));
-  const estadosOptions: ComboboxOption[] = estados.map((e) => ({ value: e.code, label: e.nome }));
-  const cidadesOptions: ComboboxOption[] = cidadesSugeridas.map((c) => ({ value: c, label: c }));
-  const segmentosOptions: ComboboxOption[] = SEGMENTOS.map((s) => ({ value: s, label: s }));
+  const estadosOptions: ComboboxOption[] = [
+    { value: "", label: "Todos os estados" },
+    ...estados.map((e) => ({ value: e.code, label: e.nome })),
+  ];
+  const cidadesOptions: ComboboxOption[] = [
+    { value: "", label: "Todas as cidades" },
+    ...cidadesSugeridas.map((c) => ({
+      value: c.nome,
+      label: c.nome,
+      detail: detalheCidade(c),
+      trend: c.forca,
+    })),
+  ];
+  const segmentosOptions: ComboboxOption[] = [
+    { value: "", label: "Todos os segmentos" },
+    ...SEGMENTOS.map((s) => ({ value: s, label: s })),
+  ];
+  const cidadeSelecionada = cidadesSugeridas.find((c) => c.nome === cidade);
 
   const localizacao = [cidade, estado ? nomeEstado(pais, estado) : "", nomePais(pais)]
     .map((s) => s.trim())
     .filter(Boolean)
     .join(", ");
-  const queryPreview = [segmento.trim(), localizacao].filter(Boolean).join(" em ");
+  const termo = segmento.trim() || "empresas";
+  const queryPreview = [termo, localizacao].filter(Boolean).join(" em ");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<PlaceResult[]>([]);
   const [imported, setImported] = useState<Set<string>>(new Set());
+  const resultsFiltrados = useMemo(
+    () =>
+      results.filter((p) =>
+        filtroSite === "com" ? !!p.site : filtroSite === "sem" ? !p.site : true,
+      ),
+    [results, filtroSite],
+  );
+
 
   // Lookup por site / instagram
   const [lookupInput, setLookupInput] = useState("");
@@ -180,7 +242,7 @@ function ImportarPage() {
     }
     setLoading(true);
     try {
-      const res = await search({ data: { query, regionCode: pais || "BR" } });
+      const res = await search({ data: { query, regionCode: pais || "BR", limit: Number(limite) } });
       setResults(res);
       toast.success(`${res.length} resultado(s) do Google Places`);
     } catch (err) {
@@ -210,7 +272,7 @@ function ImportarPage() {
 
   const importarTodas = () => {
     let count = 0;
-    for (const p of results) {
+    for (const p of resultsFiltrados) {
       if (imported.has(p.placeId)) continue;
       addEmpresa(
         empresaFromRaw({
@@ -226,7 +288,8 @@ function ImportarPage() {
       );
       count++;
     }
-    setImported(new Set(results.map((r) => r.placeId)));
+    setImported((s) => new Set([...s, ...resultsFiltrados.map((r) => r.placeId)]));
+
     toast.success(`${count} empresa(s) adicionada(s)`);
   };
 
@@ -300,7 +363,7 @@ function ImportarPage() {
                   setEstado(v);
                   setCidade("");
                 }}
-                placeholder={estadosOptions.length ? "Selecione o estado" : "Sem divisões"}
+                placeholder={estados.length ? "Todos os estados" : "Sem divisões"}
                 searchPlaceholder="Buscar estado…"
                 allowCustom
               />
@@ -311,7 +374,7 @@ function ImportarPage() {
                 options={cidadesOptions}
                 value={cidade}
                 onChange={setCidade}
-                placeholder="Selecione a cidade"
+                placeholder="Todas as cidades"
                 searchPlaceholder="Buscar cidade…"
                 emptyText="Digite para usar outra cidade"
                 allowCustom
@@ -323,28 +386,83 @@ function ImportarPage() {
                 options={segmentosOptions}
                 value={segmento}
                 onChange={setSegmento}
-                placeholder="Ex: vinícolas, pousadas"
+                placeholder="Todos os segmentos"
                 searchPlaceholder="Buscar ou digitar…"
                 emptyText="Digite um termo livre"
                 allowCustom
               />
             </div>
           </div>
-          <div className="flex items-center gap-3">
+
+          {cidadeSelecionada && (cidadeSelecionada.populacao || cidadeSelecionada.pib) && (
+            <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+              <span className="inline-flex items-center gap-1.5 font-medium">
+                <TrendIcon trend={cidadeSelecionada.forca} />
+                {cidadeSelecionada.nome}
+              </span>
+              {cidadeSelecionada.populacao && (
+                <span className="inline-flex items-center gap-1 text-muted-foreground">
+                  <Users className="h-3 w-3" />
+                  {fmtPop(cidadeSelecionada.populacao)}
+                </span>
+              )}
+              {cidadeSelecionada.setor && (
+                <span className="text-muted-foreground">Setor: {cidadeSelecionada.setor}</span>
+              )}
+              {cidadeSelecionada.pib && (
+                <span className="inline-flex items-center gap-1 text-muted-foreground">
+                  <TrendingUp className="h-3 w-3" />
+                  {fmtPib(cidadeSelecionada.pib)}
+                </span>
+              )}
+              {cidadeSelecionada.forca !== undefined && (
+                <Badge variant="outline" className="text-[10px] font-normal">
+                  {FORCA_LABEL[cidadeSelecionada.forca] ?? ""}
+                </Badge>
+              )}
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-end gap-3">
             <Button onClick={buscar} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Search className="h-4 w-4 mr-1.5" />}
               Buscar
             </Button>
+            <div>
+              <label className="text-xs text-muted-foreground block">Resultados</label>
+              <Select value={limite} onValueChange={setLimite}>
+                <SelectTrigger className="w-[110px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {["20", "30", "40", "50", "100"].map((n) => (
+                    <SelectItem key={n} value={n}>{n} empresas</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block">Site</label>
+              <Select value={filtroSite} onValueChange={(v) => setFiltroSite(v as typeof filtroSite)}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="com">Com site</SelectItem>
+                  <SelectItem value="sem">Sem site</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <span className="text-xs text-muted-foreground truncate">
               Consulta: <span className="font-mono">{queryPreview || "—"}</span>
             </span>
           </div>
 
-
           {results.length > 0 && (
             <div className="flex items-center justify-between">
               <div className="text-xs text-muted-foreground">
-                {results.length} resultado(s) · fonte: Google Places API (New)
+                {resultsFiltrados.length} de {results.length} resultado(s) · fonte: Google Places API (New)
               </div>
               <Button size="sm" variant="outline" onClick={importarTodas}>
                 <Plus className="h-3.5 w-3.5 mr-1.5" />
@@ -354,8 +472,9 @@ function ImportarPage() {
           )}
 
           <div className="space-y-2">
-            {results.map((p) => {
+            {resultsFiltrados.map((p) => {
               const done = imported.has(p.placeId);
+              const social = socialDoSite(p.site);
               return (
                 <div
                   key={p.placeId}
@@ -379,6 +498,22 @@ function ImportarPage() {
                         <Badge className="text-[10px] font-normal bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/15">
                           sem site
                         </Badge>
+                      )}
+                      {social && (
+                        <a
+                          href={social.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 rounded-md border border-border/60 px-1.5 py-0.5 text-[10px] hover:underline"
+                        >
+                          {social.rede === "instagram" ? (
+                            <Instagram className="h-3 w-3 text-pink-500" />
+                          ) : (
+                            <Facebook className="h-3 w-3 text-sky-500" />
+                          )}
+                          <AtSign className="h-2.5 w-2.5" />
+                          {social.handle}
+                        </a>
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground truncate">{p.endereco}</div>
@@ -413,7 +548,13 @@ function ImportarPage() {
                 Escolha segmento + cidade e clique em Buscar para trazer empresas reais do Google.
               </div>
             )}
+            {!loading && results.length > 0 && resultsFiltrados.length === 0 && (
+              <div className="text-xs text-muted-foreground text-center py-6 border border-dashed border-border/60 rounded-md">
+                Nenhum resultado com este filtro de site.
+              </div>
+            )}
           </div>
+
 
           <p className="text-[11px] text-muted-foreground leading-relaxed">
             ⚠️ Compliance: dados vindos de fonte pública (Google Places). Antes de qualquer
