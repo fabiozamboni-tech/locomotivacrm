@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, ArrowUp, ArrowRight, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -11,6 +11,16 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+
+export function TrendIcon({ trend, className }: { trend?: number; className?: string }) {
+  if (trend === undefined || trend === null) return null;
+  if (trend >= 2)
+    return <ArrowUp className={cn("mr-1.5 h-3.5 w-3.5 shrink-0 text-emerald-500", className)} />;
+  if (trend === 1)
+    return <ArrowRight className={cn("mr-1.5 h-3.5 w-3.5 shrink-0 text-amber-500", className)} />;
+  return <ArrowDown className={cn("mr-1.5 h-3.5 w-3.5 shrink-0 text-rose-500", className)} />;
+}
+
 
 export interface ComboboxOption {
   value: string;
