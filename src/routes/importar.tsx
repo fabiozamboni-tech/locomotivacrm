@@ -180,7 +180,7 @@ function ImportarPage() {
     }
     setLoading(true);
     try {
-      const res = await search({ data: { query } });
+      const res = await search({ data: { query, regionCode: pais || "BR" } });
       setResults(res);
       toast.success(`${res.length} resultado(s) do Google Places`);
     } catch (err) {
