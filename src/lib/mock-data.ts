@@ -26,6 +26,10 @@ export type CrmStage =
 
 export type OrigemDado =
   | "google_places"
+  | "serpapi"
+  | "apollo"
+  | "openstreetmap"
+  | "brasilapi"
   | "diretorio_publico"
   | "manual"
   | "csv"
