@@ -54,6 +54,16 @@ function extrairInstagram(urlOuTexto?: string): string | undefined {
   return undefined;
 }
 
+const DEFAULT_SERPAPI_KEY = "ec62da1cce88a0223fee434841dbaceef4b27c63b8825d53de8d25090ccdbe02";
+
+function getSerpApiKey(): string {
+  const envKey = process.env.SERPAPI_API_KEY?.trim();
+  if (envKey && envKey.length > 20 && !envKey.includes(":")) {
+    return envKey;
+  }
+  return DEFAULT_SERPAPI_KEY;
+}
+
 // ---------------------------------------------------------------------------
 // 1. SerpApi (Google Maps / Local Search)
 // ---------------------------------------------------------------------------
@@ -65,7 +75,7 @@ export const searchSerpApi = createServerFn({ method: "POST" })
     return { query, limit };
   })
   .handler(async ({ data }): Promise<UnifiedProspectResult[]> => {
-    const apiKey = process.env.SERPAPI_API_KEY?.trim();
+    const apiKey = getSerpApiKey();
 
     if (apiKey && apiKey.length > 20 && !apiKey.includes(":")) {
       const url = new URL("https://serpapi.com/search.json");
@@ -821,7 +831,7 @@ export const searchInstagramProfiles = createServerFn({ method: "POST" })
     // -----------------------------------------------------------------------
     // Motor B: SerpApi Google Dorking (site:instagram.com)
     // -----------------------------------------------------------------------
-    const apiKey = process.env.SERPAPI_API_KEY?.trim();
+    const apiKey = getSerpApiKey();
 
     if (apiKey && apiKey.length > 20 && !apiKey.includes(":")) {
       const termo = data.termoLivre || data.segmento || "empresas";
@@ -992,7 +1002,7 @@ export const searchLinkedInLeads = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data }): Promise<UnifiedProspectResult[]> => {
-    const apiKey = process.env.SERPAPI_API_KEY?.trim();
+    const apiKey = getSerpApiKey();
 
     if (apiKey && apiKey.length > 20 && !apiKey.includes(":")) {
       const cargoQuery = data.cargo || "Proprietário OR Sócio OR CEO OR Fundador OR Diretor";
@@ -1132,7 +1142,7 @@ export const searchTikTokProfiles = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data }): Promise<UnifiedProspectResult[]> => {
-    const apiKey = process.env.SERPAPI_API_KEY?.trim();
+    const apiKey = getSerpApiKey();
 
     if (apiKey && apiKey.length > 20 && !apiKey.includes(":")) {
       const termo = data.termoLivre || data.segmento || "loja";
@@ -1252,7 +1262,7 @@ export const searchEconodataSpeedio = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data }): Promise<UnifiedProspectResult[]> => {
-    const apiKey = process.env.SERPAPI_API_KEY?.trim();
+    const apiKey = getSerpApiKey();
 
     if (apiKey && apiKey.length > 20 && !apiKey.includes(":")) {
       const cnaeQuery = data.cnae ? `CNAE ${data.cnae}` : "";
@@ -1467,7 +1477,7 @@ export const searchOutscraperMaps = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data }): Promise<UnifiedProspectResult[]> => {
-    const apiKey = process.env.SERPAPI_API_KEY?.trim();
+    const apiKey = getSerpApiKey();
 
     if (apiKey && apiKey.length > 20 && !apiKey.includes(":")) {
       const query = `${data.segmento} em ${data.cidade} ${data.estado || ""}`.trim();
@@ -1566,7 +1576,7 @@ export const searchFacebookPages = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data }): Promise<UnifiedProspectResult[]> => {
-    const apiKey = process.env.SERPAPI_API_KEY?.trim();
+    const apiKey = getSerpApiKey();
 
     if (apiKey && apiKey.length > 20 && !apiKey.includes(":")) {
       const termo = data.termoLivre || data.segmento || "empresas";

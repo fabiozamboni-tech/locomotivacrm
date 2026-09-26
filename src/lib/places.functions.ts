@@ -148,7 +148,9 @@ export const searchPlaces = createServerFn({ method: "POST" })
     }
 
     // 2. Tenta motor Google Maps via SerpApi se houver chave válida configurada
-    const serpApiKey = process.env.SERPAPI_API_KEY?.trim();
+    const serpApiKey =
+      process.env.SERPAPI_API_KEY?.trim() ||
+      "ec62da1cce88a0223fee434841dbaceef4b27c63b8825d53de8d25090ccdbe02";
 
     if (serpApiKey && serpApiKey.length > 20 && !serpApiKey.includes(":")) {
       const serpUrl = new URL("https://serpapi.com/search.json");
