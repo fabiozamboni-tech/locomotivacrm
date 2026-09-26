@@ -23,7 +23,19 @@ export interface UnifiedProspectResult {
   dataInicioAtividade?: string;
   diasDesdeAbertura?: number;
   placeId?: string;
-  origem: "google_places" | "serpapi" | "apollo" | "openstreetmap" | "brasilapi" | "instagram";
+  origem:
+    | "google_places"
+    | "serpapi"
+    | "apollo"
+    | "openstreetmap"
+    | "brasilapi"
+    | "instagram"
+    | "linkedin"
+    | "tiktok"
+    | "econodata"
+    | "registrobr"
+    | "outscraper"
+    | "facebook";
   detalhesExtras?: string;
 }
 
@@ -638,7 +650,7 @@ export const lookupBrasilApiCnpj = createServerFn({ method: "POST" })
   });
 
 // ---------------------------------------------------------------------------
-// 6. Instagram Scraping & Discovery via SerpApi Google Engine
+// 6. Instagram Scraping & Discovery via SerpApi & Apify Engine
 // ---------------------------------------------------------------------------
 export const searchInstagramProfiles = createServerFn({ method: "POST" })
   .validator(
@@ -648,17 +660,91 @@ export const searchInstagramProfiles = createServerFn({ method: "POST" })
       pais?: string;
       segmento?: string;
       termoLivre?: string;
+      engine?: "serpapi" | "apify";
+      apifyToken?: string;
       limit?: number;
     }) => {
       const cidade = String(data?.cidade ?? "").trim();
       const segmento = String(data?.segmento ?? "").trim();
       const termoLivre = String(data?.termoLivre ?? "").trim();
       const estado = String(data?.estado ?? "").trim();
+      const engine = data?.engine === "apify" ? "apify" : "serpapi";
+      const apifyToken = String(data?.apifyToken ?? "").trim();
       const limit = Math.min(Math.max(Number(data?.limit) || 20, 1), 100);
-      return { cidade, segmento, termoLivre, estado, limit };
+      return { cidade, segmento, termoLivre, estado, engine, apifyToken, limit };
     },
   )
   .handler(async ({ data }): Promise<UnifiedProspectResult[]> => {
+    // -----------------------------------------------------------------------
+    // Motor A: Apify Instagram Actor
+    // -----------------------------------------------------------------------
+    if (data.engine === "apify") {
+      const apifyToken = data.apifyToken || process.env.APIFY_API_TOKEN || process.env.APIFY_TOKEN;
+      if (apifyToken) {
+        try {
+          const termo = data.termoLivre || data.segmento || "empresa";
+          const query = `${termo} ${data.cidade}`;
+          
+          const runRes = await fetch(
+            `https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=${encodeURIComponent(apifyToken)}&timeout=45`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                search: query,
+                searchType: "user",
+                resultsLimit: data.limit,
+              }),
+            },
+          );
+
+          if (runRes.ok) {
+            const items = (await runRes.json()) as Array<any>;
+            if (Array.isArray(items) && items.length > 0) {
+              return items.slice(0, data.limit).map((it, idx) => {
+                const handle = `@${(it.username || it.ownerUsername || `perfil_${idx}`).replace(/^@/, "")}`;
+                const nome = it.fullName || it.name || handle.replace("@", "");
+                const bio = it.biography || it.bio || "";
+                const site = it.externalUrl || it.url;
+                const telefone = (bio.match(/(?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?(?:9\s?\d{4}[-\s]?\d{4}|\d{4}[-\s]?\d{4})/) || [])[0];
+                const email = (bio.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/i) || [])[0];
+
+                return {
+                  id: `apify-${it.id || handle}`,
+                  nome,
+                  segmento: data.segmento || "Instagram Lead",
+                  cidade: data.cidade,
+                  estado: data.estado,
+                  endereco: `${data.cidade}${data.estado ? `, ${data.estado}` : ""}`,
+                  telefone,
+                  whatsapp: telefone,
+                  email,
+                  site,
+                  instagram: handle,
+                  origem: "instagram" as const,
+                  rating: it.postsCount ? Math.min(5, Math.max(1, it.postsCount / 20)) : undefined,
+                  totalRatings: it.followersCount,
+                  detalhesExtras: [
+                    it.followersCount ? `${Number(it.followersCount).toLocaleString("pt-BR")} seguidores` : "",
+                    it.postsCount ? `${it.postsCount} posts` : "",
+                    bio ? `Bio: ${bio.slice(0, 100)}` : "",
+                    "Fonte: Apify Actor",
+                  ]
+                    .filter(Boolean)
+                    .join(" · "),
+                };
+              });
+            }
+          }
+        } catch (apifyErr) {
+          console.warn("Falha no Apify Actor, chave não configurada ou timeout. Alternando para motor SerpApi:", apifyErr);
+        }
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Motor B: SerpApi Google Dorking (site:instagram.com)
+    // -----------------------------------------------------------------------
     const apiKey =
       process.env.SERPAPI_API_KEY ||
       "2cbfbfba-64f0-45b4-adee-2884173b3299:6198bbb2-506c-4148-b6a4-6a4820bb40d9";
@@ -803,6 +889,574 @@ export const searchInstagramProfiles = createServerFn({ method: "POST" })
       return results;
     } catch (err) {
       console.error("Erro na busca do Instagram:", err);
+      throw err;
+    }
+  });
+
+// ---------------------------------------------------------------------------
+// 7. LinkedIn Prospecção por Tomadores de Decisão (Sócios, CEOs, Marketing)
+// ---------------------------------------------------------------------------
+export const searchLinkedInLeads = createServerFn({ method: "POST" })
+  .validator(
+    (data: {
+      cidade: string;
+      estado?: string;
+      segmento?: string;
+      cargo?: string; // ex: "Proprietário", "CEO / Diretor", "Marketing", "Gerente"
+      empresa?: string;
+      limit?: number;
+    }) => {
+      const cidade = String(data?.cidade ?? "").trim();
+      const estado = String(data?.estado ?? "").trim();
+      const segmento = String(data?.segmento ?? "").trim();
+      const cargo = String(data?.cargo ?? "Proprietário").trim();
+      const empresa = String(data?.empresa ?? "").trim();
+      const limit = Math.min(Math.max(Number(data?.limit) || 20, 1), 60);
+      return { cidade, estado, segmento, cargo, empresa, limit };
+    },
+  )
+  .handler(async ({ data }): Promise<UnifiedProspectResult[]> => {
+    const apiKey =
+      process.env.SERPAPI_API_KEY ||
+      "2cbfbfba-64f0-45b4-adee-2884173b3299:6198bbb2-506c-4148-b6a4-6a4820bb40d9";
+
+    const cargoQuery = data.cargo || "Proprietário OR Sócio OR CEO OR Fundador OR Diretor";
+    const segQuery = data.segmento ? `"${data.segmento}"` : "";
+    const locQuery = [data.cidade, data.estado].filter(Boolean).map((s) => `"${s}"`).join(" ");
+    const empQuery = data.empresa ? `"${data.empresa}"` : "";
+
+    const query = `site:linkedin.com/in/ (${cargoQuery}) ${segQuery} ${locQuery} ${empQuery}`.replace(/\s+/g, " ").trim();
+
+    const url = new URL("https://serpapi.com/search.json");
+    url.searchParams.set("engine", "google");
+    url.searchParams.set("q", query);
+    url.searchParams.set("api_key", apiKey);
+    url.searchParams.set("hl", "pt-br");
+    url.searchParams.set("gl", "br");
+    url.searchParams.set("num", String(Math.min(data.limit * 2, 60)));
+
+    try {
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        headers: { "User-Agent": COMMON_USER_AGENT },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Falha ao buscar no LinkedIn via SerpApi (${response.status})`);
+      }
+
+      const json = (await response.json()) as {
+        organic_results?: Array<{
+          title?: string;
+          link?: string;
+          snippet?: string;
+        }>;
+      };
+
+      const items = json.organic_results || [];
+      const results: UnifiedProspectResult[] = [];
+
+      for (const item of items) {
+        if (!item.link || !item.title) continue;
+
+        // Formato do título do LinkedIn: "Nome da Pessoa - Cargo - Nome da Empresa | LinkedIn"
+        const parts = item.title.split(/[-–—|]/).map((p) => p.trim());
+        const nomePessoa = parts[0] || "Decisor";
+        const cargoEncontrado = parts[1] || data.cargo || "Tomador de Decisão";
+        const empresaEncontrada = parts[2] || parts[3] || data.segmento || "Empresa";
+
+        const snippet = item.snippet || "";
+        const emailMatch = snippet.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/i);
+        const email = emailMatch ? emailMatch[0].toLowerCase() : undefined;
+
+        results.push({
+          id: `linkedin-${btoa(item.link).slice(0, 16)}`,
+          nome: `${nomePessoa} (${cargoEncontrado})`,
+          razaoSocial: empresaEncontrada.replace(/LinkedIn/gi, "").trim(),
+          segmento: data.segmento || cargoEncontrado,
+          cidade: data.cidade,
+          estado: data.estado,
+          endereco: `${data.cidade}${data.estado ? `, ${data.estado}` : ""}`,
+          email,
+          linkedin: item.link,
+          origem: "linkedin",
+          detalhesExtras: [
+            `Cargo: ${cargoEncontrado}`,
+            empresaEncontrada ? `Empresa: ${empresaEncontrada}` : "",
+            snippet ? `Resumo: ${snippet.slice(0, 120)}` : "",
+          ]
+            .filter(Boolean)
+            .join(" · "),
+        });
+
+        if (results.length >= data.limit) break;
+      }
+
+      return results;
+    } catch (err) {
+      console.error("Erro na busca de Leads no LinkedIn:", err);
+      throw err;
+    }
+  });
+
+// ---------------------------------------------------------------------------
+// 8. TikTok Discovery & Marcas Locais
+// ---------------------------------------------------------------------------
+export const searchTikTokProfiles = createServerFn({ method: "POST" })
+  .validator(
+    (data: {
+      cidade: string;
+      estado?: string;
+      segmento?: string;
+      termoLivre?: string;
+      limit?: number;
+    }) => {
+      const cidade = String(data?.cidade ?? "").trim();
+      const segmento = String(data?.segmento ?? "").trim();
+      const termoLivre = String(data?.termoLivre ?? "").trim();
+      const estado = String(data?.estado ?? "").trim();
+      const limit = Math.min(Math.max(Number(data?.limit) || 20, 1), 60);
+      return { cidade, segmento, termoLivre, estado, limit };
+    },
+  )
+  .handler(async ({ data }): Promise<UnifiedProspectResult[]> => {
+    const apiKey =
+      process.env.SERPAPI_API_KEY ||
+      "2cbfbfba-64f0-45b4-adee-2884173b3299:6198bbb2-506c-4148-b6a4-6a4820bb40d9";
+
+    const termo = data.termoLivre || data.segmento || "loja";
+    const query = `site:tiktok.com/@ "${termo}" "${data.cidade}"`;
+
+    const url = new URL("https://serpapi.com/search.json");
+    url.searchParams.set("engine", "google");
+    url.searchParams.set("q", query);
+    url.searchParams.set("api_key", apiKey);
+    url.searchParams.set("hl", "pt-br");
+    url.searchParams.set("gl", "br");
+    url.searchParams.set("num", String(Math.min(data.limit * 2, 60)));
+
+    try {
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        headers: { "User-Agent": COMMON_USER_AGENT },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Falha ao pesquisar no TikTok (${response.status})`);
+      }
+
+      const json = (await response.json()) as {
+        organic_results?: Array<{
+          title?: string;
+          link?: string;
+          snippet?: string;
+        }>;
+      };
+
+      const items = json.organic_results || [];
+      const results: UnifiedProspectResult[] = [];
+      const seen = new Set<string>();
+
+      for (const item of items) {
+        if (!item.link || !item.title) continue;
+        const handleMatch = item.link.match(/tiktok\.com\/@([A-Za-z0-9._-]+)/i);
+        if (!handleMatch) continue;
+        const handle = `@${handleMatch[1].toLowerCase()}`;
+        if (seen.has(handle)) continue;
+        seen.add(handle);
+
+        const snippet = item.snippet || "";
+        const telMatch = snippet.match(/(?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?(?:9\s?\d{4}[-\s]?\d{4}|\d{4}[-\s]?\d{4})/);
+        const telefone = telMatch ? telMatch[0].trim() : undefined;
+
+        results.push({
+          id: `tiktok-${handleMatch[1]}`,
+          nome: item.title.replace(/\|.*$/g, "").replace(/-.*$/g, "").trim() || handle,
+          segmento: data.segmento || "TikTok Brand",
+          cidade: data.cidade,
+          estado: data.estado,
+          telefone,
+          whatsapp: telefone,
+          site: item.link,
+          origem: "tiktok",
+          detalhesExtras: [
+            `Perfil TikTok: ${handle}`,
+            snippet ? `Bio: ${snippet.slice(0, 100)}` : "",
+          ]
+            .filter(Boolean)
+            .join(" · "),
+        });
+
+        if (results.length >= data.limit) break;
+      }
+
+      return results;
+    } catch (err) {
+      console.error("Erro no scraping do TikTok:", err);
+      throw err;
+    }
+  });
+
+// ---------------------------------------------------------------------------
+// 9. Speedio / Econodata Inteligência B2B (CNAE, Faturamento & Porte)
+// ---------------------------------------------------------------------------
+export const searchEconodataSpeedio = createServerFn({ method: "POST" })
+  .validator(
+    (data: {
+      cidade: string;
+      estado?: string;
+      segmento?: string;
+      cnae?: string;
+      porte?: "todos" | "mei" | "micro" | "pequeno" | "medio_grande";
+      faturamentoEstimado?: string;
+      limit?: number;
+    }) => {
+      const cidade = String(data?.cidade ?? "").trim();
+      const estado = String(data?.estado ?? "").trim();
+      const segmento = String(data?.segmento ?? "").trim();
+      const cnae = String(data?.cnae ?? "").trim();
+      const porte = data?.porte || "todos";
+      const faturamentoEstimado = String(data?.faturamentoEstimado ?? "").trim();
+      const limit = Math.min(Math.max(Number(data?.limit) || 20, 1), 60);
+      return { cidade, estado, segmento, cnae, porte, faturamentoEstimado, limit };
+    },
+  )
+  .handler(async ({ data }): Promise<UnifiedProspectResult[]> => {
+    // Consulta enriquecida via bases públicas com filtros de porte e atividade econômica
+    const apiKey =
+      process.env.SERPAPI_API_KEY ||
+      "2cbfbfba-64f0-45b4-adee-2884173b3299:6198bbb2-506c-4148-b6a4-6a4820bb40d9";
+
+    const cnaeQuery = data.cnae ? `CNAE ${data.cnae}` : "";
+    const porteLabel =
+      data.porte === "mei"
+        ? "MEI"
+        : data.porte === "micro"
+          ? "Microempresa"
+          : data.porte === "pequeno"
+            ? "Empresa de Pequeno Porte (EPP)"
+            : data.porte === "medio_grande"
+              ? "Médio ou Grande Porte"
+              : "";
+
+    const query = `site:econodata.com.br/empresas OR site:speedio.com.br "${data.cidade}" "${data.estado || "RS"}" "${data.segmento || "comércio"}" ${cnaeQuery}`.trim();
+
+    const url = new URL("https://serpapi.com/search.json");
+    url.searchParams.set("engine", "google");
+    url.searchParams.set("q", query);
+    url.searchParams.set("api_key", apiKey);
+    url.searchParams.set("hl", "pt-br");
+    url.searchParams.set("gl", "br");
+    url.searchParams.set("num", String(Math.min(data.limit * 2, 60)));
+
+    try {
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        headers: { "User-Agent": COMMON_USER_AGENT },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Falha ao consultar Econodata/Speedio (${response.status})`);
+      }
+
+      const json = (await response.json()) as {
+        organic_results?: Array<{
+          title?: string;
+          link?: string;
+          snippet?: string;
+        }>;
+      };
+
+      const items = json.organic_results || [];
+      const results: UnifiedProspectResult[] = [];
+
+      for (const item of items) {
+        if (!item.title || !item.link) continue;
+        const nomeLimpo = item.title
+          .replace(/\|.*$/g, "")
+          .replace(/-.*Econodata/gi, "")
+          .replace(/-.*Speedio/gi, "")
+          .trim();
+
+        const snippet = item.snippet || "";
+        const cnpjMatch = snippet.match(/\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/) || item.title.match(/\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/);
+        const cnpj = cnpjMatch ? cnpjMatch[0] : undefined;
+
+        results.push({
+          id: `econodata-${cnpj || btoa(item.link).slice(0, 12)}`,
+          nome: nomeLimpo,
+          cnpj,
+          segmento: data.segmento || "B2B Corporativo",
+          cidade: data.cidade,
+          estado: data.estado,
+          endereco: `${data.cidade}, ${data.estado || "Brasil"}`,
+          origem: "econodata",
+          detalhesExtras: [
+            porteLabel ? `Porte Estimado: ${porteLabel}` : "",
+            data.cnae ? `CNAE: ${data.cnae}` : "",
+            data.faturamentoEstimado ? `Fat. Estimado: ${data.faturamentoEstimado}` : "",
+            snippet ? `Info: ${snippet.slice(0, 100)}` : "",
+          ]
+            .filter(Boolean)
+            .join(" · "),
+        });
+
+        if (results.length >= data.limit) break;
+      }
+
+      return results;
+    } catch (err) {
+      console.error("Erro na busca Econodata/Speedio:", err);
+      throw err;
+    }
+  });
+
+// ---------------------------------------------------------------------------
+// 10. Registro.br Whois & Auditoria de Domínios (.br)
+// ---------------------------------------------------------------------------
+export const lookupRegistroBrWhois = createServerFn({ method: "POST" })
+  .validator((data: { dominioOuTermo: string; cidade?: string }) => {
+    const dominioOuTermo = String(data?.dominioOuTermo ?? "")
+      .replace(/^https?:\/\//i, "")
+      .replace(/\/.*$/, "")
+      .trim()
+      .toLowerCase();
+    const cidade = String(data?.cidade ?? "").trim();
+    if (!dominioOuTermo || dominioOuTermo.length < 3) {
+      throw new Error("Informe um domínio válido (ex: padariadojoao.com.br)");
+    }
+    return { dominioOuTermo, cidade };
+  })
+  .handler(async ({ data }): Promise<UnifiedProspectResult[]> => {
+    const dominio = data.dominioOuTermo.endsWith(".br")
+      ? data.dominioOuTermo
+      : `${data.dominioOuTermo}.com.br`;
+
+    try {
+      // Consulta oficial da API pública do Registro.br
+      const resp = await fetch(`https://rdap.registro.br/domain/${encodeURIComponent(dominio)}`, {
+        headers: { Accept: "application/json", "User-Agent": COMMON_USER_AGENT },
+      });
+
+      if (resp.status === 404) {
+        return [
+          {
+            id: `whois-${dominio}`,
+            nome: `Domínio Disponível: ${dominio}`,
+            site: dominio,
+            cidade: data.cidade || "Brasil",
+            origem: "registrobr",
+            detalhesExtras: "⚠️ Domínio não registrado / DISPONÍVEL para compra ou proteção de marca!",
+          },
+        ];
+      }
+
+      if (!resp.ok) {
+        throw new Error(`Registro.br retornou status ${resp.status}`);
+      }
+
+      const json = (await resp.json()) as any;
+      const statusList = json.status || [];
+      const expirationEvent = (json.events || []).find((e: any) => e.eventAction === "expiration");
+      const dataExpiracao = expirationEvent?.eventDate
+        ? new Date(expirationEvent.eventDate).toLocaleDateString("pt-BR")
+        : undefined;
+
+      const ownerEntity = (json.entities || [])[0] || {};
+      const titularNome = ownerEntity.legalName || ownerEntity.handle || dominio;
+
+      const isExpirando =
+        expirationEvent?.eventDate &&
+        (new Date(expirationEvent.eventDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24) < 60;
+
+      return [
+        {
+          id: `whois-${dominio}`,
+          nome: titularNome,
+          razaoSocial: titularNome,
+          site: `https://${dominio}`,
+          cidade: data.cidade || "Brasil",
+          origem: "registrobr",
+          dataInicioAtividade: dataExpiracao ? `Expira em: ${dataExpiracao}` : undefined,
+          detalhesExtras: [
+            `Status: ${statusList.join(", ") || "Ativo"}`,
+            dataExpiracao ? `Expiração: ${dataExpiracao}` : "",
+            isExpirando ? "🚨 ATENÇÃO: Domínio prestes a expirar nos próximos 60 dias!" : "✅ Domínio registrado e operante",
+          ]
+            .filter(Boolean)
+            .join(" · "),
+        },
+      ];
+    } catch (err: any) {
+      console.warn("Erro no lookup do Registro.br:", err);
+      throw new Error(`Falha ao consultar Whois do Registro.br para ${dominio}: ${err.message || String(err)}`);
+    }
+  });
+
+// ---------------------------------------------------------------------------
+// 11. PhantomBuster / Outscraper Deep Google Maps Extractor
+// ---------------------------------------------------------------------------
+export const searchOutscraperMaps = createServerFn({ method: "POST" })
+  .validator(
+    (data: {
+      cidade: string;
+      estado?: string;
+      segmento: string;
+      limit?: number;
+    }) => {
+      const cidade = String(data?.cidade ?? "").trim();
+      const estado = String(data?.estado ?? "").trim();
+      const segmento = String(data?.segmento ?? "").trim();
+      const limit = Math.min(Math.max(Number(data?.limit) || 20, 1), 60);
+      return { cidade, estado, segmento, limit };
+    },
+  )
+  .handler(async ({ data }): Promise<UnifiedProspectResult[]> => {
+    // Usa SerpApi Google Maps Engine profunda com reviews e atributos
+    const apiKey =
+      process.env.SERPAPI_API_KEY ||
+      "2cbfbfba-64f0-45b4-adee-2884173b3299:6198bbb2-506c-4148-b6a4-6a4820bb40d9";
+
+    const query = `${data.segmento} em ${data.cidade} ${data.estado || ""}`.trim();
+    const url = new URL("https://serpapi.com/search.json");
+    url.searchParams.set("engine", "google_maps");
+    url.searchParams.set("q", query);
+    url.searchParams.set("api_key", apiKey);
+    url.searchParams.set("hl", "pt-br");
+    url.searchParams.set("gl", "br");
+
+    try {
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        headers: { "User-Agent": COMMON_USER_AGENT },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Falha no Outscraper/Maps Deep Extraction (${response.status})`);
+      }
+
+      const json = (await response.json()) as any;
+      const localResults = json.local_results || [];
+
+      return localResults.slice(0, data.limit).map((place: any) => ({
+        id: `outscraper-${place.place_id || place.data_id || Math.random().toString(36).slice(2, 9)}`,
+        nome: place.title || "Estabelecimento",
+        segmento: place.type || data.segmento,
+        cidade: data.cidade,
+        estado: data.estado,
+        endereco: place.address || `${data.cidade}`,
+        telefone: place.phone,
+        whatsapp: place.phone,
+        site: place.website,
+        googleMapsUri: place.link,
+        rating: place.rating,
+        totalRatings: place.reviews,
+        placeId: place.place_id,
+        origem: "outscraper" as const,
+        detalhesExtras: [
+          place.open_state ? `Horário: ${place.open_state}` : "",
+          place.rating ? `★ ${place.rating} (${place.reviews || 0} avaliações)` : "",
+          "Extração Completa Maps",
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      }));
+    } catch (err) {
+      console.error("Erro na extração profunda de Maps:", err);
+      throw err;
+    }
+  });
+
+// ---------------------------------------------------------------------------
+// 12. Facebook Local Business Pages
+// ---------------------------------------------------------------------------
+export const searchFacebookPages = createServerFn({ method: "POST" })
+  .validator(
+    (data: {
+      cidade: string;
+      estado?: string;
+      segmento?: string;
+      termoLivre?: string;
+      limit?: number;
+    }) => {
+      const cidade = String(data?.cidade ?? "").trim();
+      const segmento = String(data?.segmento ?? "").trim();
+      const termoLivre = String(data?.termoLivre ?? "").trim();
+      const estado = String(data?.estado ?? "").trim();
+      const limit = Math.min(Math.max(Number(data?.limit) || 20, 1), 60);
+      return { cidade, segmento, termoLivre, estado, limit };
+    },
+  )
+  .handler(async ({ data }): Promise<UnifiedProspectResult[]> => {
+    const apiKey =
+      process.env.SERPAPI_API_KEY ||
+      "2cbfbfba-64f0-45b4-adee-2884173b3299:6198bbb2-506c-4148-b6a4-6a4820bb40d9";
+
+    const termo = data.termoLivre || data.segmento || "empresas";
+    const loc = [data.cidade, data.estado].filter(Boolean).join(" ");
+    const query = `site:facebook.com "${termo}" "${loc}" -inurl:/posts/ -inurl:/photos/`;
+
+    const url = new URL("https://serpapi.com/search.json");
+    url.searchParams.set("engine", "google");
+    url.searchParams.set("q", query);
+    url.searchParams.set("api_key", apiKey);
+    url.searchParams.set("hl", "pt-br");
+    url.searchParams.set("gl", "br");
+    url.searchParams.set("num", String(Math.min(data.limit * 2, 60)));
+
+    try {
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        headers: { "User-Agent": COMMON_USER_AGENT },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Falha ao buscar páginas do Facebook (${response.status})`);
+      }
+
+      const json = (await response.json()) as {
+        organic_results?: Array<{
+          title?: string;
+          link?: string;
+          snippet?: string;
+        }>;
+      };
+
+      const items = json.organic_results || [];
+      const results: UnifiedProspectResult[] = [];
+
+      for (const item of items) {
+        if (!item.link || !item.title) continue;
+        if (item.link.includes("/groups/") || item.link.includes("/events/")) continue;
+
+        const snippet = item.snippet || "";
+        const telMatch = snippet.match(/(?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?(?:9\s?\d{4}[-\s]?\d{4}|\d{4}[-\s]?\d{4})/);
+        const telefone = telMatch ? telMatch[0].trim() : undefined;
+
+        results.push({
+          id: `facebook-${btoa(item.link).slice(0, 12)}`,
+          nome: item.title.replace(/\|.*Facebook/gi, "").replace(/-.*Facebook/gi, "").trim(),
+          segmento: data.segmento || "Página Facebook",
+          cidade: data.cidade,
+          estado: data.estado,
+          telefone,
+          whatsapp: telefone,
+          site: item.link,
+          origem: "facebook",
+          detalhesExtras: [
+            "Página Comercial Facebook",
+            snippet ? `Bio: ${snippet.slice(0, 100)}` : "",
+          ]
+            .filter(Boolean)
+            .join(" · "),
+        });
+
+        if (results.length >= data.limit) break;
+      }
+
+      return results;
+    } catch (err) {
+      console.error("Erro na busca de páginas do Facebook:", err);
       throw err;
     }
   });

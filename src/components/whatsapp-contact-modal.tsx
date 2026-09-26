@@ -32,32 +32,32 @@ interface WhatsAppContactModalProps {
 
 const TEMPLATES = [
   {
-    id: "site",
-    titulo: "🌐 Criação / Redesign de Site",
-    descricao: "Para oferecer desenvolvimento ou melhoria de site profissional",
+    id: "gargalo_vendas",
+    titulo: "📊 Diagnóstico de Gargalo & Perda para Concorrentes",
+    descricao: "Abordagem consultiva mostrando clientes perdidos nas buscas locais",
     gerar: (e: ContactableEmpresa) =>
-      `Olá! Tudo bem? Me chamo [Seu Nome]. Notei a presença da ${e.nome} em ${e.cidade || "sua região"} e gostaria de apresentar uma proposta rápida e sem compromisso para criar/modernizar o site da sua empresa e ampliar sua captação de clientes. Podemos conversar?`,
+      `Olá! Tudo bem? Me chamo [Seu Nome]. Estive analisando o fluxo de busca de clientes para o setor de ${e.segmento || "serviços"} em ${e.cidade || "sua região"} e notei que a ${e.nome} está perdendo vendas prontas para concorrentes por falta de um canal rápido de conversão e atendimento digital.\n\nPreparamos um diagnóstico rápido de 2 minutos apontando exatamente onde está esse gargalo de faturamento. Posso compartilhar com você por aqui?`,
   },
   {
-    id: "trafego",
-    titulo: "🚀 Tráfego Pago & Anúncios",
-    descricao: "Captação de novos clientes via Google Ads e Meta Ads",
+    id: "erros_conversao",
+    titulo: "🔍 Auditoria de Conversão & Otimização de ROI",
+    descricao: "Foco nos erros técnicos e falhas que impedem o visitante de fechar negócio",
     gerar: (e: ContactableEmpresa) =>
-      `Olá, equipe da ${e.nome}! Tudo bem? Trabalhamos com geração de novos clientes e vendas através de anúncios segmentados no Google e Instagram para o setor de ${e.segmento || "empresas"} em ${e.cidade || "sua cidade"}. Gostariam de receber um diagnóstico gratuito sobre o potencial de captação na sua região?`,
+      `Olá! Falo com o responsável comercial ou gestor da ${e.nome}? Estive analisando a presença digital de vocês e identifiquei 2 falhas críticas que fazem clientes desistirem da compra antes mesmo de entrar em contato.\n\nNosso foco não é 'site bonito', e sim gerar vendas previsíveis e retorno sobre investimento para ${e.segmento || "sua empresa"}. Gostaria de ver esse diagnóstico sem compromisso?`,
   },
   {
-    id: "redes",
-    titulo: "📸 Gestão de Instagram & Redes",
-    descricao: "Posicionamento digital e produção de conteúdo",
+    id: "trafego_resultado",
+    titulo: "📈 Captação de Clientes & Vendas Previsíveis",
+    descricao: "Foco em orçamentos qualificados e geração direta de receita",
     gerar: (e: ContactableEmpresa) =>
-      `Olá! Estive acompanhando o trabalho da ${e.nome} e identificamos excelentes oportunidades para potencializar o alcance, engajamento e vendas através do Instagram e mídias sociais. Quando teriam 5 minutos para conversarmos esta semana?`,
+      `Olá, equipe da ${e.nome}! Tudo bem? Analisando o mercado de ${e.cidade || "sua cidade"}, vimos que há uma demanda diária de pessoas buscando por ${e.segmento || "seus serviços"}, mas que hoje acabam comprando de outras empresas por falta de posicionamento estratégico.\n\nTrabalhamos com geração direta de orçamentos e receita no seu WhatsApp. Quando vocês teriam 5 minutos esta semana para avaliarmos os números da sua região?`,
   },
   {
-    id: "comercial",
-    titulo: "💼 Apresentação Comercial Geral",
-    descricao: "Primeiro contato direto com tomador de decisão",
+    id: "contato_decisor",
+    titulo: "💼 Abordagem Direta ao Sócio / Diretor",
+    descricao: "Contato executivo focado em redução de custos de aquisição e eficiência",
     gerar: (e: ContactableEmpresa) =>
-      `Olá! Gostaria de falar com o responsável comercial ou de marketing da ${e.nome}. Temos soluções sob medida para otimizar os processos e atrair novas oportunidades de negócio para a empresa. Como posso falar com ele?`,
+      `Olá! Gostaria de falar com o sócio ou diretor responsável pela estratégia de crescimento da ${e.nome}. Identificamos oportunidades claras no funil de captação de vocês em ${e.cidade || "sua região"} para aumentar o fechamento de novos clientes sem desperdício de verba. Quem seria a pessoa indicada para conversarmos?`,
   },
 ];
 

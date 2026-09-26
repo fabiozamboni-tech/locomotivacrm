@@ -32,32 +32,32 @@ interface InstagramDmModalProps {
 
 const INSTAGRAM_TEMPLATES = [
   {
-    id: "site_proposta",
-    titulo: "🌐 Criação de Site / Catálogo Online",
-    descricao: "Ideal para perfis sem site oficial ou que usam apenas Linktree simples",
+    id: "gargalo_bio_conversao",
+    titulo: "📊 Gargalo no Perfil: Tráfego sem Conversão em Vendas",
+    descricao: "Diagnóstico apontando perda de vendas na bio para concorrentes",
     gerar: (p: ContactableInstagramProfile) =>
-      `Olá, equipe da ${p.nome}! 👋\n\nAchei incrível o conteúdo de vocês aqui no Instagram. Estive analisando o perfil e notei que vocês ainda não possuem um site profissional próprio para apresentar seus produtos/serviços e fechar vendas no automático.\n\nDesenvolvemos páginas de alta conversão para empresas de ${p.segmento || "destaque"} em ${p.cidade || "sua região"}. Gostaria de ver uma demonstração visual sem compromisso?`,
+      `Olá, equipe da ${p.nome}! 👋\n\nEstive analisando o perfil de vocês e notei um gargalo crítico: vocês produzem um ótimo conteúdo, mas o fluxo da bio não direciona o visitante para fechar negócio e acaba fazendo a ${p.nome} perder vendas para concorrentes de ${p.cidade || "sua região"} que já têm canais diretos de conversão.\n\nPreparamos um diagnóstico rápido de 2 minutos mostrando como corrigir esse vazamento de faturamento. Posso te enviar por aqui?`,
   },
   {
-    id: "trafego_local",
-    titulo: "🚀 Anúncios & Captação de Clientes",
-    descricao: "Proposta de geração de leads e vendas com tráfego pago segmentado",
+    id: "perda_concorrentes",
+    titulo: "🔍 Auditoria de Conversão & Retorno Financeiro",
+    descricao: "Foco nos erros que encarecem a captação e deixam dinheiro na mesa",
     gerar: (p: ContactableInstagramProfile) =>
-      `Oi ${p.nome}! Tudo bem? 🎯\n\nAcompanho o perfil de vocês aqui em ${p.cidade || "sua cidade"} e vejo muito potencial na marca. Nós ajudamos empresas de ${p.segmento || "seu segmento"} a multiplicarem os contatos diários de novos clientes através de anúncios estratégicos no Instagram e Google.\n\nPodemos trocar uma ideia rápida de 5 minutos sobre como atrair mais clientes para a ${p.nome} este mês?`,
+      `Oi ${p.nome}! Tudo bem? 🎯\n\nFizemos uma análise comparativa do setor de ${p.segmento || "empresas"} em ${p.cidade || "sua cidade"} e encontramos 2 falhas na jornada digital que fazem clientes interessados desistirem antes de chamar no WhatsApp.\n\nNosso foco não é vender 'site bonito', e sim estruturar processos que geram retorno sobre investimento real. Gostariam de ver esses 2 pontos sem nenhum compromisso?`,
   },
   {
-    id: "parceria_elogio",
-    titulo: "✨ Elogio ao Perfil & Abordagem Consultiva",
-    descricao: "Abordagem calorosa valorizando o conteúdo e propondo parceria comercial",
+    id: "aquisicao_previsivel",
+    titulo: "📈 Sistema de Aquisição Previsível & Faturamento",
+    descricao: "Otimização de seguidores e visitantes em orçamentos diários",
     gerar: (p: ContactableInstagramProfile) =>
-      `Olá ${p.nome}, parabéns pela excelente apresentação aqui no Instagram! 👏\n\nSou especialista em estratégias digitais e soluções para negócios em ${p.cidade || "sua região"}. Identifiquei algumas melhorias pontuais que podem aumentar bastante a conversão dos seguidores em clientes pagantes.\n\nSe fizer sentido para vocês, posso te mandar um áudio ou resumo de 2 minutos explicando. Que tal?`,
+      `Olá, equipe da ${p.nome}! 👏\n\nAcompanhamos o trabalho de vocês e identificamos que o perfil tem potencial para gerar pelo menos o dobro de orçamentos diários com pequenos ajustes no fluxo de atendimento e conversão.\n\nTopariam receber um áudio ou resumo de 3 minutos mostrando o que os líderes do seu segmento estão fazendo para vender no automático?`,
   },
   {
-    id: "gancho_rapido",
-    titulo: "⚡ Quebra de Gelo Curto (Alta Resposta)",
-    descricao: "Mensagem curta e curiosa para obter resposta rápida no Direct",
+    id: "contato_decisor_dm",
+    titulo: "💼 Abordagem Direta ao Sócio / Gestor",
+    descricao: "Contato executivo para alcançar quem decide sobre vendas e crescimento",
     gerar: (p: ContactableInstagramProfile) =>
-      `Oi ${p.nome}! Vi os posts de vocês e achei o trabalho excelente! 👏 Quem é a pessoa responsável pelo setor comercial/marketing por aí com quem eu possa conversar rapidinho?`,
+      `Oi ${p.nome}! 👏 Quem é o sócio ou responsável pelas decisões comerciais e estratégicas da empresa por aí com quem eu possa trocar uma ideia rápida de 3 minutos sobre oportunidades de receita em ${p.cidade || "sua região"}?`,
   },
 ];
 

@@ -55,6 +55,12 @@ import {
   searchOverpass,
   lookupBrasilApiCnpj,
   searchInstagramProfiles,
+  searchLinkedInLeads,
+  searchTikTokProfiles,
+  searchEconodataSpeedio,
+  lookupRegistroBrWhois,
+  searchOutscraperMaps,
+  searchFacebookPages,
   type UnifiedProspectResult,
 } from "@/lib/prospecting.functions";
 import {
@@ -65,6 +71,10 @@ import {
   InstagramDmModal,
   type ContactableInstagramProfile,
 } from "@/components/instagram-dm-modal";
+import {
+  LinkedInMessageModal,
+  type ContactableLinkedInProfile,
+} from "@/components/linkedin-message-modal";
 import type { InstagramProfile } from "@/lib/store";
 import { empresaFromRaw, CIDADES_RS_FOCO, SEGMENTOS } from "@/lib/mock-data";
 import {
@@ -186,6 +196,7 @@ interface ProspectItemProps {
   onExclude?: () => void;
   onOpenWhatsApp: (empresa: ContactableEmpresa) => void;
   onOpenInstagramDm?: (perfil: ContactableInstagramProfile) => void;
+  onOpenLinkedIn?: (perfil: ContactableLinkedInProfile) => void;
 }
 
 function ProspectItemCard({
@@ -215,6 +226,7 @@ function ProspectItemCard({
   onExclude,
   onOpenWhatsApp,
   onOpenInstagramDm,
+  onOpenLinkedIn,
 }: ProspectItemProps) {
   const social = socialDoSite(site);
   const instagramHandle =
@@ -410,18 +422,42 @@ function ProspectItemCard({
             </a>
           )}
 
-          {/* LinkedIn */}
+          {/* LinkedIn Link & Direct Message Button */}
           {linkedin && (
-            <a
-              href={linkedin}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 text-sky-600 dark:text-sky-400 hover:underline font-medium"
-            >
-              <Linkedin className="h-3.5 w-3.5" />
-              <span>LinkedIn</span>
-              <ExternalLink className="h-3 w-3" />
-            </a>
+            <div className="inline-flex items-center gap-1.5">
+              <a
+                href={linkedin}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-sky-600 dark:text-sky-400 hover:underline font-medium"
+              >
+                <Linkedin className="h-3.5 w-3.5" />
+                <span>LinkedIn</span>
+                <ExternalLink className="h-3 w-3" />
+              </a>
+
+              {onOpenLinkedIn && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onOpenLinkedIn({
+                      nome,
+                      cargo: segmento || "Decisor",
+                      empresa: razaoSocial || nome,
+                      linkedinUrl: linkedin,
+                      cidade,
+                      segmento,
+                      email,
+                    })
+                  }
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-sky-600 hover:bg-sky-700 text-white transition-colors cursor-pointer shadow-xs"
+                  title="Abrir gerador de mensagem consultiva e InMail no LinkedIn"
+                >
+                  <MessageSquare className="h-3 w-3" />
+                  <span>Abordar</span>
+                </button>
+              )}
+            </div>
           )}
 
           {/* Detalhes Extras */}
@@ -496,6 +532,15 @@ function ImportarPage() {
   const handleOpenInstagramDm = (perfil: ContactableInstagramProfile) => {
     setInstagramDmPerfil(perfil);
     setInstagramDmModalOpen(true);
+  };
+
+  // Modal de primeiro contato via LinkedIn (InMail / Conexão Consultiva)
+  const [linkedInModalOpen, setLinkedInModalOpen] = useState(false);
+  const [linkedInPerfil, setLinkedInPerfil] = useState<ContactableLinkedInProfile | null>(null);
+
+  const handleOpenLinkedIn = (perfil: ContactableLinkedInProfile) => {
+    setLinkedInPerfil(perfil);
+    setLinkedInModalOpen(true);
   };
 
   const handleExcluirResultado = (item: {
@@ -575,6 +620,12 @@ function ImportarPage() {
   const searchOsm = useServerFn(searchOverpass);
   const lookupCnpj = useServerFn(lookupBrasilApiCnpj);
   const searchInstagram = useServerFn(searchInstagramProfiles);
+  const searchLinkedIn = useServerFn(searchLinkedInLeads);
+  const searchTikTok = useServerFn(searchTikTokProfiles);
+  const searchEconodata = useServerFn(searchEconodataSpeedio);
+  const lookupWhois = useServerFn(lookupRegistroBrWhois);
+  const searchOutscraper = useServerFn(searchOutscraperMaps);
+  const searchFacebook = useServerFn(searchFacebookPages);
   const lookup = useServerFn(lookupEmpresa);
 
   // -------------------------------------------------------------------------
@@ -942,9 +993,11 @@ function ImportarPage() {
   };
 
   // -------------------------------------------------------------------------
-  // 6. Instagram Scraping & Base de Dados Salva (Local/Offline)
+  // 6. Instagram Scraping & Base de Dados Salva (Local/Offline) + Apify
   // -------------------------------------------------------------------------
   const [instagramModo, setInstagramModo] = useState<"database" | "live">("database");
+  const [instagramEngine, setInstagramEngine] = useState<"serpapi" | "apify">("serpapi");
+  const [apifyToken, setApifyToken] = useState("");
   const [instagramTermoLivre, setInstagramTermoLivre] = useState("");
   const [instagramLoading, setInstagramLoading] = useState(false);
   const [instagramLiveResults, setInstagramLiveResults] = useState<UnifiedProspectResult[]>([]);
@@ -959,6 +1012,8 @@ function ImportarPage() {
           estado: estado ? nomeEstado(pais, estado) : undefined,
           pais: pais ? nomePais(pais) : undefined,
           termoLivre: instagramTermoLivre.trim() || undefined,
+          engine: instagramEngine,
+          apifyToken: apifyToken.trim() || undefined,
           limit: parseInt(limite, 10) || 20,
         },
       });
@@ -992,7 +1047,7 @@ function ImportarPage() {
             segmento: item.segmento || segmento,
             seguidores: item.totalRatings !== undefined ? String(item.totalRatings) : undefined,
             salvoEm: new Date().toISOString(),
-            origemBusca: "instagram_search",
+            origemBusca: instagramEngine === "apify" ? "apify_actor" : "instagram_search",
           });
         }
 
@@ -1017,6 +1072,226 @@ function ImportarPage() {
       toast.error(`Erro na busca do Instagram: ${err.message || String(err)}`);
     } finally {
       setInstagramLoading(false);
+    }
+  };
+
+  // -------------------------------------------------------------------------
+  // 7. LinkedIn Prospecção de Decisores (Sócios, CEOs, Marketing)
+  // -------------------------------------------------------------------------
+  const [linkedInCargo, setLinkedInCargo] = useState("Proprietário");
+  const [linkedInEmpresa, setLinkedInEmpresa] = useState("");
+  const [linkedInLoading, setLinkedInLoading] = useState(false);
+  const [linkedInResults, setLinkedInResults] = useState<UnifiedProspectResult[]>([]);
+
+  const linkedInResultsFiltrados = useMemo(() => {
+    return linkedInResults.filter((item) => {
+      if (isEmpresaExcluida({ nome: item.nome, site: item.site, cidade: item.cidade || cidade })) return false;
+      if (filtroSite === "com" && !item.site) return false;
+      if (filtroSite === "sem" && item.site) return false;
+      return true;
+    });
+  }, [linkedInResults, filtroSite, isEmpresaExcluida, cidade]);
+
+  const buscarLinkedIn = async () => {
+    setLinkedInLoading(true);
+    try {
+      const res = await searchLinkedIn({
+        data: {
+          cidade: cidade.trim(),
+          estado: estado ? nomeEstado(pais, estado) : undefined,
+          segmento: segmento.trim() || undefined,
+          cargo: linkedInCargo === "todos" ? undefined : linkedInCargo,
+          empresa: linkedInEmpresa.trim() || undefined,
+          limit: parseInt(limite, 10) || 20,
+        },
+      });
+      setLinkedInResults(res);
+      toast.success(`${res.length} decisor(es) encontrado(s) no LinkedIn`);
+    } catch (err: any) {
+      toast.error(`Erro na busca do LinkedIn: ${err.message || String(err)}`);
+    } finally {
+      setLinkedInLoading(false);
+    }
+  };
+
+  // -------------------------------------------------------------------------
+  // 8. TikTok Discovery
+  // -------------------------------------------------------------------------
+  const [tikTokTermoLivre, setTikTokTermoLivre] = useState("");
+  const [tikTokLoading, setTikTokLoading] = useState(false);
+  const [tikTokResults, setTikTokResults] = useState<UnifiedProspectResult[]>([]);
+
+  const tikTokResultsFiltrados = useMemo(() => {
+    return tikTokResults.filter((item) => {
+      if (isEmpresaExcluida({ nome: item.nome, site: item.site, cidade: item.cidade || cidade })) return false;
+      if (filtroSite === "com" && !item.site) return false;
+      if (filtroSite === "sem" && item.site) return false;
+      return true;
+    });
+  }, [tikTokResults, filtroSite, isEmpresaExcluida, cidade]);
+
+  const buscarTikTok = async () => {
+    setTikTokLoading(true);
+    try {
+      const res = await searchTikTok({
+        data: {
+          cidade: cidade.trim(),
+          estado: estado ? nomeEstado(pais, estado) : undefined,
+          segmento: segmento.trim() || undefined,
+          termoLivre: tikTokTermoLivre.trim() || undefined,
+          limit: parseInt(limite, 10) || 20,
+        },
+      });
+      setTikTokResults(res);
+      toast.success(`${res.length} perfil(is) de marca encontrados no TikTok`);
+    } catch (err: any) {
+      toast.error(`Erro na busca do TikTok: ${err.message || String(err)}`);
+    } finally {
+      setTikTokLoading(false);
+    }
+  };
+
+  // -------------------------------------------------------------------------
+  // 9. Speedio / Econodata (CNAE, Porte & Faturamento)
+  // -------------------------------------------------------------------------
+  const [econodataCnae, setEconodataCnae] = useState("");
+  const [econodataPorte, setEconodataPorte] = useState<"todos" | "mei" | "micro" | "pequeno" | "medio_grande">("todos");
+  const [econodataFaturamento, setEconodataFaturamento] = useState("");
+  const [econodataLoading, setEconodataLoading] = useState(false);
+  const [econodataResults, setEconodataResults] = useState<UnifiedProspectResult[]>([]);
+
+  const econodataResultsFiltrados = useMemo(() => {
+    return econodataResults.filter((item) => {
+      if (isEmpresaExcluida({ nome: item.nome, cnpj: item.cnpj, site: item.site, cidade: item.cidade || cidade })) return false;
+      if (filtroSite === "com" && !item.site) return false;
+      if (filtroSite === "sem" && item.site) return false;
+      return true;
+    });
+  }, [econodataResults, filtroSite, isEmpresaExcluida, cidade]);
+
+  const buscarEconodata = async () => {
+    setEconodataLoading(true);
+    try {
+      const res = await searchEconodata({
+        data: {
+          cidade: cidade.trim(),
+          estado: estado ? nomeEstado(pais, estado) : undefined,
+          segmento: segmento.trim() || undefined,
+          cnae: econodataCnae.trim() || undefined,
+          porte: econodataPorte,
+          faturamentoEstimado: econodataFaturamento.trim() || undefined,
+          limit: parseInt(limite, 10) || 20,
+        },
+      });
+      setEconodataResults(res);
+      toast.success(`${res.length} empresa(s) encontradas na inteligência B2B Econodata/Speedio`);
+    } catch (err: any) {
+      toast.error(`Erro na busca Econodata/Speedio: ${err.message || String(err)}`);
+    } finally {
+      setEconodataLoading(false);
+    }
+  };
+
+  // -------------------------------------------------------------------------
+  // 10. Registro.br Whois & Auditoria de Domínios
+  // -------------------------------------------------------------------------
+  const [registroBrDominio, setRegistroBrDominio] = useState("");
+  const [registroBrLoading, setRegistroBrLoading] = useState(false);
+  const [registroBrResults, setRegistroBrResults] = useState<UnifiedProspectResult[]>([]);
+
+  const consultarRegistroBr = async () => {
+    if (!registroBrDominio.trim()) {
+      return toast.error("Informe um domínio para consulta no Registro.br");
+    }
+    setRegistroBrLoading(true);
+    try {
+      const res = await lookupWhois({
+        data: {
+          dominioOuTermo: registroBrDominio.trim(),
+          cidade: cidade.trim() || undefined,
+        },
+      });
+      setRegistroBrResults(res);
+      toast.success(`Auditoria Whois concluída para ${registroBrDominio}`);
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao consultar Registro.br");
+    } finally {
+      setRegistroBrLoading(false);
+    }
+  };
+
+  // -------------------------------------------------------------------------
+  // 11. PhantomBuster / Outscraper (Google Maps Deep Extractor)
+  // -------------------------------------------------------------------------
+  const [outscraperSegmento, setOutscraperSegmento] = useState("");
+  const [outscraperLoading, setOutscraperLoading] = useState(false);
+  const [outscraperResults, setOutscraperResults] = useState<UnifiedProspectResult[]>([]);
+
+  const outscraperResultsFiltrados = useMemo(() => {
+    return outscraperResults.filter((item) => {
+      if (isEmpresaExcluida({ nome: item.nome, placeId: item.placeId, site: item.site, cidade: item.cidade || cidade })) return false;
+      if (filtroSite === "com" && !item.site) return false;
+      if (filtroSite === "sem" && item.site) return false;
+      return true;
+    });
+  }, [outscraperResults, filtroSite, isEmpresaExcluida, cidade]);
+
+  const buscarOutscraper = async () => {
+    const seg = outscraperSegmento.trim() || segmento.trim();
+    if (!seg) return toast.error("Informe o segmento ou atividade para extração");
+    setOutscraperLoading(true);
+    try {
+      const res = await searchOutscraper({
+        data: {
+          cidade: cidade.trim(),
+          estado: estado ? nomeEstado(pais, estado) : undefined,
+          segmento: seg,
+          limit: parseInt(limite, 10) || 20,
+        },
+      });
+      setOutscraperResults(res);
+      toast.success(`${res.length} estabelecimentos extraídos via Outscraper/PhantomBuster Maps`);
+    } catch (err: any) {
+      toast.error(`Erro na extração Outscraper: ${err.message || String(err)}`);
+    } finally {
+      setOutscraperLoading(false);
+    }
+  };
+
+  // -------------------------------------------------------------------------
+  // 12. Facebook Páginas Comerciais
+  // -------------------------------------------------------------------------
+  const [facebookTermoLivre, setFacebookTermoLivre] = useState("");
+  const [facebookLoading, setFacebookLoading] = useState(false);
+  const [facebookResults, setFacebookResults] = useState<UnifiedProspectResult[]>([]);
+
+  const facebookResultsFiltrados = useMemo(() => {
+    return facebookResults.filter((item) => {
+      if (isEmpresaExcluida({ nome: item.nome, site: item.site, cidade: item.cidade || cidade })) return false;
+      if (filtroSite === "com" && !item.site) return false;
+      if (filtroSite === "sem" && item.site) return false;
+      return true;
+    });
+  }, [facebookResults, filtroSite, isEmpresaExcluida, cidade]);
+
+  const buscarFacebook = async () => {
+    setFacebookLoading(true);
+    try {
+      const res = await searchFacebook({
+        data: {
+          cidade: cidade.trim(),
+          estado: estado ? nomeEstado(pais, estado) : undefined,
+          segmento: segmento.trim() || undefined,
+          termoLivre: facebookTermoLivre.trim() || undefined,
+          limit: parseInt(limite, 10) || 20,
+        },
+      });
+      setFacebookResults(res);
+      toast.success(`${res.length} página(s) comercial(is) encontrada(s) no Facebook`);
+    } catch (err: any) {
+      toast.error(`Erro na busca do Facebook: ${err.message || String(err)}`);
+    } finally {
+      setFacebookLoading(false);
     }
   };
 
@@ -1514,38 +1789,54 @@ function ImportarPage() {
         </div>
       </div>
 
-      {/* TABS DE PROVEDORES */}
+      {/* TABS DE PROVEDORES E CANAIS DE PROSPECÇÃO */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 h-auto p-1 bg-muted/60 border border-border/60">
-          <TabsTrigger value="google_places" className="flex items-center gap-1.5 py-2 text-xs">
+        <TabsList className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12 h-auto p-1 bg-muted/60 border border-border/60 gap-1">
+          <TabsTrigger value="google_places" className="flex items-center gap-1.5 py-1.5 text-xs">
             <MapPin className="h-3.5 w-3.5 text-blue-500" />
             <span>Google Places</span>
           </TabsTrigger>
-          <TabsTrigger value="serpapi" className="flex items-center gap-1.5 py-2 text-xs">
+          <TabsTrigger value="serpapi" className="flex items-center gap-1.5 py-1.5 text-xs">
             <Globe className="h-3.5 w-3.5 text-emerald-500" />
             <span>SerpApi</span>
           </TabsTrigger>
-          <TabsTrigger value="instagram" className="flex items-center gap-1.5 py-2 text-xs">
+          <TabsTrigger value="outscraper" className="flex items-center gap-1.5 py-1.5 text-xs">
+            <MapPin className="h-3.5 w-3.5 text-cyan-500" />
+            <span>Outscraper</span>
+          </TabsTrigger>
+          <TabsTrigger value="instagram" className="flex items-center gap-1.5 py-1.5 text-xs">
             <Instagram className="h-3.5 w-3.5 text-pink-500" />
             <span>Instagram ({instagramProfilesDb.length})</span>
           </TabsTrigger>
-          <TabsTrigger value="apollo" className="flex items-center gap-1.5 py-2 text-xs">
-            <Building2 className="h-3.5 w-3.5 text-purple-500" />
-            <span>Apollo.io B2B</span>
+          <TabsTrigger value="linkedin" className="flex items-center gap-1.5 py-1.5 text-xs">
+            <Linkedin className="h-3.5 w-3.5 text-sky-500" />
+            <span>LinkedIn</span>
           </TabsTrigger>
-          <TabsTrigger value="openstreetmap" className="flex items-center gap-1.5 py-2 text-xs">
-            <Compass className="h-3.5 w-3.5 text-amber-500" />
-            <span>OpenStreetMap</span>
+          <TabsTrigger value="tiktok" className="flex items-center gap-1.5 py-1.5 text-xs">
+            <AtSign className="h-3.5 w-3.5 text-slate-800 dark:text-slate-200" />
+            <span>TikTok</span>
           </TabsTrigger>
-          <TabsTrigger value="brasilapi" className="flex items-center gap-1.5 py-2 text-xs">
+          <TabsTrigger value="facebook" className="flex items-center gap-1.5 py-1.5 text-xs">
+            <Facebook className="h-3.5 w-3.5 text-blue-600" />
+            <span>Facebook</span>
+          </TabsTrigger>
+          <TabsTrigger value="econodata" className="flex items-center gap-1.5 py-1.5 text-xs">
+            <Building2 className="h-3.5 w-3.5 text-indigo-500" />
+            <span>Econodata</span>
+          </TabsTrigger>
+          <TabsTrigger value="brasilapi" className="flex items-center gap-1.5 py-1.5 text-xs">
             <FileText className="h-3.5 w-3.5 text-green-600" />
-            <span>BrasilAPI (CNPJ)</span>
+            <span>BrasilAPI</span>
           </TabsTrigger>
-          <TabsTrigger value="outros" className="flex items-center gap-1.5 py-2 text-xs">
+          <TabsTrigger value="registrobr" className="flex items-center gap-1.5 py-1.5 text-xs">
+            <Globe className="h-3.5 w-3.5 text-orange-500" />
+            <span>Registro.br</span>
+          </TabsTrigger>
+          <TabsTrigger value="outros" className="flex items-center gap-1.5 py-1.5 text-xs">
             <Upload className="h-3.5 w-3.5 text-muted-foreground" />
-            <span>CSV / Manual</span>
+            <span>CSV/Manual</span>
           </TabsTrigger>
-          <TabsTrigger value="excluidos" className="flex items-center gap-1.5 py-2 text-xs">
+          <TabsTrigger value="excluidos" className="flex items-center gap-1.5 py-1.5 text-xs">
             <Ban className="h-3.5 w-3.5 text-rose-500" />
             <span>Excluídos ({empresasExcluidas.length})</span>
           </TabsTrigger>
@@ -1739,6 +2030,7 @@ function ImportarPage() {
           </Card>
         </TabsContent>
 
+
         {/* ------------------------------------------------------------------- */}
         {/* ABA 2: SERPAPI */}
         {/* ------------------------------------------------------------------- */}
@@ -1747,80 +2039,52 @@ function ImportarPage() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Globe className="h-4 w-4 text-emerald-500" />
-                Descoberta via SerpApi (Google Maps Engine)
+                Busca Web & Maps via SerpApi
                 <Badge variant="secondary" className="ml-1 text-[10px] font-normal">
-                  Chave Conectada
+                  Google Engine
                 </Badge>
               </CardTitle>
               <CardDescription className="text-xs">
-                Busca de empresas no motor Google Maps utilizando a API SerpApi.
+                Varredura ampla no Google Search / Maps com extração de contatos públicos e redes sociais.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {renderSharedFilters()}
 
-              <div className="grid md:grid-cols-[1fr_130px_140px_auto] gap-2 pt-1">
-                <div>
-                  <label className="text-xs text-muted-foreground">Texto de busca personalizada (opcional)</label>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
+                    placeholder={`Consulta customizada (padrão: ${queryPadrao || "segmento em cidade"})...`}
                     value={serpQueryCustom}
                     onChange={(e) => setSerpQueryCustom(e.target.value)}
-                    placeholder={`Padrão: ${queryPadrao || "vinícolas em Bento Gonçalves RS"}`}
+                    className="pl-8 text-xs"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") buscarSerpApi();
+                    }}
                   />
                 </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Limite</label>
-                  <Select value={limite} onValueChange={setLimite}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {["10", "20", "30", "50"].map((n) => (
-                        <SelectItem key={n} value={n}>
-                          {n} resultados
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Filtro de Site</label>
-                  <Select
-                    value={filtroSite}
-                    onValueChange={(v) => setFiltroSite(v as typeof filtroSite)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todos">Todos</SelectItem>
-                      <SelectItem value="com">Com site</SelectItem>
-                      <SelectItem value="sem">Sem site</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-end">
-                  <Button onClick={buscarSerpApi} disabled={serpLoading}>
-                    {serpLoading ? (
-                      <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                    ) : (
-                      <Search className="h-4 w-4 mr-1.5" />
-                    )}
-                    Buscar SerpApi
-                  </Button>
-                </div>
+                <Button onClick={buscarSerpApi} disabled={serpLoading}>
+                  {serpLoading ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      Buscando...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-3.5 w-3.5 mr-1.5" />
+                      Buscar SerpApi
+                    </>
+                  )}
+                </Button>
               </div>
 
-              {serpResults.length > 0 && (
+              {serpResultsFiltrados.length > 0 && (
                 <div className="flex items-center justify-between pt-2">
                   <div className="text-xs text-muted-foreground">
-                    {serpResultsFiltrados.length} de {serpResults.length} resultado(s) encontrados
+                    Exibindo <strong>{serpResultsFiltrados.length}</strong> empresa(s)
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => importarTodasUnified(serpResultsFiltrados)}
-                  >
+                  <Button size="sm" variant="outline" onClick={() => importarTodasUnified(serpResultsFiltrados)}>
                     <Plus className="h-3.5 w-3.5 mr-1.5" />
                     Adicionar todas ao Radar
                   </Button>
@@ -1835,14 +2099,15 @@ function ImportarPage() {
                       key={p.id}
                       id={p.id}
                       nome={p.nome}
-                      razaoSocial={p.razaoSocial}
-                      segmento={p.segmento}
-                      cidade={p.cidade}
-                      endereco={p.endereco}
-                      telefone={p.telefone}
+                      segmento={p.segmento || segmento}
+                      cidade={p.cidade || cidade}
+                      estado={p.estado}
+                      telefone={p.telefone || p.whatsapp}
                       whatsapp={p.whatsapp}
+                      email={p.email}
                       site={p.site}
                       instagram={p.instagram}
+                      linkedin={p.linkedin}
                       googleMapsUri={p.googleMapsUri}
                       rating={p.rating}
                       totalRatings={p.totalRatings}
@@ -1852,10 +2117,8 @@ function ImportarPage() {
                       onExclude={() =>
                         handleExcluirResultado({
                           nome: p.nome,
-                          razaoSocial: p.razaoSocial,
-                          cnpj: p.cnpj,
                           cidade: p.cidade || cidade,
-                          estado: p.estado || (estado ? nomeEstado(pais, estado) : undefined),
+                          estado: p.estado,
                           segmento: p.segmento || segmento,
                           site: p.site,
                           telefone: p.telefone || p.whatsapp,
@@ -1865,6 +2128,7 @@ function ImportarPage() {
                       }
                       onOpenWhatsApp={handleOpenWhatsApp}
                       onOpenInstagramDm={handleOpenInstagramDm}
+                      onOpenLinkedIn={handleOpenLinkedIn}
                     />
                   );
                 })}
@@ -1879,7 +2143,116 @@ function ImportarPage() {
         </TabsContent>
 
         {/* ------------------------------------------------------------------- */}
-        {/* ABA 3: INSTAGRAM SCRAPING & BASE DE DADOS */}
+        {/* ABA: PHANTOMBUSTER / OUTSCRAPER (GOOGLE MAPS DEEP EXTRACTOR) */}
+        {/* ------------------------------------------------------------------- */}
+        <TabsContent value="outscraper" className="space-y-4 mt-0">
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-cyan-500" />
+                Extração Automatizada de Dados (Outscraper & PhantomBuster Maps)
+                <Badge variant="secondary" className="ml-1 text-[10px] font-normal">
+                  Google Maps Scraper
+                </Badge>
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Extração de alto volume com horários, avaliações, categorias completas e múltiplos telefones diretamente do Google Maps.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {renderSharedFilters()}
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder={`Atividade ou Nicho específico em ${cidade || "cidade"} (ex: Barbearia, Construtora, Dentista)...`}
+                    value={outscraperSegmento}
+                    onChange={(e) => setOutscraperSegmento(e.target.value)}
+                    className="pl-8 text-xs"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") buscarOutscraper();
+                    }}
+                  />
+                </div>
+                <Button onClick={buscarOutscraper} disabled={outscraperLoading} className="bg-cyan-600 hover:bg-cyan-700 text-white">
+                  {outscraperLoading ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      Extraindo Maps...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-3.5 w-3.5 mr-1.5" />
+                      Executar Extração Deep Maps
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {outscraperResultsFiltrados.length > 0 && (
+                <div className="flex items-center justify-between pt-2">
+                  <div className="text-xs text-muted-foreground">
+                    Exibindo <strong>{outscraperResultsFiltrados.length}</strong> estabelecimento(s)
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => importarTodasUnified(outscraperResultsFiltrados)}>
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    Adicionar todas ao Radar CRM
+                  </Button>
+                </div>
+              )}
+
+              <div className="space-y-2.5">
+                {outscraperResultsFiltrados.map((p) => {
+                  const done = imported.has(p.id);
+                  return (
+                    <ProspectItemCard
+                      key={p.id}
+                      id={p.id}
+                      nome={p.nome}
+                      segmento={p.segmento || segmento}
+                      cidade={p.cidade || cidade}
+                      estado={p.estado}
+                      endereco={p.endereco}
+                      telefone={p.telefone}
+                      whatsapp={p.whatsapp}
+                      site={p.site}
+                      googleMapsUri={p.googleMapsUri}
+                      rating={p.rating}
+                      totalRatings={p.totalRatings}
+                      detalhesExtras={p.detalhesExtras}
+                      isImported={done}
+                      onImport={() => importarUnified(p)}
+                      onExclude={() =>
+                        handleExcluirResultado({
+                          nome: p.nome,
+                          cidade: p.cidade || cidade,
+                          estado: p.estado,
+                          segmento: p.segmento || segmento,
+                          site: p.site,
+                          telefone: p.telefone,
+                          placeId: p.placeId,
+                          origem: "outscraper",
+                        })
+                      }
+                      onOpenWhatsApp={handleOpenWhatsApp}
+                      onOpenInstagramDm={handleOpenInstagramDm}
+                      onOpenLinkedIn={handleOpenLinkedIn}
+                    />
+                  );
+                })}
+                {!outscraperLoading && outscraperResults.length === 0 && (
+                  <div className="text-xs text-muted-foreground text-center py-6 border border-dashed border-border/60 rounded-md">
+                    Selecione a cidade acima e clique em "Executar Extração Deep Maps".
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------------------------- */}
+        {/* ABA 3: INSTAGRAM SCRAPING & BASE DE DADOS + APIFY */}
         {/* ------------------------------------------------------------------- */}
         <TabsContent value="instagram" className="space-y-4 mt-0">
           <Card className="border-border/60">
@@ -1900,7 +2273,7 @@ function ImportarPage() {
                     </Badge>
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    Pesquise perfis comerciais no Instagram com filtros geográficos e de segmento. Os perfis encontrados são salvos localmente para consultas instantâneas e deduplicação automática em novas buscas.
+                    Pesquise perfis comerciais no Instagram com filtros geográficos e de segmento. Suporte a SerpApi e Apify Actor com deduplicação automática.
                   </CardDescription>
                 </div>
               </div>
@@ -1958,11 +2331,61 @@ function ImportarPage() {
                         Nova Pesquisa no Instagram (API Live Scraping)
                       </div>
                       <div className="text-[11px] text-muted-foreground">
-                        Executa varredura ao vivo na web pelo SerpApi, <strong>ignora perfis já salvos</strong> e completa sua base com novas empresas.
+                        Executa varredura ao vivo, <strong>ignora perfis já salvos</strong> e completa sua base com novas empresas.
                       </div>
                     </div>
                   </label>
                 </RadioGroup>
+
+                {/* Seletor de Motor no modo Live (SerpApi vs Apify) */}
+                {instagramModo === "live" && (
+                  <div className="pt-2 border-t border-border/40 space-y-2">
+                    <div className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
+                      <Sparkles className="h-3 w-3 text-pink-500" />
+                      Motor de Scraping:
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setInstagramEngine("serpapi")}
+                        className={`p-2 rounded-md border text-left cursor-pointer text-xs transition-all ${
+                          instagramEngine === "serpapi"
+                            ? "border-pink-500 bg-pink-500/10 text-foreground font-semibold shadow-xs"
+                            : "border-border/60 bg-background text-muted-foreground hover:bg-muted/40"
+                        }`}
+                      >
+                        <div className="font-medium text-foreground">Google Index (SerpApi)</div>
+                        <div className="text-[10px] text-muted-foreground">Rápido, indexado e seguro contra bloqueios.</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setInstagramEngine("apify")}
+                        className={`p-2 rounded-md border text-left cursor-pointer text-xs transition-all ${
+                          instagramEngine === "apify"
+                            ? "border-pink-500 bg-pink-500/10 text-foreground font-semibold shadow-xs"
+                            : "border-border/60 bg-background text-muted-foreground hover:bg-muted/40"
+                        }`}
+                      >
+                        <div className="font-medium text-foreground flex items-center justify-between">
+                          <span>Apify Instagram Actor</span>
+                          <Badge variant="outline" className="text-[9px]">Lovable</Badge>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">Scraping com contagem de posts e métricas.</div>
+                      </button>
+                    </div>
+
+                    {instagramEngine === "apify" && (
+                      <Input
+                        type="password"
+                        placeholder="Token Apify (Opcional se configurado em .env/Lovable)..."
+                        value={apifyToken}
+                        onChange={(e) => setApifyToken(e.target.value)}
+                        className="text-xs font-mono h-8"
+                      />
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Barra de Ações e Filtros adicionais */}
@@ -2124,51 +2547,70 @@ function ImportarPage() {
         </TabsContent>
 
         {/* ------------------------------------------------------------------- */}
-        {/* ABA 3: APOLLO.IO */}
+        {/* ABA: LINKEDIN DECISORES (PROPRIETÁRIOS, CEOS & MARKETING) */}
         {/* ------------------------------------------------------------------- */}
-        <TabsContent value="apollo" className="space-y-4 mt-0">
+        <TabsContent value="linkedin" className="space-y-4 mt-0">
           <Card className="border-border/60">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-purple-500" />
-                Prospecção Corporativa via Apollo.io
+                <Linkedin className="h-4 w-4 text-sky-500" />
+                Prospecção de Decisores no LinkedIn
                 <Badge variant="secondary" className="ml-1 text-[10px] font-normal">
-                  Chave Conectada
+                  C-Level & Sócios
                 </Badge>
               </CardTitle>
               <CardDescription className="text-xs">
-                Busca de indústrias, empresas B2B e organizações por setor econômico e localização.
+                Busca direcionada de Proprietários, CEOs, Diretores e Gestores de Marketing por setor econômico e localização.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {renderSharedFilters()}
 
-              <div className="grid md:grid-cols-[1fr_130px_140px_auto] gap-2 pt-1">
+              <div className="grid md:grid-cols-[1fr_1fr_130px_130px_auto] gap-2 pt-1 items-end">
                 <div>
-                  <label className="text-xs text-muted-foreground">Nome específico de empresa (opcional)</label>
+                  <label className="text-xs text-muted-foreground block mb-1">Cargo / Nível de Decisão</label>
+                  <Select
+                    value={linkedInCargo}
+                    onValueChange={(v) => setLinkedInCargo(v as any)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os Cargos</SelectItem>
+                      <SelectItem value="proprietarios">Proprietários / Sócios / Founders</SelectItem>
+                      <SelectItem value="ceos_diretores">CEOs / Diretores Executivos</SelectItem>
+                      <SelectItem value="marketing_vendas">Marketing & Vendas</SelectItem>
+                      <SelectItem value="gerentes">Gerentes Gerais / Operações</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Empresa Específica (Opcional)</label>
                   <Input
-                    value={apolloQueryCustom}
-                    onChange={(e) => setApolloQueryCustom(e.target.value)}
-                    placeholder="ex: Randon, Tramontina, Marcopolo..."
+                    value={linkedInEmpresa}
+                    onChange={(e) => setLinkedInEmpresa(e.target.value)}
+                    placeholder="ex: Hospital São Lucas, Vinícola Aurora..."
+                    className="text-xs"
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground">Limite</label>
+                  <label className="text-xs text-muted-foreground block mb-1">Limite</label>
                   <Select value={limite} onValueChange={setLimite}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {["10", "25", "50", "100"].map((n) => (
+                      {["10", "20", "40", "60"].map((n) => (
                         <SelectItem key={n} value={n}>
-                          {n} empresas
+                          {n} decisores
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground">Filtro de Site</label>
+                  <label className="text-xs text-muted-foreground block mb-1">Filtro de Site</label>
                   <Select
                     value={filtroSite}
                     onValueChange={(v) => setFiltroSite(v as typeof filtroSite)}
@@ -2183,76 +2625,73 @@ function ImportarPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex items-end">
-                  <Button onClick={buscarApollo} disabled={apolloLoading}>
-                    {apolloLoading ? (
+                <div>
+                  <Button onClick={buscarLinkedIn} disabled={linkedInLoading} className="bg-sky-600 hover:bg-sky-700 text-white">
+                    {linkedInLoading ? (
                       <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
                     ) : (
                       <Search className="h-4 w-4 mr-1.5" />
                     )}
-                    Buscar Apollo.io
+                    Buscar Decisores
                   </Button>
                 </div>
               </div>
 
-              {apolloResults.length > 0 && (
+              {linkedInResults.length > 0 && (
                 <div className="flex items-center justify-between pt-2">
                   <div className="text-xs text-muted-foreground">
-                    {apolloResultsFiltrados.length} de {apolloResults.length} organização(ões) encontrada(s)
+                    Exibindo <strong>{linkedInResultsFiltrados.length}</strong> de {linkedInResults.length} decisor(es)
                   </div>
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => importarTodasUnified(apolloResultsFiltrados)}
+                    onClick={() => importarTodasUnified(linkedInResultsFiltrados)}
                   >
                     <Plus className="h-3.5 w-3.5 mr-1.5" />
-                    Adicionar todas ao Radar
+                    Adicionar todos ao Radar CRM
                   </Button>
                 </div>
               )}
 
               <div className="space-y-2.5">
-                {apolloResultsFiltrados.map((p) => {
+                {linkedInResultsFiltrados.map((p) => {
                   const done = imported.has(p.id);
                   return (
                     <ProspectItemCard
                       key={p.id}
                       id={p.id}
                       nome={p.nome}
-                      razaoSocial={p.razaoSocial}
-                      segmento={p.segmento}
-                      cidade={p.cidade}
+                      segmento={p.segmento || segmento}
+                      cidade={p.cidade || cidade}
                       estado={p.estado}
-                      endereco={p.endereco}
                       telefone={p.telefone}
                       whatsapp={p.whatsapp}
+                      email={p.email}
                       site={p.site}
-                      instagram={p.instagram}
                       linkedin={p.linkedin}
-                      googleMapsUri={p.googleMapsUri}
                       detalhesExtras={p.detalhesExtras}
                       isImported={done}
                       onImport={() => importarUnified(p)}
                       onExclude={() =>
                         handleExcluirResultado({
                           nome: p.nome,
-                          razaoSocial: p.razaoSocial,
                           cidade: p.cidade || cidade,
-                          estado: p.estado || (estado ? nomeEstado(pais, estado) : undefined),
+                          estado: p.estado,
                           segmento: p.segmento || segmento,
                           site: p.site,
-                          telefone: p.telefone || p.whatsapp,
-                          origem: "apollo",
+                          telefone: p.telefone,
+                          origem: "linkedin",
                         })
                       }
                       onOpenWhatsApp={handleOpenWhatsApp}
                       onOpenInstagramDm={handleOpenInstagramDm}
+                      onOpenLinkedIn={handleOpenLinkedIn}
                     />
                   );
                 })}
-                {!apolloLoading && apolloResults.length === 0 && (
+                {!linkedInLoading && linkedInResults.length === 0 && (
                   <div className="text-xs text-muted-foreground text-center py-6 border border-dashed border-border/60 rounded-md">
-                    Selecione os filtros acima e clique em "Buscar Apollo.io".
+                    Selecione o cargo e a localização e clique em "Buscar Decisores".
                   </div>
                 )}
               </div>
@@ -2261,105 +2700,300 @@ function ImportarPage() {
         </TabsContent>
 
         {/* ------------------------------------------------------------------- */}
-        {/* ABA 4: OPENSTREETMAP (OVERPASS) */}
+        {/* ABA: TIKTOK DISCOVERY */}
         {/* ------------------------------------------------------------------- */}
-        <TabsContent value="openstreetmap" className="space-y-4 mt-0">
+        <TabsContent value="tiktok" className="space-y-4 mt-0">
           <Card className="border-border/60">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                <Compass className="h-4 w-4 text-amber-500" />
-                Busca Aberta via OpenStreetMap (Overpass API)
-                <Badge
-                  variant="secondary"
-                  className="ml-1 text-[10px] font-normal bg-green-500/15 text-green-600 dark:text-green-400"
-                >
-                  Gratuito / Open Data
+                <AtSign className="h-4 w-4 text-foreground" />
+                Descoberta de Marcas e Perfis no TikTok
+                <Badge variant="secondary" className="ml-1 text-[10px] font-normal">
+                  Redes Sociais
                 </Badge>
               </CardTitle>
               <CardDescription className="text-xs">
-                Consulta geoespacial livre no banco global do OpenStreetMap para identificar estabelecimentos e serviços.
+                Localize perfis comerciais, marcas emergentes e influenciadores corporativos por nicho e região.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {renderSharedFilters()}
 
-              <div className="grid md:grid-cols-[1fr_130px_140px_auto] gap-2 pt-1">
-                <div>
-                  <label className="text-xs text-muted-foreground">Categoria OSM</label>
-                  <Select value={osmCategoria} onValueChange={setOsmCategoria}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="shop">Comércio Geral (Shop)</SelectItem>
-                      <SelectItem value="amenity">Serviços & Alimentação (Amenity)</SelectItem>
-                      <SelectItem value="craft">Oficinas & Produção (Craft)</SelectItem>
-                      <SelectItem value="office">Escritórios & Empresas (Office)</SelectItem>
-                      <SelectItem value="tourism">Turismo & Hospedagem (Tourism)</SelectItem>
-                    </SelectContent>
-                  </Select>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Palavras-chave de busca no TikTok (ex: loja de roupas, estética, café gourmet)..."
+                    value={tikTokTermoLivre}
+                    onChange={(e) => setTikTokTermoLivre(e.target.value)}
+                    className="pl-8 text-xs"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") buscarTikTok();
+                    }}
+                  />
                 </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Limite</label>
-                  <Select value={limite} onValueChange={setLimite}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {["20", "40", "60", "100"].map((n) => (
-                        <SelectItem key={n} value={n}>
-                          {n} registros
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Filtro de Site</label>
-                  <Select
-                    value={filtroSite}
-                    onValueChange={(v) => setFiltroSite(v as typeof filtroSite)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todos">Todos</SelectItem>
-                      <SelectItem value="com">Com site</SelectItem>
-                      <SelectItem value="sem">Sem site</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-end">
-                  <Button onClick={buscarOsm} disabled={osmLoading}>
-                    {osmLoading ? (
-                      <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                    ) : (
-                      <Search className="h-4 w-4 mr-1.5" />
-                    )}
-                    Buscar no OSM
-                  </Button>
-                </div>
+                <Button onClick={buscarTikTok} disabled={tikTokLoading}>
+                  {tikTokLoading ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      Rastreando TikTok...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-3.5 w-3.5 mr-1.5" />
+                      Buscar no TikTok
+                    </>
+                  )}
+                </Button>
               </div>
 
-              {osmResults.length > 0 && (
+              {tikTokResultsFiltrados.length > 0 && (
                 <div className="flex items-center justify-between pt-2">
                   <div className="text-xs text-muted-foreground">
-                    {osmResultsFiltrados.length} de {osmResults.length} estabelecimento(s) encontrados
+                    Exibindo <strong>{tikTokResultsFiltrados.length}</strong> marca(s) encontrada(s)
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => importarTodasUnified(osmResultsFiltrados)}
-                  >
+                  <Button size="sm" variant="outline" onClick={() => importarTodasUnified(tikTokResultsFiltrados)}>
                     <Plus className="h-3.5 w-3.5 mr-1.5" />
-                    Adicionar todas ao Radar
+                    Adicionar todas ao Radar CRM
                   </Button>
                 </div>
               )}
 
               <div className="space-y-2.5">
-                {osmResultsFiltrados.map((p) => {
+                {tikTokResultsFiltrados.map((p) => {
+                  const done = imported.has(p.id);
+                  return (
+                    <ProspectItemCard
+                      key={p.id}
+                      id={p.id}
+                      nome={p.nome}
+                      segmento={p.segmento || segmento}
+                      cidade={p.cidade || cidade}
+                      estado={p.estado}
+                      telefone={p.telefone}
+                      whatsapp={p.whatsapp}
+                      site={p.site}
+                      detalhesExtras={p.detalhesExtras}
+                      isImported={done}
+                      onImport={() => importarUnified(p)}
+                      onExclude={() =>
+                        handleExcluirResultado({
+                          nome: p.nome,
+                          cidade: p.cidade || cidade,
+                          estado: p.estado,
+                          segmento: p.segmento || segmento,
+                          site: p.site,
+                          telefone: p.telefone,
+                          origem: "tiktok",
+                        })
+                      }
+                      onOpenWhatsApp={handleOpenWhatsApp}
+                      onOpenInstagramDm={handleOpenInstagramDm}
+                      onOpenLinkedIn={handleOpenLinkedIn}
+                    />
+                  );
+                })}
+                {!tikTokLoading && tikTokResults.length === 0 && (
+                  <div className="text-xs text-muted-foreground text-center py-6 border border-dashed border-border/60 rounded-md">
+                    Selecione a localização ou informe termos de nicho e clique em "Buscar no TikTok".
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------------------------- */}
+        {/* ABA: FACEBOOK PÁGINAS COMERCIAIS */}
+        {/* ------------------------------------------------------------------- */}
+        <TabsContent value="facebook" className="space-y-4 mt-0">
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Facebook className="h-4 w-4 text-blue-600" />
+                Páginas Comerciais no Facebook
+                <Badge variant="secondary" className="ml-1 text-[10px] font-normal">
+                  Rede Social & Negócios
+                </Badge>
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Encontre empresas, páginas locais e comércios com perfis ativos no ecossistema Facebook.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {renderSharedFilters()}
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Termos específicos para páginas no Facebook (ex: imobiliária, clínica médica, oficina)..."
+                    value={facebookTermoLivre}
+                    onChange={(e) => setFacebookTermoLivre(e.target.value)}
+                    className="pl-8 text-xs"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") buscarFacebook();
+                    }}
+                  />
+                </div>
+                <Button onClick={buscarFacebook} disabled={facebookLoading} className="bg-blue-600 hover:bg-blue-700 text-white">
+                  {facebookLoading ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      Buscando Páginas...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-3.5 w-3.5 mr-1.5" />
+                      Buscar no Facebook
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {facebookResultsFiltrados.length > 0 && (
+                <div className="flex items-center justify-between pt-2">
+                  <div className="text-xs text-muted-foreground">
+                    Exibindo <strong>{facebookResultsFiltrados.length}</strong> página(s) comercial(is)
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => importarTodasUnified(facebookResultsFiltrados)}>
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    Adicionar todas ao Radar CRM
+                  </Button>
+                </div>
+              )}
+
+              <div className="space-y-2.5">
+                {facebookResultsFiltrados.map((p) => {
+                  const done = imported.has(p.id);
+                  return (
+                    <ProspectItemCard
+                      key={p.id}
+                      id={p.id}
+                      nome={p.nome}
+                      segmento={p.segmento || segmento}
+                      cidade={p.cidade || cidade}
+                      estado={p.estado}
+                      telefone={p.telefone}
+                      whatsapp={p.whatsapp}
+                      site={p.site}
+                      detalhesExtras={p.detalhesExtras}
+                      isImported={done}
+                      onImport={() => importarUnified(p)}
+                      onExclude={() =>
+                        handleExcluirResultado({
+                          nome: p.nome,
+                          cidade: p.cidade || cidade,
+                          estado: p.estado,
+                          segmento: p.segmento || segmento,
+                          site: p.site,
+                          telefone: p.telefone,
+                          origem: "facebook",
+                        })
+                      }
+                      onOpenWhatsApp={handleOpenWhatsApp}
+                      onOpenInstagramDm={handleOpenInstagramDm}
+                      onOpenLinkedIn={handleOpenLinkedIn}
+                    />
+                  );
+                })}
+                {!facebookLoading && facebookResults.length === 0 && (
+                  <div className="text-xs text-muted-foreground text-center py-6 border border-dashed border-border/60 rounded-md">
+                    Selecione a cidade acima e clique em "Buscar no Facebook".
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------------------------- */}
+        {/* ABA: ECONODATA & SPEEDIO (CNAE, PORTE & FATURAMENTO) */}
+        {/* ------------------------------------------------------------------- */}
+        <TabsContent value="econodata" className="space-y-4 mt-0">
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-indigo-500" />
+                Inteligência B2B Econodata & Speedio
+                <Badge variant="secondary" className="ml-1 text-[10px] font-normal">
+                  CNAE & Faturamento
+                </Badge>
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Filtre empresas ativas por ramo de atividade oficial (CNAE), porte corporativo (MEI, Micro, Pequeno, Médio/Grande) e faturamento estimado.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {renderSharedFilters()}
+
+              <div className="grid md:grid-cols-[1fr_160px_160px_auto] gap-2 pt-1 items-end">
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">CNAE (Código ou Descrição)</label>
+                  <Input
+                    value={econodataCnae}
+                    onChange={(e) => setEconodataCnae(e.target.value)}
+                    placeholder="ex: 6201-5/01, Tecnologia, Construção..."
+                    className="text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Porte da Empresa</label>
+                  <Select
+                    value={econodataPorte}
+                    onValueChange={(v) => setEconodataPorte(v as any)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os Portes</SelectItem>
+                      <SelectItem value="mei">MEI</SelectItem>
+                      <SelectItem value="micro">Microempresa (ME)</SelectItem>
+                      <SelectItem value="pequeno">Empresa Pequeno Porte (EPP)</SelectItem>
+                      <SelectItem value="medio_grande">Médio e Grande Porte</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Faturamento Estimado</label>
+                  <Input
+                    value={econodataFaturamento}
+                    onChange={(e) => setEconodataFaturamento(e.target.value)}
+                    placeholder="ex: > 1M, 360k-4.8M..."
+                    className="text-xs"
+                  />
+                </div>
+                <div>
+                  <Button onClick={buscarEconodata} disabled={econodataLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                    {econodataLoading ? (
+                      <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4 mr-1.5" />
+                    )}
+                    Buscar Base B2B
+                  </Button>
+                </div>
+              </div>
+
+              {econodataResults.length > 0 && (
+                <div className="flex items-center justify-between pt-2">
+                  <div className="text-xs text-muted-foreground">
+                    Exibindo <strong>{econodataResultsFiltrados.length}</strong> de {econodataResults.length} empresa(s)
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => importarTodasUnified(econodataResultsFiltrados)}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    Adicionar todas ao Radar CRM
+                  </Button>
+                </div>
+              )}
+
+              <div className="space-y-2.5">
+                {econodataResultsFiltrados.map((p) => {
                   const done = imported.has(p.id);
                   return (
                     <ProspectItemCard
@@ -2367,17 +3001,15 @@ function ImportarPage() {
                       id={p.id}
                       nome={p.nome}
                       razaoSocial={p.razaoSocial}
-                      segmento={p.segmento}
-                      cidade={p.cidade}
+                      cnpj={p.cnpj}
+                      segmento={p.segmento || segmento}
+                      cidade={p.cidade || cidade}
+                      estado={p.estado}
                       endereco={p.endereco}
-                      bairro={p.bairro}
-                      cep={p.cep}
                       telefone={p.telefone}
                       whatsapp={p.whatsapp}
                       email={p.email}
                       site={p.site}
-                      instagram={p.instagram}
-                      googleMapsUri={p.googleMapsUri}
                       detalhesExtras={p.detalhesExtras}
                       isImported={done}
                       onImport={() => importarUnified(p)}
@@ -2385,23 +3017,24 @@ function ImportarPage() {
                         handleExcluirResultado({
                           nome: p.nome,
                           razaoSocial: p.razaoSocial,
+                          cnpj: p.cnpj,
                           cidade: p.cidade || cidade,
-                          estado: p.estado || (estado ? nomeEstado(pais, estado) : undefined),
+                          estado: p.estado,
                           segmento: p.segmento || segmento,
                           site: p.site,
-                          telefone: p.telefone || p.whatsapp,
-                          placeId: p.placeId,
-                          origem: "openstreetmap",
+                          telefone: p.telefone,
+                          origem: "econodata",
                         })
                       }
                       onOpenWhatsApp={handleOpenWhatsApp}
                       onOpenInstagramDm={handleOpenInstagramDm}
+                      onOpenLinkedIn={handleOpenLinkedIn}
                     />
                   );
                 })}
-                {!osmLoading && osmResults.length === 0 && (
+                {!econodataLoading && econodataResults.length === 0 && (
                   <div className="text-xs text-muted-foreground text-center py-6 border border-dashed border-border/60 rounded-md">
-                    Selecione a cidade acima e clique em "Buscar no OSM".
+                    Defina a cidade e os filtros de CNAE ou Porte e clique em "Buscar Base B2B".
                   </div>
                 )}
               </div>
@@ -2573,6 +3206,7 @@ function ImportarPage() {
                       }
                       onOpenWhatsApp={handleOpenWhatsApp}
                       onOpenInstagramDm={handleOpenInstagramDm}
+                      onOpenLinkedIn={handleOpenLinkedIn}
                     />
                   );
                 })}
@@ -2587,6 +3221,104 @@ function ImportarPage() {
                   </div>
                 )}
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------------------------- */}
+        {/* ABA: REGISTRO.BR (WHOIS & AUDITORIA DE EXPIRAÇÃO DE DOMÍNIOS) */}
+        {/* ------------------------------------------------------------------- */}
+        <TabsContent value="registrobr" className="space-y-4 mt-0">
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Globe className="h-4 w-4 text-orange-500" />
+                Registro.br — Diretório Whois & Auditoria de Domínios
+                <Badge variant="secondary" className="ml-1 text-[10px] font-normal bg-orange-500/10 text-orange-600 dark:text-orange-400">
+                  RDAP Oficial .BR
+                </Badge>
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Verifique status de registro, datas de expiração e contatos técnicos de domínios <code>.br</code> para identificar oportunidades de abordagem (domínios expirando, com problemas de renovação ou disponíveis).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div className="relative flex-1">
+                  <Globe className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Informe o domínio (ex: minhamarca.com.br, advogados.com.br)..."
+                    value={registroBrDominio}
+                    onChange={(e) => setRegistroBrDominio(e.target.value)}
+                    className="pl-8 text-xs font-mono"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") consultarRegistroBr();
+                    }}
+                  />
+                </div>
+                <Button onClick={consultarRegistroBr} disabled={registroBrLoading} className="bg-orange-600 hover:bg-orange-700 text-white">
+                  {registroBrLoading ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      Consultando Whois...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-3.5 w-3.5 mr-1.5" />
+                      Consultar Whois / RDAP
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {registroBrResults.length > 0 && (
+                <div className="space-y-2.5 pt-2">
+                  {registroBrResults.map((p) => {
+                    const done = imported.has(p.id);
+                    return (
+                      <ProspectItemCard
+                        key={p.id}
+                        id={p.id}
+                        nome={p.nome}
+                        razaoSocial={p.razaoSocial}
+                        cnpj={p.cnpj}
+                        segmento={p.segmento || "Domínio Web / Registro.br"}
+                        cidade={p.cidade || cidade}
+                        estado={p.estado}
+                        site={p.site}
+                        detalhesExtras={p.detalhesExtras}
+                        isImported={done}
+                        onImport={() => importarUnified(p)}
+                        onExclude={() =>
+                          handleExcluirResultado({
+                            nome: p.nome,
+                            razaoSocial: p.razaoSocial,
+                            cnpj: p.cnpj,
+                            site: p.site,
+                            cidade: p.cidade || cidade,
+                            origem: "registrobr",
+                          })
+                        }
+                        onOpenWhatsApp={handleOpenWhatsApp}
+                        onOpenInstagramDm={handleOpenInstagramDm}
+                        onOpenLinkedIn={handleOpenLinkedIn}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+
+              {!registroBrLoading && registroBrResults.length === 0 && (
+                <div className="text-center py-10 px-4 border border-dashed border-border/60 rounded-lg space-y-2">
+                  <Globe className="h-8 w-8 mx-auto text-orange-500/60" />
+                  <div className="text-sm font-semibold text-foreground">
+                    Consulte um domínio nacional (.br)
+                  </div>
+                  <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                    Digite um domínio nacional acima para checar o status no Registro.br, identificar se está expirado, em processo de liberação ou se os dados de titularidade estão ativos.
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -2927,6 +3659,13 @@ function ImportarPage() {
         open={instagramDmModalOpen}
         onOpenChange={setInstagramDmModalOpen}
         perfil={instagramDmPerfil}
+      />
+
+      {/* MODAL DE PRIMEIRO CONTATO VIA LINKEDIN (MENSAGEM CONSULTIVA DE ALTO VALOR) */}
+      <LinkedInMessageModal
+        open={linkedInModalOpen}
+        onOpenChange={setLinkedInModalOpen}
+        perfil={linkedInPerfil}
       />
     </div>
   );
