@@ -40,6 +40,7 @@ import {
   Database,
   RefreshCw,
   MessageCircle,
+  Key,
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -75,6 +76,7 @@ import {
   LinkedInMessageModal,
   type ContactableLinkedInProfile,
 } from "@/components/linkedin-message-modal";
+import { ApiManagerModal } from "@/components/api-manager-modal";
 import type { InstagramProfile } from "@/lib/store";
 import { empresaFromRaw, CIDADES_RS_FOCO, SEGMENTOS } from "@/lib/mock-data";
 import {
@@ -542,6 +544,9 @@ function ImportarPage() {
     setLinkedInPerfil(perfil);
     setLinkedInModalOpen(true);
   };
+
+  // Modal da Central de Cadastro e Status de APIs
+  const [apiModalOpen, setApiModalOpen] = useState(false);
 
   const handleExcluirResultado = (item: {
     nome: string;
@@ -1781,9 +1786,19 @@ function ImportarPage() {
             Capture e enriqueça leads a partir de múltiplas fontes integradas: Google Places, SerpApi, Apollo.io, OpenStreetMap, BrasilAPI ou planilhas.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={exportarEmpresas}>
-            <Download className="h-4 w-4 mr-1.5" />
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setApiModalOpen(true)}
+            className="bg-primary/5 border-primary/30 text-foreground hover:bg-primary/10 text-xs shadow-xs"
+          >
+            <Key className="h-3.5 w-3.5 mr-1.5 text-primary" />
+            <span className="h-2 w-2 rounded-full bg-emerald-500 mr-1 animate-pulse" />
+            Gerenciar APIs & Status
+          </Button>
+          <Button variant="outline" size="sm" onClick={exportarEmpresas} className="text-xs">
+            <Download className="h-3.5 w-3.5 mr-1.5" />
             Exportar CRM ({empresas.length})
           </Button>
         </div>
@@ -3666,6 +3681,12 @@ function ImportarPage() {
         open={linkedInModalOpen}
         onOpenChange={setLinkedInModalOpen}
         perfil={linkedInPerfil}
+      />
+
+      {/* MODAL DE GERENCIAMENTO E STATUS DE APIS */}
+      <ApiManagerModal
+        open={apiModalOpen}
+        onOpenChange={setApiModalOpen}
       />
     </div>
   );
