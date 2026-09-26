@@ -30,6 +30,7 @@ export type OrigemDado =
   | "apollo"
   | "openstreetmap"
   | "brasilapi"
+  | "instagram"
   | "diretorio_publico"
   | "manual"
   | "csv"

@@ -22,7 +22,8 @@ export interface UnifiedProspectResult {
   totalRatings?: number;
   dataInicioAtividade?: string;
   diasDesdeAbertura?: number;
-  origem: "google_places" | "serpapi" | "apollo" | "openstreetmap" | "brasilapi";
+  placeId?: string;
+  origem: "google_places" | "serpapi" | "apollo" | "openstreetmap" | "brasilapi" | "instagram";
   detalhesExtras?: string;
 }
 
@@ -634,4 +635,174 @@ export const lookupBrasilApiCnpj = createServerFn({ method: "POST" })
     }
 
     return results;
+  });
+
+// ---------------------------------------------------------------------------
+// 6. Instagram Scraping & Discovery via SerpApi Google Engine
+// ---------------------------------------------------------------------------
+export const searchInstagramProfiles = createServerFn({ method: "POST" })
+  .validator(
+    (data: {
+      cidade: string;
+      estado?: string;
+      pais?: string;
+      segmento?: string;
+      termoLivre?: string;
+      limit?: number;
+    }) => {
+      const cidade = String(data?.cidade ?? "").trim();
+      const segmento = String(data?.segmento ?? "").trim();
+      const termoLivre = String(data?.termoLivre ?? "").trim();
+      const estado = String(data?.estado ?? "").trim();
+      const limit = Math.min(Math.max(Number(data?.limit) || 20, 1), 100);
+      return { cidade, segmento, termoLivre, estado, limit };
+    },
+  )
+  .handler(async ({ data }): Promise<UnifiedProspectResult[]> => {
+    const apiKey =
+      process.env.SERPAPI_API_KEY ||
+      "2cbfbfba-64f0-45b4-adee-2884173b3299:6198bbb2-506c-4148-b6a4-6a4820bb40d9";
+
+    const termo = data.termoLivre || data.segmento || "empresas";
+    const loc = [data.cidade, data.estado].filter(Boolean).join(" ");
+    const searchQuery = `site:instagram.com "${termo}" "${loc}"`;
+
+    const url = new URL("https://serpapi.com/search.json");
+    url.searchParams.set("engine", "google");
+    url.searchParams.set("q", searchQuery);
+    url.searchParams.set("api_key", apiKey);
+    url.searchParams.set("hl", "pt-br");
+    url.searchParams.set("gl", "br");
+    url.searchParams.set("num", String(Math.min(data.limit * 2, 100)));
+
+    try {
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        headers: { "User-Agent": COMMON_USER_AGENT },
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error(`SerpApi Instagram failed [${response.status}]: ${errText}`);
+        throw new Error(
+          response.status === 401
+            ? "Chave do SerpApi não autorizada. Verifique sua chave em .env."
+            : `Falha ao pesquisar no Instagram via SerpApi (${response.status})`,
+        );
+      }
+
+      const json = (await response.json()) as {
+        organic_results?: Array<{
+          title?: string;
+          link?: string;
+          snippet?: string;
+          rich_snippet?: any;
+          about_this_result?: any;
+        }>;
+      };
+
+      const items = json.organic_results || [];
+      const results: UnifiedProspectResult[] = [];
+      const seenHandles = new Set<string>();
+
+      for (const item of items) {
+        if (!item.link || !item.title) continue;
+
+        // Extrai o username / handle do link do Instagram
+        const handleMatch = item.link.match(/instagram\.com\/([A-Za-z0-9._-]+)/i);
+        if (!handleMatch) continue;
+        const handleRaw = handleMatch[1].toLowerCase();
+
+        // Ignora rotas do sistema do Instagram
+        if (
+          [
+            "p",
+            "reel",
+            "reels",
+            "explore",
+            "stories",
+            "tv",
+            "directory",
+            "accounts",
+            "tags",
+            "direct",
+            "legal",
+            "about",
+            "developer",
+          ].includes(handleRaw)
+        ) {
+          continue;
+        }
+
+        const handle = `@${handleRaw}`;
+        if (seenHandles.has(handle)) continue;
+        seenHandles.add(handle);
+
+        // Limpa o título para obter o nome da empresa
+        let nomeLimpo = item.title
+          .replace(/\(@[A-Za-z0-9._-]+\)/gi, "")
+          .replace(/•\s*Fotos e vídeos do Instagram/gi, "")
+          .replace(/•\s*Instagram photos and videos/gi, "")
+          .replace(/on Instagram:?.*$/gi, "")
+          .replace(/\|\s*Instagram/gi, "")
+          .replace(/[-–—]\s*Instagram/gi, "")
+          .trim();
+
+        if (!nomeLimpo || nomeLimpo.length < 2) {
+          nomeLimpo = handleRaw
+            .replace(/[._]/g, " ")
+            .replace(/\b\w/g, (l) => l.toUpperCase());
+        }
+
+        const snippet = item.snippet || "";
+
+        // Extrai e-mail do snippet
+        const emailMatch = snippet.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/i);
+        const email = emailMatch ? emailMatch[0].toLowerCase() : undefined;
+
+        // Extrai telefone / WhatsApp do snippet
+        const telMatch = snippet.match(/(?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?(?:9\s?\d{4}[-\s]?\d{4}|\d{4}[-\s]?\d{4})/);
+        const telefone = telMatch ? telMatch[0].trim() : undefined;
+
+        // Extrai site do snippet (ex: linktr.ee, site próprio)
+        let site: string | undefined;
+        const urlMatch = snippet.match(/(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+(?:\/[^\s,]*)?)/i);
+        if (urlMatch && !urlMatch[0].includes("instagram.com")) {
+          site = urlMatch[0].replace(/[\.,;)]+$/, "");
+        }
+
+        // Extrai contagem de seguidores se disponível
+        const seguidoresMatch = snippet.match(/([0-9.,]+(?:\s?mil|\s?k|\s?mi)?)\s+seguidores/i);
+        const seguidores = seguidoresMatch ? seguidoresMatch[1] : undefined;
+
+        results.push({
+          id: `insta-${handleRaw}`,
+          nome: nomeLimpo,
+          segmento: data.segmento || termo || "Instagram Lead",
+          cidade: data.cidade,
+          estado: data.estado,
+          endereco: `${data.cidade}${data.estado ? `, ${data.estado}` : ""}`,
+          telefone,
+          whatsapp: telefone,
+          email,
+          site,
+          instagram: handle,
+          googleMapsUri: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${nomeLimpo} ${data.cidade}`)}`,
+          origem: "instagram",
+          detalhesExtras: [
+            seguidores ? `${seguidores} seguidores` : "",
+            snippet ? `Bio: ${snippet.slice(0, 120)}${snippet.length > 120 ? "..." : ""}` : "",
+          ]
+            .filter(Boolean)
+            .join(" · "),
+        });
+
+        if (results.length >= data.limit) break;
+      }
+
+      return results;
+    } catch (err) {
+      console.error("Erro na busca do Instagram:", err);
+      throw err;
+    }
   });

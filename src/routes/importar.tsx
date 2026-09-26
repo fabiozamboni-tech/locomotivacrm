@@ -33,6 +33,13 @@ import {
   MessageSquare,
   Mail,
   Phone,
+  Ban,
+  EyeOff,
+  RotateCcw,
+  Trash2,
+  Database,
+  RefreshCw,
+  MessageCircle,
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -47,12 +54,18 @@ import {
   searchApollo,
   searchOverpass,
   lookupBrasilApiCnpj,
+  searchInstagramProfiles,
   type UnifiedProspectResult,
 } from "@/lib/prospecting.functions";
 import {
   WhatsAppContactModal,
   type ContactableEmpresa,
 } from "@/components/whatsapp-contact-modal";
+import {
+  InstagramDmModal,
+  type ContactableInstagramProfile,
+} from "@/components/instagram-dm-modal";
+import type { InstagramProfile } from "@/lib/store";
 import { empresaFromRaw, CIDADES_RS_FOCO, SEGMENTOS } from "@/lib/mock-data";
 import {
   PAISES,
@@ -170,7 +183,9 @@ interface ProspectItemProps {
   detalhesExtras?: string;
   isImported: boolean;
   onImport: () => void;
+  onExclude?: () => void;
   onOpenWhatsApp: (empresa: ContactableEmpresa) => void;
+  onOpenInstagramDm?: (perfil: ContactableInstagramProfile) => void;
 }
 
 function ProspectItemCard({
@@ -197,7 +212,9 @@ function ProspectItemCard({
   detalhesExtras,
   isImported,
   onImport,
+  onExclude,
   onOpenWhatsApp,
+  onOpenInstagramDm,
 }: ProspectItemProps) {
   const social = socialDoSite(site);
   const instagramHandle =
@@ -344,18 +361,42 @@ function ProspectItemCard({
             </a>
           )}
 
-          {/* Instagram */}
+          {/* Instagram Link & Direct DM Button */}
           {instagramUrl && (
-            <a
-              href={instagramUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 text-pink-600 dark:text-pink-400 hover:underline font-medium"
-            >
-              <Instagram className="h-3.5 w-3.5" />
-              <span>{instagramHandle}</span>
-              <ExternalLink className="h-3 w-3" />
-            </a>
+            <div className="inline-flex items-center gap-1.5">
+              <a
+                href={instagramUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-pink-600 dark:text-pink-400 hover:underline font-medium"
+              >
+                <Instagram className="h-3.5 w-3.5" />
+                <span>{instagramHandle}</span>
+                <ExternalLink className="h-3 w-3" />
+              </a>
+
+              {onOpenInstagramDm && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onOpenInstagramDm({
+                      nome,
+                      handle: (instagramHandle || "").replace(/^@/, ""),
+                      instagramUrl: instagramUrl,
+                      cidade,
+                      segmento,
+                      site,
+                      bio: detalhesExtras,
+                    })
+                  }
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-gradient-to-r from-pink-600 via-rose-600 to-amber-600 hover:opacity-90 text-white transition-opacity cursor-pointer shadow-xs"
+                  title="Abrir gerador de DM com IA e enviar mensagem no Instagram"
+                >
+                  <MessageCircle className="h-3 w-3" />
+                  <span>Enviar DM</span>
+                </button>
+              )}
+            </div>
           )}
 
           {/* E-mail */}
@@ -392,27 +433,52 @@ function ProspectItemCard({
         </div>
       </div>
 
-      {/* Botão de Adicionar ao Radar */}
+      {/* Botões de Ação */}
       <div className="flex md:flex-col items-center justify-end gap-2 shrink-0">
         <Button
           size="sm"
           variant={isImported ? "secondary" : "default"}
           disabled={isImported}
           onClick={onImport}
-          className="w-full md:w-auto"
+          className="w-full md:w-auto shadow-xs"
         >
           <Plus className="h-3.5 w-3.5 mr-1.5" />
           {isImported ? "Adicionada" : "Adicionar"}
         </Button>
+        {onExclude && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onExclude}
+            className="w-full md:w-auto text-xs text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 px-2.5 h-8 border border-transparent hover:border-rose-500/20"
+            title="Excluir este resultado e nunca mais exibir nas buscas das APIs"
+          >
+            <EyeOff className="h-3.5 w-3.5 mr-1.5 text-rose-500" />
+            <span>Excluir</span>
+          </Button>
+        )}
       </div>
     </div>
   );
 }
 
 function ImportarPage() {
-  const { empresas, addEmpresa } = useStore();
+  const {
+    empresas,
+    addEmpresa,
+    empresasExcluidas,
+    excluirEmpresa,
+    restaurarEmpresaExcluida,
+    limparExcluidos,
+    isEmpresaExcluida,
+    instagramProfilesDb,
+    salvarInstagramProfiles,
+    removerInstagramProfile,
+    limparInstagramProfilesDb,
+  } = useStore();
   const [activeTab, setActiveTab] = useState("google_places");
   const [imported, setImported] = useState<Set<string>>(new Set());
+  const [buscaExcluidos, setBuscaExcluidos] = useState("");
 
   // Modal de primeiro contato via WhatsApp
   const [whatsAppModalOpen, setWhatsAppModalOpen] = useState(false);
@@ -423,6 +489,83 @@ function ImportarPage() {
     setWhatsAppModalOpen(true);
   };
 
+  // Modal de primeiro contato via Instagram Direct (DM com IA)
+  const [instagramDmModalOpen, setInstagramDmModalOpen] = useState(false);
+  const [instagramDmPerfil, setInstagramDmPerfil] = useState<ContactableInstagramProfile | null>(null);
+
+  const handleOpenInstagramDm = (perfil: ContactableInstagramProfile) => {
+    setInstagramDmPerfil(perfil);
+    setInstagramDmModalOpen(true);
+  };
+
+  const handleExcluirResultado = (item: {
+    nome: string;
+    razaoSocial?: string;
+    cnpj?: string;
+    cidade?: string;
+    estado?: string;
+    segmento?: string;
+    site?: string;
+    telefone?: string;
+    placeId?: string;
+    origem?: string;
+  }) => {
+    excluirEmpresa(item);
+    toast.error(`"${item.nome}" foi excluída e não aparecerá mais nas buscas.`, {
+      description: "Você pode gerenciá-la ou restaurá-la a qualquer momento na aba Excluídos.",
+      action: {
+        label: "Desfazer",
+        onClick: () => {
+          const id =
+            item.placeId ||
+            (item.cnpj ? `cnpj-${item.cnpj.replace(/\D/g, "")}` : "");
+          if (id) {
+            restaurarEmpresaExcluida(id);
+          }
+        },
+      },
+    });
+  };
+
+  const exportarExcluidos = () => {
+    if (empresasExcluidas.length === 0) return toast.info("Nenhuma empresa na lista de excluídos");
+    const header = ["Nome", "Razao Social", "CNPJ", "Cidade", "Estado", "Segmento", "Site", "Telefone", "Origem", "Data Exclusao"].join(";");
+    const rows = empresasExcluidas.map((e) =>
+      [
+        `"${e.nome}"`,
+        `"${e.razaoSocial || ""}"`,
+        `"${e.cnpj || ""}"`,
+        `"${e.cidade || ""}"`,
+        `"${e.estado || ""}"`,
+        `"${e.segmento || ""}"`,
+        `"${e.site || ""}"`,
+        `"${e.telefone || ""}"`,
+        `"${e.origem || ""}"`,
+        `"${e.excluidoEm}"`,
+      ].join(";"),
+    );
+    downloadFile(
+      `radar-empresas-excluidas-${new Date().toISOString().slice(0, 10)}.csv`,
+      [header, ...rows].join("\n"),
+      "text/csv;charset=utf-8;",
+    );
+    toast.success("Lista de excluídos exportada com sucesso");
+  };
+
+  const excluidosFiltrados = useMemo(() => {
+    if (!buscaExcluidos.trim()) return empresasExcluidas;
+    const q = buscaExcluidos.toLowerCase().trim();
+    return empresasExcluidas.filter(
+      (e) =>
+        e.nome.toLowerCase().includes(q) ||
+        (e.razaoSocial && e.razaoSocial.toLowerCase().includes(q)) ||
+        (e.cnpj && e.cnpj.includes(q)) ||
+        (e.cidade && e.cidade.toLowerCase().includes(q)) ||
+        (e.segmento && e.segmento.toLowerCase().includes(q)) ||
+        (e.site && e.site.toLowerCase().includes(q)),
+    );
+  }, [empresasExcluidas, buscaExcluidos]);
+
   // -------------------------------------------------------------------------
   // Server Functions
   // -------------------------------------------------------------------------
@@ -431,6 +574,7 @@ function ImportarPage() {
   const searchApo = useServerFn(searchApollo);
   const searchOsm = useServerFn(searchOverpass);
   const lookupCnpj = useServerFn(lookupBrasilApiCnpj);
+  const searchInstagram = useServerFn(searchInstagramProfiles);
   const lookup = useServerFn(lookupEmpresa);
 
   // -------------------------------------------------------------------------
@@ -512,10 +656,20 @@ function ImportarPage() {
 
   const resultsGoogleFiltrados = useMemo(
     () =>
-      resultsGoogle.filter((p) =>
-        filtroSite === "com" ? !!p.site : filtroSite === "sem" ? !p.site : true,
-      ),
-    [resultsGoogle, filtroSite],
+      resultsGoogle.filter((p) => {
+        if (
+          isEmpresaExcluida({
+            nome: p.nome,
+            placeId: p.placeId,
+            site: p.site,
+            cidade: p.cidade || cidade,
+          })
+        ) {
+          return false;
+        }
+        return filtroSite === "com" ? !!p.site : filtroSite === "sem" ? !p.site : true;
+      }),
+    [resultsGoogle, filtroSite, isEmpresaExcluida, cidade],
   );
 
   const buscarGoogle = async () => {
@@ -588,10 +742,22 @@ function ImportarPage() {
 
   const serpResultsFiltrados = useMemo(
     () =>
-      serpResults.filter((p) =>
-        filtroSite === "com" ? !!p.site : filtroSite === "sem" ? !p.site : true,
-      ),
-    [serpResults, filtroSite],
+      serpResults.filter((p) => {
+        if (
+          isEmpresaExcluida({
+            nome: p.nome,
+            razaoSocial: p.razaoSocial,
+            cnpj: p.cnpj,
+            site: p.site,
+            placeId: p.placeId,
+            cidade: p.cidade || cidade,
+          })
+        ) {
+          return false;
+        }
+        return filtroSite === "com" ? !!p.site : filtroSite === "sem" ? !p.site : true;
+      }),
+    [serpResults, filtroSite, isEmpresaExcluida, cidade],
   );
 
   const buscarSerpApi = async () => {
@@ -618,10 +784,20 @@ function ImportarPage() {
 
   const apolloResultsFiltrados = useMemo(
     () =>
-      apolloResults.filter((p) =>
-        filtroSite === "com" ? !!p.site : filtroSite === "sem" ? !p.site : true,
-      ),
-    [apolloResults, filtroSite],
+      apolloResults.filter((p) => {
+        if (
+          isEmpresaExcluida({
+            nome: p.nome,
+            razaoSocial: p.razaoSocial,
+            site: p.site,
+            cidade: p.cidade || cidade,
+          })
+        ) {
+          return false;
+        }
+        return filtroSite === "com" ? !!p.site : filtroSite === "sem" ? !p.site : true;
+      }),
+    [apolloResults, filtroSite, isEmpresaExcluida, cidade],
   );
 
   const buscarApollo = async () => {
@@ -656,10 +832,21 @@ function ImportarPage() {
 
   const osmResultsFiltrados = useMemo(
     () =>
-      osmResults.filter((p) =>
-        filtroSite === "com" ? !!p.site : filtroSite === "sem" ? !p.site : true,
-      ),
-    [osmResults, filtroSite],
+      osmResults.filter((p) => {
+        if (
+          isEmpresaExcluida({
+            nome: p.nome,
+            razaoSocial: p.razaoSocial,
+            placeId: p.placeId,
+            site: p.site,
+            cidade: p.cidade || cidade,
+          })
+        ) {
+          return false;
+        }
+        return filtroSite === "com" ? !!p.site : filtroSite === "sem" ? !p.site : true;
+      }),
+    [osmResults, filtroSite, isEmpresaExcluida, cidade],
   );
 
   const buscarOsm = async () => {
@@ -692,7 +879,16 @@ function ImportarPage() {
   const [cnpjResults, setCnpjResults] = useState<UnifiedProspectResult[]>([]);
 
   const cnpjResultsFiltrados = useMemo(() => {
-    let list = cnpjResults;
+    let list = cnpjResults.filter(
+      (p) =>
+        !isEmpresaExcluida({
+          nome: p.nome,
+          razaoSocial: p.razaoSocial,
+          cnpj: p.cnpj,
+          site: p.site,
+          cidade: p.cidade || cidade,
+        }),
+    );
 
     // Filtro por tempo de criação / idade da empresa
     if (tempoCriacaoFiltro !== "todos") {
@@ -711,7 +907,7 @@ function ImportarPage() {
     }
 
     return list;
-  }, [cnpjResults, tempoCriacaoFiltro, filtroSite]);
+  }, [cnpjResults, tempoCriacaoFiltro, filtroSite, isEmpresaExcluida, cidade]);
 
   const consultarBrasilApi = async () => {
     const rawList = cnpjInput
@@ -746,7 +942,233 @@ function ImportarPage() {
   };
 
   // -------------------------------------------------------------------------
-  // 6. CSV / Manual / Lookup State
+  // 6. Instagram Scraping & Base de Dados Salva (Local/Offline)
+  // -------------------------------------------------------------------------
+  const [instagramModo, setInstagramModo] = useState<"database" | "live">("database");
+  const [instagramTermoLivre, setInstagramTermoLivre] = useState("");
+  const [instagramLoading, setInstagramLoading] = useState(false);
+  const [instagramLiveResults, setInstagramLiveResults] = useState<UnifiedProspectResult[]>([]);
+
+  const buscarInstagram = async () => {
+    setInstagramLoading(true);
+    try {
+      const rawResults = await searchInstagram({
+        data: {
+          segmento: segmento.trim() || undefined,
+          cidade: cidade.trim(),
+          estado: estado ? nomeEstado(pais, estado) : undefined,
+          pais: pais ? nomePais(pais) : undefined,
+          termoLivre: instagramTermoLivre.trim() || undefined,
+          limit: parseInt(limite, 10) || 20,
+        },
+      });
+
+      // Deduplicação contra a base de dados já salva
+      const handleSetDb = new Set(
+        instagramProfilesDb.map((p) => p.handle.toLowerCase().replace(/^@/, "").trim())
+      );
+
+      const novosPerfis: InstagramProfile[] = [];
+      const resultadosVivosParaExibir: UnifiedProspectResult[] = [];
+
+      for (const item of rawResults) {
+        const handleClean = (item.instagram || "").toLowerCase().replace(/^@/, "").trim();
+        const isJaNoBanco = handleClean ? handleSetDb.has(handleClean) : false;
+
+        // Se for novo perfil, salva na base de dados persistente
+        if (handleClean && !isJaNoBanco) {
+          novosPerfis.push({
+            id: `ig-${handleClean}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            handle: handleClean,
+            nome: item.nome,
+            instagramUrl: `https://instagram.com/${handleClean}`,
+            bio: item.detalhesExtras,
+            site: item.site,
+            email: item.email,
+            telefone: item.telefone,
+            whatsapp: item.whatsapp,
+            cidade: item.cidade || cidade || "—",
+            estado: item.estado || (estado ? nomeEstado(pais, estado) : undefined),
+            segmento: item.segmento || segmento,
+            seguidores: item.totalRatings !== undefined ? String(item.totalRatings) : undefined,
+            salvoEm: new Date().toISOString(),
+            origemBusca: "instagram_search",
+          });
+        }
+
+        resultadosVivosParaExibir.push(item);
+      }
+
+      setInstagramLiveResults(resultadosVivosParaExibir);
+
+      if (novosPerfis.length > 0) {
+        salvarInstagramProfiles(novosPerfis);
+        toast.success(
+          `Encontrados ${rawResults.length} perfis (${novosPerfis.length} novos adicionados automaticamente à base salva!)`
+        );
+      } else if (rawResults.length > 0) {
+        toast.info(
+          `Encontrados ${rawResults.length} perfis (todos já constam na sua base de dados salva)`
+        );
+      } else {
+        toast.info("Nenhum perfil comercial público do Instagram encontrado para os filtros selecionados.");
+      }
+    } catch (err: any) {
+      toast.error(`Erro na busca do Instagram: ${err.message || String(err)}`);
+    } finally {
+      setInstagramLoading(false);
+    }
+  };
+
+  const instagramResultadosFiltrados = useMemo(() => {
+    if (instagramModo === "live") {
+      return instagramLiveResults.filter((item) => {
+        if (
+          isEmpresaExcluida({
+            nome: item.nome,
+            site: item.site,
+            cidade: item.cidade || cidade,
+          })
+        ) {
+          return false;
+        }
+        if (filtroSite === "com" && !item.site) return false;
+        if (filtroSite === "sem" && item.site) return false;
+        return true;
+      });
+    }
+
+    // Modo "database": base salva localmente
+    return instagramProfilesDb
+      .filter((p) => {
+        if (
+          isEmpresaExcluida({
+            nome: p.nome,
+            site: p.site,
+            cidade: p.cidade,
+          })
+        ) {
+          return false;
+        }
+
+        if (filtroSite === "com" && !p.site) return false;
+        if (filtroSite === "sem" && p.site) return false;
+
+        if (cidade && p.cidade && !p.cidade.toLowerCase().includes(cidade.toLowerCase())) {
+          return false;
+        }
+
+        if (segmento && p.segmento && !p.segmento.toLowerCase().includes(segmento.toLowerCase())) {
+          return false;
+        }
+
+        if (instagramTermoLivre.trim()) {
+          const q = instagramTermoLivre.toLowerCase().trim();
+          const match =
+            p.nome.toLowerCase().includes(q) ||
+            p.handle.toLowerCase().includes(q) ||
+            (p.bio && p.bio.toLowerCase().includes(q)) ||
+            (p.site && p.site.toLowerCase().includes(q)) ||
+            (p.email && p.email.toLowerCase().includes(q)) ||
+            (p.telefone && p.telefone.includes(q)) ||
+            (p.whatsapp && p.whatsapp.includes(q));
+          if (!match) return false;
+        }
+
+        return true;
+      })
+      .map(
+        (p): UnifiedProspectResult => ({
+          id: p.id,
+          nome: p.nome,
+          segmento: p.segmento,
+          cidade: p.cidade,
+          estado: p.estado,
+          site: p.site,
+          email: p.email,
+          telefone: p.telefone,
+          whatsapp: p.whatsapp,
+          instagram: `@${p.handle.replace(/^@/, "")}`,
+          detalhesExtras: p.bio,
+          origem: "instagram",
+        })
+      );
+  }, [
+    instagramModo,
+    instagramLiveResults,
+    instagramProfilesDb,
+    filtroSite,
+    cidade,
+    segmento,
+    instagramTermoLivre,
+    isEmpresaExcluida,
+  ]);
+
+  const importarInstagramParaRadar = (p: UnifiedProspectResult) => {
+    addEmpresa(
+      empresaFromRaw({
+        nome: p.nome,
+        segmento: p.segmento || segmento || "Outros",
+        cidade: p.cidade || cidade || "—",
+        endereco: p.cidade ? `${p.cidade}, ${p.estado || ""}` : "Endereço não informado",
+        telefone: p.telefone,
+        whatsapp: p.whatsapp,
+        email: p.email,
+        site: p.site,
+        instagram: p.instagram,
+        observacoes: p.detalhesExtras
+          ? `Perfil Instagram: ${p.instagram || ""}\nBio: ${p.detalhesExtras}`
+          : `Perfil Instagram: ${p.instagram || ""}`,
+        origem: "instagram",
+      })
+    );
+    setImported((prev) => new Set(prev).add(p.id));
+    toast.success(`${p.nome} adicionada ao Radar CRM`);
+  };
+
+  const importarTodosInstagram = () => {
+    let count = 0;
+    for (const p of instagramResultadosFiltrados) {
+      if (!imported.has(p.id)) {
+        importarInstagramParaRadar(p);
+        count++;
+      }
+    }
+    if (count > 0) {
+      toast.success(`${count} perfis adicionados ao Radar CRM`);
+    } else {
+      toast.info("Todos os perfis listados já foram adicionados");
+    }
+  };
+
+  const exportarInstagramCsv = () => {
+    if (instagramProfilesDb.length === 0) return toast.info("Nenhum perfil salvo na base do Instagram");
+    const header = ["Handle", "Nome", "Segmento", "Cidade", "Estado", "Bio", "Site", "Email", "Telefone", "WhatsApp", "Data Captura"].join(";");
+    const rows = instagramProfilesDb.map((p) =>
+      [
+        `"@${p.handle.replace(/^@/, "")}"`,
+        `"${p.nome}"`,
+        `"${p.segmento || ""}"`,
+        `"${p.cidade || ""}"`,
+        `"${p.estado || ""}"`,
+        `"${(p.bio || "").replace(/"/g, '""')}"`,
+        `"${p.site || ""}"`,
+        `"${p.email || ""}"`,
+        `"${p.telefone || ""}"`,
+        `"${p.whatsapp || ""}"`,
+        `"${p.salvoEm}"`,
+      ].join(";"),
+    );
+    downloadFile(
+      `radar-instagram-base-${new Date().toISOString().slice(0, 10)}.csv`,
+      [header, ...rows].join("\n"),
+      "text/csv;charset=utf-8;",
+    );
+    toast.success("Base de perfis do Instagram exportada com sucesso");
+  };
+
+  // -------------------------------------------------------------------------
+  // 7. CSV / Manual / Lookup State
   // -------------------------------------------------------------------------
   const [csv, setCsv] = useState(CSV_EXAMPLE);
   const [lookupInput, setLookupInput] = useState("");
@@ -1094,7 +1516,7 @@ function ImportarPage() {
 
       {/* TABS DE PROVEDORES */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid grid-cols-2 md:grid-cols-6 h-auto p-1 bg-muted/60 border border-border/60">
+        <TabsList className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 h-auto p-1 bg-muted/60 border border-border/60">
           <TabsTrigger value="google_places" className="flex items-center gap-1.5 py-2 text-xs">
             <MapPin className="h-3.5 w-3.5 text-blue-500" />
             <span>Google Places</span>
@@ -1102,6 +1524,10 @@ function ImportarPage() {
           <TabsTrigger value="serpapi" className="flex items-center gap-1.5 py-2 text-xs">
             <Globe className="h-3.5 w-3.5 text-emerald-500" />
             <span>SerpApi</span>
+          </TabsTrigger>
+          <TabsTrigger value="instagram" className="flex items-center gap-1.5 py-2 text-xs">
+            <Instagram className="h-3.5 w-3.5 text-pink-500" />
+            <span>Instagram ({instagramProfilesDb.length})</span>
           </TabsTrigger>
           <TabsTrigger value="apollo" className="flex items-center gap-1.5 py-2 text-xs">
             <Building2 className="h-3.5 w-3.5 text-purple-500" />
@@ -1118,6 +1544,10 @@ function ImportarPage() {
           <TabsTrigger value="outros" className="flex items-center gap-1.5 py-2 text-xs">
             <Upload className="h-3.5 w-3.5 text-muted-foreground" />
             <span>CSV / Manual</span>
+          </TabsTrigger>
+          <TabsTrigger value="excluidos" className="flex items-center gap-1.5 py-2 text-xs">
+            <Ban className="h-3.5 w-3.5 text-rose-500" />
+            <span>Excluídos ({empresasExcluidas.length})</span>
           </TabsTrigger>
         </TabsList>
 
@@ -1282,7 +1712,20 @@ function ImportarPage() {
                       totalRatings={p.totalRatings}
                       isImported={done}
                       onImport={() => importarGooglePlace(p)}
+                      onExclude={() =>
+                        handleExcluirResultado({
+                          nome: p.nome,
+                          cidade: p.cidade || cidade,
+                          estado: estado ? nomeEstado(pais, estado) : undefined,
+                          segmento: p.segmento || segmento,
+                          site: p.site,
+                          telefone: p.telefone,
+                          placeId: p.placeId,
+                          origem: "google_places",
+                        })
+                      }
                       onOpenWhatsApp={handleOpenWhatsApp}
+                      onOpenInstagramDm={handleOpenInstagramDm}
                     />
                   );
                 })}
@@ -1406,13 +1849,273 @@ function ImportarPage() {
                       detalhesExtras={p.detalhesExtras}
                       isImported={done}
                       onImport={() => importarUnified(p)}
+                      onExclude={() =>
+                        handleExcluirResultado({
+                          nome: p.nome,
+                          razaoSocial: p.razaoSocial,
+                          cnpj: p.cnpj,
+                          cidade: p.cidade || cidade,
+                          estado: p.estado || (estado ? nomeEstado(pais, estado) : undefined),
+                          segmento: p.segmento || segmento,
+                          site: p.site,
+                          telefone: p.telefone || p.whatsapp,
+                          placeId: p.placeId,
+                          origem: "serpapi",
+                        })
+                      }
                       onOpenWhatsApp={handleOpenWhatsApp}
+                      onOpenInstagramDm={handleOpenInstagramDm}
                     />
                   );
                 })}
                 {!serpLoading && serpResults.length === 0 && (
                   <div className="text-xs text-muted-foreground text-center py-6 border border-dashed border-border/60 rounded-md">
                     Selecione os filtros ou informe a consulta e clique em "Buscar SerpApi".
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------------------------- */}
+        {/* ABA 3: INSTAGRAM SCRAPING & BASE DE DADOS */}
+        {/* ------------------------------------------------------------------- */}
+        <TabsContent value="instagram" className="space-y-4 mt-0">
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Instagram className="h-4 w-4 text-pink-500" />
+                    Descoberta de Perfis no Instagram & Base Salva
+                    <Badge variant="secondary" className="ml-1 text-[10px] font-normal">
+                      Web Scraping
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] font-normal bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/30"
+                    >
+                      {instagramProfilesDb.length} salvos no banco
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Pesquise perfis comerciais no Instagram com filtros geográficos e de segmento. Os perfis encontrados são salvos localmente para consultas instantâneas e deduplicação automática em novas buscas.
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Filtros Geográficos e de Segmento */}
+              {renderSharedFilters()}
+
+              {/* Seletor de Modo: Base Salva vs Nova Pesquisa Live */}
+              <div className="bg-muted/40 rounded-lg p-3.5 border border-border/60 space-y-3">
+                <div className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                  <Database className="h-3.5 w-3.5 text-pink-500" />
+                  Fonte de Dados da Pesquisa:
+                </div>
+                <RadioGroup
+                  value={instagramModo}
+                  onValueChange={(v) => setInstagramModo(v as "database" | "live")}
+                  className="grid grid-cols-1 md:grid-cols-2 gap-2.5"
+                >
+                  <label
+                    htmlFor="ig-mode-db"
+                    className={`flex items-start gap-2.5 p-3 rounded-lg border text-xs cursor-pointer transition-all ${
+                      instagramModo === "database"
+                        ? "border-pink-500/80 bg-pink-500/5 text-foreground shadow-xs ring-1 ring-pink-500/30"
+                        : "border-border/60 bg-background/80 text-muted-foreground hover:bg-muted/40"
+                    }`}
+                  >
+                    <RadioGroupItem value="database" id="ig-mode-db" className="mt-0.5 text-pink-600" />
+                    <div className="space-y-0.5">
+                      <div className="font-semibold text-foreground flex items-center gap-1.5">
+                        <Database className="h-3.5 w-3.5 text-pink-500" />
+                        Pesquisar na Base de Dados Salva (Local/Offline)
+                        <Badge variant="outline" className="text-[10px] font-mono ml-1">
+                          {instagramProfilesDb.length} perfis
+                        </Badge>
+                      </div>
+                      <div className="text-[11px] text-muted-foreground">
+                        Busca instantânea e offline nos perfis comerciais já capturados e salvos no seu armazenamento local.
+                      </div>
+                    </div>
+                  </label>
+
+                  <label
+                    htmlFor="ig-mode-live"
+                    className={`flex items-start gap-2.5 p-3 rounded-lg border text-xs cursor-pointer transition-all ${
+                      instagramModo === "live"
+                        ? "border-pink-500/80 bg-pink-500/5 text-foreground shadow-xs ring-1 ring-pink-500/30"
+                        : "border-border/60 bg-background/80 text-muted-foreground hover:bg-muted/40"
+                    }`}
+                  >
+                    <RadioGroupItem value="live" id="ig-mode-live" className="mt-0.5 text-pink-600" />
+                    <div className="space-y-0.5">
+                      <div className="font-semibold text-foreground flex items-center gap-1.5">
+                        <RefreshCw className="h-3.5 w-3.5 text-pink-500" />
+                        Nova Pesquisa no Instagram (API Live Scraping)
+                      </div>
+                      <div className="text-[11px] text-muted-foreground">
+                        Executa varredura ao vivo na web pelo SerpApi, <strong>ignora perfis já salvos</strong> e completa sua base com novas empresas.
+                      </div>
+                    </div>
+                  </label>
+                </RadioGroup>
+              </div>
+
+              {/* Barra de Ações e Filtros adicionais */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder={
+                      instagramModo === "live"
+                        ? "Termo adicional para scraping (ex: @usuario, estética, boutique, café gourmet)..."
+                        : "Filtrar por nome, @handle, bio, email, telefone..."
+                    }
+                    value={instagramTermoLivre}
+                    onChange={(e) => setInstagramTermoLivre(e.target.value)}
+                    className="pl-8 text-xs"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && instagramModo === "live") {
+                        buscarInstagram();
+                      }
+                    }}
+                  />
+                </div>
+
+                {instagramModo === "live" ? (
+                  <Button
+                    onClick={buscarInstagram}
+                    disabled={instagramLoading}
+                    className="bg-gradient-to-r from-pink-600 via-rose-600 to-amber-600 hover:opacity-90 text-white font-medium text-xs px-4"
+                  >
+                    {instagramLoading ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                        Varrendo Instagram...
+                      </>
+                    ) : (
+                      <>
+                        <Search className="h-3.5 w-3.5 mr-1.5" />
+                        Buscar Novos Perfis
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={exportarInstagramCsv}
+                      disabled={instagramProfilesDb.length === 0}
+                      className="text-xs"
+                    >
+                      <Download className="h-3.5 w-3.5 mr-1.5" />
+                      Exportar CSV ({instagramProfilesDb.length})
+                    </Button>
+                    {instagramProfilesDb.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (confirm("Deseja realmente limpar todos os perfis salvos na base do Instagram?")) {
+                            limparInstagramProfilesDb();
+                            toast.success("Base do Instagram limpa");
+                          }
+                        }}
+                        className="text-xs text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10"
+                        title="Limpar todos os perfis salvos"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Informações da Busca e Botão de Ação em Massa */}
+              {instagramResultadosFiltrados.length > 0 && (
+                <div className="flex items-center justify-between pt-1">
+                  <div className="text-xs text-muted-foreground">
+                    Exibindo <strong>{instagramResultadosFiltrados.length}</strong> perfil(is){" "}
+                    {instagramModo === "live"
+                      ? "encontrados nesta pesquisa"
+                      : "na sua base de dados salva"}
+                  </div>
+                  <Button size="sm" variant="outline" onClick={importarTodosInstagram}>
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    Adicionar todas ao Radar CRM
+                  </Button>
+                </div>
+              )}
+
+              {/* Lista de Resultados */}
+              <div className="space-y-2.5">
+                {instagramResultadosFiltrados.map((p) => {
+                  const done = imported.has(p.id);
+                  return (
+                    <ProspectItemCard
+                      key={p.id}
+                      id={p.id}
+                      nome={p.nome}
+                      segmento={p.segmento || segmento}
+                      cidade={p.cidade || cidade}
+                      estado={p.estado}
+                      telefone={p.telefone}
+                      whatsapp={p.whatsapp}
+                      email={p.email}
+                      site={p.site}
+                      instagram={p.instagram}
+                      detalhesExtras={p.detalhesExtras}
+                      isImported={done}
+                      onImport={() => importarInstagramParaRadar(p)}
+                      onExclude={() =>
+                        handleExcluirResultado({
+                          nome: p.nome,
+                          cidade: p.cidade || cidade,
+                          estado: p.estado,
+                          segmento: p.segmento || segmento,
+                          site: p.site,
+                          telefone: p.telefone || p.whatsapp,
+                          origem: "instagram",
+                        })
+                      }
+                      onOpenWhatsApp={handleOpenWhatsApp}
+                      onOpenInstagramDm={handleOpenInstagramDm}
+                    />
+                  );
+                })}
+
+                {instagramResultadosFiltrados.length === 0 && !instagramLoading && (
+                  <div className="text-center py-12 px-4 border border-dashed border-border/60 rounded-lg space-y-3">
+                    <Instagram className="h-10 w-10 mx-auto text-pink-500/60" />
+                    <div className="text-sm font-semibold text-foreground">
+                      {instagramModo === "database"
+                        ? instagramProfilesDb.length === 0
+                          ? "Sua base de dados do Instagram ainda está vazia"
+                          : "Nenhum perfil encontrado para os filtros selecionados"
+                        : "Nenhum perfil retornado na pesquisa"}
+                    </div>
+                    <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                      {instagramModo === "database"
+                        ? instagramProfilesDb.length === 0
+                          ? "Selecione a opção 'Nova Pesquisa no Instagram (API Live)' acima para realizar sua primeira varredura e salvar perfis automaticamente."
+                          : "Tente ajustar a cidade, o segmento ou o campo de busca livre para encontrar perfis já salvos."
+                        : "Clique no botão 'Buscar Novos Perfis' para rastrear perfis comerciais públicos do Instagram de acordo com a cidade e segmento selecionados."}
+                    </p>
+                    {instagramModo === "database" && instagramProfilesDb.length === 0 && (
+                      <Button
+                        size="sm"
+                        onClick={() => setInstagramModo("live")}
+                        className="bg-gradient-to-r from-pink-600 via-rose-600 to-amber-600 hover:opacity-90 text-white text-xs"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                        Ir para Nova Pesquisa Live
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
@@ -1530,7 +2233,20 @@ function ImportarPage() {
                       detalhesExtras={p.detalhesExtras}
                       isImported={done}
                       onImport={() => importarUnified(p)}
+                      onExclude={() =>
+                        handleExcluirResultado({
+                          nome: p.nome,
+                          razaoSocial: p.razaoSocial,
+                          cidade: p.cidade || cidade,
+                          estado: p.estado || (estado ? nomeEstado(pais, estado) : undefined),
+                          segmento: p.segmento || segmento,
+                          site: p.site,
+                          telefone: p.telefone || p.whatsapp,
+                          origem: "apollo",
+                        })
+                      }
                       onOpenWhatsApp={handleOpenWhatsApp}
+                      onOpenInstagramDm={handleOpenInstagramDm}
                     />
                   );
                 })}
@@ -1665,7 +2381,21 @@ function ImportarPage() {
                       detalhesExtras={p.detalhesExtras}
                       isImported={done}
                       onImport={() => importarUnified(p)}
+                      onExclude={() =>
+                        handleExcluirResultado({
+                          nome: p.nome,
+                          razaoSocial: p.razaoSocial,
+                          cidade: p.cidade || cidade,
+                          estado: p.estado || (estado ? nomeEstado(pais, estado) : undefined),
+                          segmento: p.segmento || segmento,
+                          site: p.site,
+                          telefone: p.telefone || p.whatsapp,
+                          placeId: p.placeId,
+                          origem: "openstreetmap",
+                        })
+                      }
                       onOpenWhatsApp={handleOpenWhatsApp}
+                      onOpenInstagramDm={handleOpenInstagramDm}
                     />
                   );
                 })}
@@ -1828,7 +2558,21 @@ function ImportarPage() {
                       detalhesExtras={p.detalhesExtras}
                       isImported={done}
                       onImport={() => importarUnified(p)}
+                      onExclude={() =>
+                        handleExcluirResultado({
+                          nome: p.nome,
+                          razaoSocial: p.razaoSocial,
+                          cnpj: p.cnpj,
+                          cidade: p.cidade || cidade,
+                          estado: p.estado || (estado ? nomeEstado(pais, estado) : undefined),
+                          segmento: p.segmento || segmento,
+                          site: p.site,
+                          telefone: p.telefone || p.whatsapp,
+                          origem: "brasilapi",
+                        })
+                      }
                       onOpenWhatsApp={handleOpenWhatsApp}
+                      onOpenInstagramDm={handleOpenInstagramDm}
                     />
                   );
                 })}
@@ -1989,6 +2733,186 @@ function ImportarPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ------------------------------------------------------------------- */}
+        {/* ABA 7: RESULTADOS EXCLUÍDOS / BLACKLIST */}
+        {/* ------------------------------------------------------------------- */}
+        <TabsContent value="excluidos" className="space-y-4 mt-0">
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Ban className="h-4 w-4 text-rose-500" />
+                    Empresas e Resultados Excluídos
+                    <Badge variant="secondary" className="ml-1 text-[10px] font-normal bg-rose-500/15 text-rose-600 dark:text-rose-400">
+                      {empresasExcluidas.length} {empresasExcluidas.length === 1 ? "registro" : "registros"}
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription className="text-xs mt-0.5">
+                    Estes estabelecimentos foram bloqueados e <strong>nunca mais serão exibidos</strong> nos retornos de busca de nenhuma API (Google Places, SerpApi, Apollo, OSM ou BrasilAPI).
+                  </CardDescription>
+                </div>
+
+                {empresasExcluidas.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={exportarExcluidos}
+                      className="text-xs h-8"
+                    >
+                      <Download className="h-3.5 w-3.5 mr-1" />
+                      Exportar Lista
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        if (window.confirm("Deseja realmente limpar toda a lista de excluídos? Todas as empresas voltarão a aparecer nas buscas das APIs.")) {
+                          limparExcluidos();
+                          toast.success("Lista de excluídos foi limpa com sucesso.");
+                        }
+                      }}
+                      className="text-xs h-8 text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1 text-rose-500" />
+                      Limpar Todos
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              {empresasExcluidas.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Pesquisar por nome, CNPJ, cidade ou segmento na lista de excluídos..."
+                      value={buscaExcluidos}
+                      onChange={(e) => setBuscaExcluidos(e.target.value)}
+                      className="pl-8 text-xs"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {empresasExcluidas.length > 0 ? (
+                <div className="space-y-2.5">
+                  {excluidosFiltrados.map((ex) => (
+                    <div
+                      key={ex.id}
+                      className="rounded-lg border border-border/60 p-3.5 flex flex-col md:flex-row md:items-start justify-between gap-3.5 bg-card/60 hover:bg-card hover:border-border transition-all"
+                    >
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-sm text-foreground line-through opacity-85">
+                            {ex.nome}
+                          </span>
+
+                          {ex.segmento && (
+                            <Badge variant="outline" className="text-[10px] font-normal">
+                              {ex.segmento}
+                            </Badge>
+                          )}
+
+                          {ex.cnpj && (
+                            <Badge variant="outline" className="text-[10px] font-mono text-muted-foreground">
+                              CNPJ: {ex.cnpj}
+                            </Badge>
+                          )}
+
+                          {ex.origem && (
+                            <Badge variant="secondary" className="text-[10px] font-normal opacity-80">
+                              Origem: {ex.origem}
+                            </Badge>
+                          )}
+
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] font-normal bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30 flex items-center gap-1"
+                          >
+                            <Ban className="h-2.5 w-2.5" />
+                            Excluído em {new Date(ex.excluidoEm).toLocaleDateString("pt-BR")}
+                          </Badge>
+                        </div>
+
+                        {ex.razaoSocial && ex.razaoSocial.trim().toLowerCase() !== ex.nome.trim().toLowerCase() && (
+                          <div className="text-xs text-muted-foreground font-mono">
+                            Razão Social: <span className="text-foreground/80">{ex.razaoSocial}</span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground pt-0.5">
+                          {(ex.cidade || ex.estado) && (
+                            <span className="inline-flex items-center gap-1">
+                              <MapPin className="h-3 w-3 text-primary" />
+                              {[ex.cidade, ex.estado].filter(Boolean).join(" - ")}
+                            </span>
+                          )}
+
+                          {ex.site && (
+                            <a
+                              href={ex.site.startsWith("http") ? ex.site : `https://${ex.site}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                            >
+                              <Globe className="h-3 w-3" />
+                              <span>{ex.site.replace(/^https?:\/\//i, "").replace(/\/$/, "")}</span>
+                              <ExternalLink className="h-2.5 w-2.5" />
+                            </a>
+                          )}
+
+                          {ex.telefone && (
+                            <span className="inline-flex items-center gap-1">
+                              <Phone className="h-3 w-3" />
+                              {ex.telefone}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            restaurarEmpresaExcluida(ex.id);
+                            toast.success(`"${ex.nome}" foi restaurada e voltará a aparecer nas buscas.`);
+                          }}
+                          className="text-xs h-8 hover:border-primary hover:text-primary"
+                          title="Remover da lista de excluídos e permitir que este resultado apareça novamente nas pesquisas"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5 mr-1.5 text-primary" />
+                          Restaurar / Permitir
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {excluidosFiltrados.length === 0 && (
+                    <div className="text-xs text-muted-foreground text-center py-6 border border-dashed border-border/60 rounded-md">
+                      Nenhuma empresa excluída encontrada com o termo "{buscaExcluidos}".
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-12 px-4 border border-dashed border-border/60 rounded-lg space-y-2">
+                  <Ban className="h-8 w-8 mx-auto text-muted-foreground/60" />
+                  <div className="text-sm font-semibold text-foreground">
+                    Nenhuma empresa excluída
+                  </div>
+                  <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                    Ao realizar buscas no Google Places, SerpApi, Apollo, OpenStreetMap ou BrasilAPI, você pode clicar no botão <strong>"Excluir"</strong> para bloquear permanentemente qualquer resultado indesejado.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* MODAL DE PRIMEIRO CONTATO VIA WHATSAPP */}
@@ -1996,6 +2920,13 @@ function ImportarPage() {
         open={whatsAppModalOpen}
         onOpenChange={setWhatsAppModalOpen}
         empresa={whatsAppEmpresa}
+      />
+
+      {/* MODAL DE PRIMEIRO CONTATO VIA INSTAGRAM DIRECT (DM COM IA) */}
+      <InstagramDmModal
+        open={instagramDmModalOpen}
+        onOpenChange={setInstagramDmModalOpen}
+        perfil={instagramDmPerfil}
       />
     </div>
   );
