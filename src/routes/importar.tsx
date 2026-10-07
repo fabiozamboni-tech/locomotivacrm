@@ -41,6 +41,9 @@ import {
   RefreshCw,
   MessageCircle,
   Key,
+  Star,
+  Copy,
+  Navigation,
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -49,7 +52,12 @@ import {
   type PlaceResult,
   type GooglePlacesConnectorMode,
 } from "@/lib/places.functions";
-import { lookupEmpresa, type LookupResult } from "@/lib/lookup.functions";
+import {
+  lookupEmpresa,
+  type LookupResult,
+  lookupGoogleMapsAddress,
+  type GoogleMapsLookupResult,
+} from "@/lib/lookup.functions";
 import {
   searchSerpApi,
   searchApollo,
@@ -632,6 +640,7 @@ function ImportarPage() {
   const searchOutscraper = useServerFn(searchOutscraperMaps);
   const searchFacebook = useServerFn(searchFacebookPages);
   const lookup = useServerFn(lookupEmpresa);
+  const lookupMaps = useServerFn(lookupGoogleMapsAddress);
 
   // -------------------------------------------------------------------------
   // Shared Geographic & Segment Filters
@@ -1510,6 +1519,85 @@ function ImportarPage() {
     setLookupResult(null);
     setLookupInput("");
   };
+
+  // Google Maps Address / Link Lookup State
+  const [mapsInput, setMapsInput] = useState("");
+  const [mapsLoading, setMapsLoading] = useState(false);
+  const [mapsResult, setMapsResult] = useState<GoogleMapsLookupResult | null>(null);
+
+  const buscarMaps = async (customInput?: string) => {
+    const query = (customInput ?? mapsInput).trim();
+    if (!query) return toast.error("Informe o link do Google Maps ou o endereço da empresa");
+    if (customInput) setMapsInput(customInput);
+    setMapsLoading(true);
+    setMapsResult(null);
+    try {
+      const res = await lookupMaps({ data: { input: query } });
+      setMapsResult(res);
+      toast.success(`Dados do Google Maps extraídos para "${res.nome}"`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha na busca do Google Maps");
+    } finally {
+      setMapsLoading(false);
+    }
+  };
+
+  const aplicarMapsNoFormulario = () => {
+    if (!mapsResult) return;
+    setForm({
+      nome: mapsResult.nome || "",
+      segmento: mapsResult.segmento || "",
+      cidade: mapsResult.cidade !== "—" ? mapsResult.cidade : "",
+      bairro: mapsResult.bairro || "",
+      endereco: mapsResult.endereco || "",
+      telefone: mapsResult.telefone || mapsResult.whatsapp || "",
+      whatsapp: mapsResult.whatsapp || "",
+      email: mapsResult.email || "",
+      site: mapsResult.site || "",
+      instagram: "",
+      observacoes: [
+        mapsResult.resumo,
+        mapsResult.googleMapsUrl ? `Google Maps: ${mapsResult.googleMapsUrl}` : "",
+        mapsResult.rating ? `Avaliação: ⭐ ${mapsResult.rating} (${mapsResult.totalRatings || 0} avaliações)` : "",
+        mapsResult.statusFuncionamento ? `Status: ${mapsResult.statusFuncionamento}` : "",
+        mapsResult.horario ? `Horários: ${mapsResult.horario}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    });
+    toast.success("Dados preenchidos no formulário manual! Revise e clique em 'Salvar Empresa'.");
+  };
+
+  const importarMapsDireto = () => {
+    if (!mapsResult) return;
+    addEmpresa(
+      empresaFromRaw({
+        nome: mapsResult.nome,
+        segmento: mapsResult.segmento || "Comércio / Serviços",
+        cidade: mapsResult.cidade || "—",
+        bairro: mapsResult.bairro,
+        endereco: mapsResult.endereco,
+        telefone: mapsResult.telefone || mapsResult.whatsapp,
+        whatsapp: mapsResult.whatsapp,
+        email: mapsResult.email,
+        site: mapsResult.site,
+        origem: "google_maps",
+        observacoes: [
+          mapsResult.resumo,
+          mapsResult.googleMapsUrl ? `Google Maps: ${mapsResult.googleMapsUrl}` : "",
+          mapsResult.rating ? `Avaliação: ⭐ ${mapsResult.rating} (${mapsResult.totalRatings || 0} avaliações)` : "",
+          mapsResult.statusFuncionamento ? `Status: ${mapsResult.statusFuncionamento}` : "",
+          mapsResult.horario ? `Horários: ${mapsResult.horario}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      }),
+    );
+    toast.success(`${mapsResult.nome} adicionada ao radar com sucesso!`);
+    setMapsResult(null);
+    setMapsInput("");
+  };
+
 
   const salvarManual = () => {
     if (!form.nome.trim()) return toast.error("Nome é obrigatório");
@@ -3342,6 +3430,192 @@ function ImportarPage() {
         {/* ABA 6: CSV, MANUAL & ENRIQUECIMENTO */}
         {/* ------------------------------------------------------------------- */}
         <TabsContent value="outros" className="space-y-4 mt-0">
+          {/* Lookup por Endereço ou Link do Google Maps */}
+          <Card className="border-border/60 bg-card shadow-sm border-l-4 border-l-emerald-500">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-emerald-500" />
+                  Buscar Dados da Empresa via Endereço ou Link do Google Maps
+                  <Badge variant="secondary" className="text-[10px] font-normal bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    Google Maps & SerpApi
+                  </Badge>
+                </CardTitle>
+              </div>
+              <CardDescription className="text-xs">
+                Cole a URL compartilhada do Google Maps (ex: <code>https://maps.app.goo.gl/...</code> ou <code>google.com/maps/place/...</code>) ou digite o endereço comercial/nome da empresa para extrair telefone, site, categoria, endereço completo e avaliação.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid md:grid-cols-[1fr_auto] gap-2">
+                <div className="relative flex-1">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={mapsInput}
+                    onChange={(e) => setMapsInput(e.target.value)}
+                    placeholder="Cole o link do Google Maps ou digite: ex. Av. Osvaldo Aranha 1075, Bento Gonçalves RS"
+                    className="pl-9 text-xs sm:text-sm"
+                    onKeyDown={(e) => e.key === "Enter" && !mapsLoading && buscarMaps()}
+                  />
+                </div>
+                <Button
+                  onClick={() => buscarMaps()}
+                  disabled={mapsLoading}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  {mapsLoading ? (
+                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  ) : (
+                    <Search className="h-4 w-4 mr-1.5" />
+                  )}
+                  Buscar no Google Maps
+                </Button>
+              </div>
+
+              {/* Sugestões rápidas de teste */}
+              <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-muted-foreground">
+                <span className="font-medium text-foreground">Exemplos rápidos:</span>
+                <button
+                  type="button"
+                  onClick={() => buscarMaps("Av. Osvaldo Aranha, 1075, Bento Gonçalves - RS")}
+                  className="px-2 py-0.5 rounded-md bg-muted hover:bg-muted/80 border border-border/60 text-foreground transition-colors"
+                >
+                  Av. Osvaldo Aranha 1075 (Bento Gonçalves)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => buscarMaps("Vinícola Aurora, Bento Gonçalves RS")}
+                  className="px-2 py-0.5 rounded-md bg-muted hover:bg-muted/80 border border-border/60 text-foreground transition-colors"
+                >
+                  Vinícola Aurora (RS)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => buscarMaps("Rua Buarque de Macedo, 200, Garibaldi - RS")}
+                  className="px-2 py-0.5 rounded-md bg-muted hover:bg-muted/80 border border-border/60 text-foreground transition-colors"
+                >
+                  Rua Buarque de Macedo (Garibaldi)
+                </button>
+              </div>
+
+              {/* Resultado da Busca no Google Maps */}
+              {mapsResult && (
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-base text-foreground">{mapsResult.nome}</span>
+                        <Badge
+                          variant="outline"
+                          className="text-[11px] border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                        >
+                          {mapsResult.segmento}
+                        </Badge>
+                        {mapsResult.rating && (
+                          <Badge variant="secondary" className="text-[11px] flex items-center gap-1">
+                            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                            {mapsResult.rating} ({mapsResult.totalRatings || 0} avaliações)
+                          </Badge>
+                        )}
+                        {mapsResult.statusFuncionamento && (
+                          <Badge variant="outline" className="text-[10px]">
+                            {mapsResult.statusFuncionamento}
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                        <MapPin className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                        <span>{mapsResult.endereco}</span>
+                        {mapsResult.cidade && mapsResult.cidade !== "—" && (
+                          <span className="font-medium text-foreground">
+                            ({mapsResult.cidade}
+                            {mapsResult.estado ? ` - ${mapsResult.estado}` : ""})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={aplicarMapsNoFormulario}
+                        className="text-xs border-emerald-500/30 hover:bg-emerald-500/10"
+                      >
+                        <Copy className="h-3.5 w-3.5 mr-1.5 text-emerald-600" />
+                        Preencher Cadastro Manual
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={importarMapsDireto}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
+                      >
+                        <Plus className="h-3.5 w-3.5 mr-1.5" />
+                        Adicionar Direto ao Radar
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Grid de Detalhes Coletados */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 pt-2 border-t border-border/50 text-xs">
+                    {mapsResult.telefone && (
+                      <div className="flex items-center gap-2 p-2 rounded bg-background/60 border border-border/40">
+                        <Phone className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                        <div className="truncate">
+                          <span className="text-[10px] text-muted-foreground block">Telefone / Fone</span>
+                          <span className="font-medium select-all">{mapsResult.telefone}</span>
+                        </div>
+                      </div>
+                    )}
+                    {mapsResult.whatsapp && (
+                      <div className="flex items-center gap-2 p-2 rounded bg-background/60 border border-border/40">
+                        <MessageCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                        <div className="truncate">
+                          <span className="text-[10px] text-muted-foreground block">WhatsApp</span>
+                          <span className="font-medium select-all">{mapsResult.whatsapp}</span>
+                        </div>
+                      </div>
+                    )}
+                    {mapsResult.site && (
+                      <div className="flex items-center gap-2 p-2 rounded bg-background/60 border border-border/40">
+                        <Globe className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                        <div className="truncate">
+                          <span className="text-[10px] text-muted-foreground block">Website</span>
+                          <a
+                            href={mapsResult.site.startsWith("http") ? mapsResult.site : `https://${mapsResult.site}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-medium text-primary hover:underline truncate block"
+                          >
+                            {mapsResult.site.replace(/^https?:\/\//i, "").replace(/\/$/, "")}
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                    {mapsResult.googleMapsUrl && (
+                      <div className="flex items-center gap-2 p-2 rounded bg-background/60 border border-border/40">
+                        <Navigation className="h-3.5 w-3.5 text-orange-500 shrink-0" />
+                        <div className="truncate">
+                          <span className="text-[10px] text-muted-foreground block">Google Maps</span>
+                          <a
+                            href={mapsResult.googleMapsUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-medium text-emerald-600 hover:underline flex items-center gap-1"
+                          >
+                            Abrir no Maps
+                            <ExternalLink className="h-3 w-3 inline" />
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <div className="grid md:grid-cols-2 gap-4">
             {/* Importação CSV */}
             <Card className="border-border/60">
@@ -3480,6 +3754,7 @@ function ImportarPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
 
         {/* ------------------------------------------------------------------- */}
         {/* ABA 7: RESULTADOS EXCLUÍDOS / BLACKLIST */}

@@ -47,6 +47,18 @@ export function googleSearchUrl(query: string): string {
 
 export const ORIGEM_LABEL: Record<string, string> = {
   google_places: "Google Places",
+  google_maps: "Google Maps",
+  serpapi: "SerpApi (Google Maps)",
+  apollo: "Apollo.io",
+  openstreetmap: "OpenStreetMap",
+  brasilapi: "BrasilAPI (CNPJ)",
+  instagram: "Instagram",
+  linkedin: "LinkedIn",
+  tiktok: "TikTok",
+  econodata: "Econodata / Speedio",
+  registrobr: "Registro.br (Whois)",
+  outscraper: "Outscraper",
+  facebook: "Facebook",
   diretorio_publico: "Diretório público",
   manual: "Inserção manual",
   csv: "Importação CSV",
@@ -60,7 +72,9 @@ export function origemLink(
 ): { href?: string; label: string } {
   const label = ORIGEM_LABEL[origem] ?? origem.replace("_", " ");
   const q = `${nome} ${cidade}`;
-  if (origem === "google_places") return { href: googleMapsUrl(q), label };
+  if (origem === "google_places" || origem === "google_maps" || origem === "serpapi") {
+    return { href: googleMapsUrl(q), label };
+  }
   if (origem === "diretorio_publico") return { href: googleSearchUrl(q), label };
   return { label };
 }

@@ -26,6 +26,7 @@ export type CrmStage =
 
 export type OrigemDado =
   | "google_places"
+  | "google_maps"
   | "serpapi"
   | "apollo"
   | "openstreetmap"
