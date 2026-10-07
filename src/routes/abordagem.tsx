@@ -13,22 +13,13 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { gerarAbordagem, type Canal, type Foco, type Tom } from "@/lib/generators";
+import { toCtx } from "@/lib/ai.functions";
 import {
-  gerarAbordagemIA,
-  gerarVariacoesAbordagemIA,
-  gerarMatrizDMAM_IA,
-  toCtx,
-  type VariacaoAbordagem,
-} from "@/lib/ai.functions";
-import {
-  gerarMatrizDMAM,
-  gerarItemDMAM,
-  PILARES_INFO,
-  type PilarDMAM,
-  type ItemDMAM,
-  type MatrizDMAMResult,
-} from "@/lib/dmam-framework";
+  gerarDossierEAbordagens360_IA,
+  type Dossier360Result,
+  type SistemaGestaoItem,
+  type TratamentoSintomaItem,
+} from "@/lib/dossier-360.functions";
 import { whatsappUrl } from "@/lib/links";
 import {
   Copy,
@@ -39,7 +30,6 @@ import {
   Phone,
   Type,
   Sparkles,
-  Wand2,
   Send,
   Check,
   AlertCircle,
@@ -50,12 +40,23 @@ import {
   Bot,
   Zap,
   Flame,
+  Search,
+  ExternalLink,
+  Package,
+  BarChart3,
+  Globe,
+  Video,
+  FileText,
+  DollarSign,
   ArrowRight,
+  ShieldCheck,
+  CheckCircle2,
+  BrainCircuit,
+  Settings2,
+  Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
-
-type Elegancia = "sutil" | "elegante" | "equilibrado" | "direto";
 
 function waSendUrl(numero: string | undefined, texto: string): string | undefined {
   const base = whatsappUrl(numero);
@@ -68,694 +69,654 @@ export const Route = createFileRoute("/abordagem")({
   component: AbordagemPage,
 });
 
-const CANAIS: { value: Canal; label: string; icon: typeof Mail }[] = [
-  { value: "whatsapp", label: "WhatsApp", icon: MessageCircle },
-  { value: "email", label: "E-mail", icon: Mail },
-  { value: "instagram", label: "Direct / Instagram", icon: Instagram },
-  { value: "ligacao", label: "Ligação (roteiro)", icon: Phone },
-  { value: "curta", label: "Mensagem curta", icon: Type },
+type CanalTipo = "whatsapp" | "email" | "instagram" | "ligacaoReuniao" | "propostaValor360";
+
+const CANAIS: { value: CanalTipo; label: string; icon: typeof Mail }[] = [
+  { value: "whatsapp", label: "WhatsApp Estratégico", icon: MessageCircle },
+  { value: "email", label: "E-mail Executivo", icon: Mail },
+  { value: "instagram", label: "Direct Instagram", icon: Instagram },
+  { value: "ligacaoReuniao", label: "Roteiro de Reunião", icon: Phone },
+  { value: "propostaValor360", label: "Pitch de Proposta 360", icon: FileText },
 ];
 
 function AbordagemPage() {
   const { empresa: empresaId } = useSearch({ from: "/abordagem" });
   const { empresas } = useStore();
   const [selected, setSelected] = useState<string>(empresaId ?? empresas[0]?.id ?? "");
-  const [modo, setModo] = useState<"dmam" | "classico">("dmam");
-  const [pilarAtivo, setPilarAtivo] = useState<"todos" | "dores" | "medos" | "ambicoes" | "maturidade" | "integrada">("todos");
-  const [canal, setCanal] = useState<Canal>("whatsapp");
-  const [tom, setTom] = useState<Tom>("consultivo");
-  const [foco, setFoco] = useState<Foco>("geral");
-  const [seed, setSeed] = useState(0);
-  const [elegancia, setElegancia] = useState<Elegancia>("elegante");
-  const [qtd, setQtd] = useState(5);
-  const [variacoes, setVariacoes] = useState<VariacaoAbordagem[]>([]);
-  const [loadingVar, setLoadingVar] = useState(false);
-  const [loadingDMAM, setLoadingDMAM] = useState(false);
+  const [canal, setCanal] = useState<CanalTipo>("whatsapp");
+  const [activeTab, setActiveTab] = useState<"dossier" | "sistemas" | "prescricao" | "abordagens">("abordagens");
+  const [dossier, setDossier] = useState<Dossier360Result | null>(null);
+  const [loadingIA, setLoadingIA] = useState(false);
+  const [nomeAgencia, setNomeAgencia] = useState("nossa agência de Comunicação 360 & Tecnologia");
+  const [textoEditado, setTextoEditado] = useState("");
 
   const empresa = empresas.find((e) => e.id === selected);
 
-  // Matriz DMAM inicial determinística
-  const matrizInicial = useMemo(() => {
-    if (!empresa) return null;
-    return gerarMatrizDMAM(empresa, canal, tom);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [empresa, canal, tom, seed]);
+  // Executa a análise com IA e pesquisa web em tempo real
+  const executarPesquisaEDossier = async () => {
+    if (!empresa) return;
+    setLoadingIA(true);
+    try {
+      const res = await gerarDossierEAbordagens360_IA({
+        data: {
+          empresa: toCtx(empresa),
+          canalPreferencial: canal === "propostaValor360" ? "email" : (canal as any),
+          nomeAgencia,
+        },
+      });
+      setDossier(res);
+      // Preenche o editor com o texto do canal selecionado
+      if (res.abordagensPorCanal[canal]) {
+        const item = res.abordagensPorCanal[canal];
+        if ("texto" in item) {
+          setTextoEditado(canal === "email" && "assunto" in item ? `Assunto: ${item.assunto}\n\n${item.texto}` : item.texto);
+        } else if ("textoCompleto" in item) {
+          setTextoEditado(item.textoCompleto);
+        } else if ("falaAbertura" in item) {
+          setTextoEditado(`Fala de Abertura:\n${item.falaAbertura}\n\nPergunta-Chave de Diagnóstico:\n${item.perguntaChaveDiagnostico}\n\nPassos da Reunião:\n${item.roteiroPassos.join("\n")}`);
+        }
+      }
+      toast.success(`Pesquisa e Dossiê 360 gerados com sucesso para ${empresa.nome}!`);
+    } catch (e) {
+      toast.error((e as Error).message || "Falha na análise com IA");
+    } finally {
+      setLoadingIA(false);
+    }
+  };
 
-  const [matrizDMAM, setMatrizDMAM] = useState<MatrizDMAMResult | null>(matrizInicial);
-
+  // Atualiza o texto do editor quando troca de canal ou quando o dossiê carrega
   useEffect(() => {
-    if (matrizInicial) {
-      setMatrizDMAM(matrizInicial);
+    if (dossier?.abordagensPorCanal[canal]) {
+      const item = dossier.abordagensPorCanal[canal];
+      if ("texto" in item) {
+        setTextoEditado(canal === "email" && "assunto" in item ? `Assunto: ${item.assunto}\n\n${item.texto}` : item.texto);
+      } else if ("textoCompleto" in item) {
+        setTextoEditado(item.textoCompleto);
+      } else if ("falaAbertura" in item) {
+        setTextoEditado(`Fala de Abertura:\n${item.falaAbertura}\n\nPergunta-Chave de Diagnóstico:\n${item.perguntaChaveDiagnostico}\n\nPassos da Reunião:\n${item.roteiroPassos.join("\n")}`);
+      }
     }
-  }, [matrizInicial]);
+  }, [canal, dossier]);
 
-  const textoClassico = useMemo(
-    () => (empresa ? gerarAbordagem(empresa, canal, tom, foco) : ""),
+  // Carrega automaticamente o dossiê determinístico ao trocar de empresa se ainda não houver
+  useEffect(() => {
+    if (empresa && !dossier) {
+      executarPesquisaEDossier();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [empresa, canal, tom, foco, seed],
-  );
+  }, [selected]);
 
-  const [editado, setEditado] = useState("");
-  const [loadingIA, setLoadingIA] = useState(false);
-
-  // Texto base do editor: se estiver no modo DMAM e tiver matriz, usa a integrada ou dores
-  const textoPadrao = useMemo(() => {
-    if (modo === "dmam" && matrizDMAM) {
-      if (pilarAtivo === "dores") return matrizDMAM.dores.texto;
-      if (pilarAtivo === "medos") return matrizDMAM.medos.texto;
-      if (pilarAtivo === "ambicoes") return matrizDMAM.ambicoes.texto;
-      if (pilarAtivo === "maturidade") return matrizDMAM.maturidade.texto;
-      if (pilarAtivo === "integrada") return matrizDMAM.mensagemIntegradaCompleta;
-      return matrizDMAM.mensagemIntegradaCompleta;
-    }
-    return textoClassico;
-  }, [modo, matrizDMAM, pilarAtivo, textoClassico]);
-
-  const finalTxt = editado || textoPadrao;
   const waNumero = empresa?.whatsapp || empresa?.telefone;
-  const waFinal = waSendUrl(waNumero, finalTxt);
-
-  const gerarDMAM_comIA = async () => {
-    if (!empresa) return;
-    setLoadingDMAM(true);
-    try {
-      const res = await gerarMatrizDMAM_IA({
-        data: { empresa: toCtx(empresa), canal, tom },
-      });
-      setMatrizDMAM(res);
-      setEditado(res.mensagemIntegradaCompleta);
-      toast.success("Abordagens nos 4 Pilares (DMAM) geradas com IA com sucesso!");
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setLoadingDMAM(false);
-    }
-  };
-
-  const gerarOpcoes = async () => {
-    if (!empresa) return;
-    setLoadingVar(true);
-    try {
-      const r = await gerarVariacoesAbordagemIA({
-        data: { empresa: toCtx(empresa), canal, foco, elegancia, quantidade: qtd },
-      });
-      setVariacoes(r);
-      toast.success(`${r.length} opções geradas com ChatGPT`);
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setLoadingVar(false);
-    }
-  };
-
-  const regen = () => {
-    setSeed((s) => s + 1);
-    setEditado("");
-    toast.success("Mensagens regeneradas");
-  };
-
+  const waFinal = waSendUrl(waNumero, textoEditado);
 
   return (
-    <div className="px-4 md:px-8 py-6 md:py-8 space-y-6 max-w-[1440px]">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="px-4 md:px-8 py-6 md:py-8 space-y-6 max-w-[1480px]">
+      {/* CABEÇALHO */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/60 pb-5">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">Gerador de Abordagens Consultivas</h1>
-            <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
-              Metodologia DMAM + IA
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-bold tracking-tight">Inteligência de Vendas B2B & Comunicação 360</h1>
+            <Badge variant="secondary" className="text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-medium">
+              Pesquisa em Tempo Real + IA
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            Gere abordagens altamente persuasivas e personalizadas com base em <strong>Dores</strong>, <strong>Medos</strong>, <strong>Ambições</strong> e <strong>Maturidade</strong>.
+            Mapeamento corporativo, fatores psicológicos dos decisores, diagnóstico operacional, <strong>Sistemas de Gestão</strong> e prescrição de <strong>Comunicação 360</strong> com foco em geração de lucros.
           </p>
         </div>
 
-        {/* Seletor de Modo de Abordagem */}
-        <div className="flex items-center bg-muted/60 p-1 rounded-lg border border-border/60">
-          <button
-            type="button"
-            onClick={() => setModo("dmam")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition ${
-              modo === "dmam"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <Button
+            onClick={executarPesquisaEDossier}
+            disabled={!empresa || loadingIA}
+            className="bg-gradient-to-r from-emerald-600 via-primary to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white shadow-sm text-xs h-9 font-medium"
           >
-            <Flame className="h-3.5 w-3.5 text-amber-500" />
-            Framework DMAM (4 Pilares)
-          </button>
-          <button
-            type="button"
-            onClick={() => setModo("classico")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition ${
-              modo === "classico"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Layers className="h-3.5 w-3.5 text-blue-500" />
-            Modo Clássico (Tom & Foco)
-          </button>
+            {loadingIA ? (
+              <Bot className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Search className="h-4 w-4 mr-2" />
+            )}
+            {loadingIA ? "Pesquisando Web & Gerando Dossiê..." : "🔍 Pesquisar Web & Gerar Dossiê com IA"}
+          </Button>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-[360px_1fr] gap-6">
-        {/* COLUNA ESQUERDA: CONFIGURAÇÃO */}
-        <Card className="border-border/60 h-fit space-y-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Zap className="h-4 w-4 text-primary" />
-              Configuração da Abordagem
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 text-xs">
-            {/* Empresa Selecionada */}
-            <div>
-              <Label>Empresa-Alvo</Label>
-              <Select value={selected} onValueChange={(v) => { setSelected(v); setEditado(""); }}>
-                <SelectTrigger className="text-xs">
-                  <SelectValue placeholder="Selecione uma empresa" />
-                </SelectTrigger>
-                <SelectContent>
-                  {empresas.map((e) => (
-                    <SelectItem key={e.id} value={e.id} className="text-xs">
-                      {e.nome} · {e.cidade}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+      {/* SELEÇÃO E RESUMO DA EMPRESA */}
+      <div className="grid md:grid-cols-[380px_1fr] gap-4 items-center">
+        <div className="space-y-1.5">
+          <label className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
+            Empresa-Alvo para Prospecção
+          </label>
+          <Select value={selected} onValueChange={(v) => { setSelected(v); setDossier(null); }}>
+            <SelectTrigger className="text-xs h-9 bg-card">
+              <SelectValue placeholder="Selecione uma empresa" />
+            </SelectTrigger>
+            <SelectContent>
+              {empresas.map((e) => (
+                <SelectItem key={e.id} value={e.id} className="text-xs">
+                  {e.nome} · {e.cidade} ({e.segmento})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-            {/* Canal de Envio */}
-            <div>
-              <Label>Canal de Comunicação</Label>
-              <div className="grid grid-cols-2 gap-1.5">
+        {empresa && (
+          <div className="flex items-center gap-3 p-2.5 rounded-lg border border-border/60 bg-muted/30 text-xs flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-foreground">{empresa.nome}</span>
+              <Badge variant="outline" className="text-[10px]">{empresa.segmento}</Badge>
+              <Badge variant="secondary" className="text-[10px]">{empresa.cidade}/RS</Badge>
+            </div>
+            <div className="h-3 w-px bg-border/80 hidden sm:block" />
+            <div className="text-muted-foreground flex items-center gap-2 text-[11px]">
+              <span>Site: <strong>{empresa.site || "Não possui"}</strong></span>
+              <span>•</span>
+              <span>Instagram: <strong>{empresa.instagram || "Não localizado"}</strong></span>
+              <span>•</span>
+              <span>Score: <strong>{empresa.score}/100</strong></span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* NAVEGAÇÃO DE ABAS PRINCIPAIS */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-4">
+        <TabsList className="bg-muted/60 p-1 border border-border/60 rounded-lg flex-wrap h-auto gap-1">
+          <TabsTrigger value="abordagens" className="text-xs py-1.5 px-3 flex items-center gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <Zap className="h-3.5 w-3.5 text-amber-500" />
+            Central de Abordagens por Canal
+          </TabsTrigger>
+          <TabsTrigger value="dossier" className="text-xs py-1.5 px-3 flex items-center gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <BrainCircuit className="h-3.5 w-3.5 text-purple-500" />
+            Dossiê Psicológico & Operacional (3 Dimensões)
+          </TabsTrigger>
+          <TabsTrigger value="sistemas" className="text-xs py-1.5 px-3 flex items-center gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <Settings2 className="h-3.5 w-3.5 text-blue-500" />
+            Sistemas de Gestão & Automação Operacional
+          </TabsTrigger>
+          <TabsTrigger value="prescricao" className="text-xs py-1.5 px-3 flex items-center gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <DollarSign className="h-3.5 w-3.5 text-emerald-500" />
+            Prescrição 360 & Geração de Lucro
+          </TabsTrigger>
+        </TabsList>
+
+        {/* ------------------------------------------------------------------- */}
+        {/* ABA 1: CENTRAL DE ABORDAGENS POR CANAL */}
+        {/* ------------------------------------------------------------------- */}
+        <TabsContent value="abordagens" className="space-y-4 mt-0">
+          <div className="grid lg:grid-cols-[300px_1fr] gap-5">
+            {/* Seletor Lateral de Canais */}
+            <Card className="border-border/60 h-fit space-y-3">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-primary" />
+                  Canais de Abordagem
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Selecione o formato de comunicação desejado.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
                 {CANAIS.map((c) => {
                   const Icon = c.icon;
                   const active = canal === c.value;
                   return (
                     <button
                       key={c.value}
-                      onClick={() => { setCanal(c.value); setEditado(""); }}
-                      className={`flex items-center gap-1.5 rounded-md border px-2.5 py-2 text-xs transition ${
-                        active ? "border-primary bg-primary/10 text-primary font-medium" : "border-border/60 hover:bg-accent text-muted-foreground"
+                      onClick={() => setCanal(c.value)}
+                      className={`w-full flex items-center justify-between p-2.5 rounded-md border text-left text-xs transition ${
+                        active
+                          ? "border-primary bg-primary/10 text-primary font-medium shadow-sm"
+                          : "border-border/60 hover:bg-accent text-muted-foreground"
                       }`}
                     >
-                      <Icon className="h-3.5 w-3.5 shrink-0" />
-                      <span>{c.label}</span>
+                      <div className="flex items-center gap-2">
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span>{c.label}</span>
+                      </div>
+                      {active && <Check className="h-3.5 w-3.5 text-primary" />}
                     </button>
                   );
                 })}
-              </div>
-            </div>
 
-            {/* Tom de Comunicação */}
-            <div>
-              <Label>Tom do Texto</Label>
-              <Select value={tom} onValueChange={(v) => { setTom(v as Tom); setEditado(""); }}>
-                <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="consultivo" className="text-xs">Consultivo (Especialista e Aconselhador)</SelectItem>
-                  <SelectItem value="formal" className="text-xs">Formal (Corporativo e Executivo)</SelectItem>
-                  <SelectItem value="amistoso" className="text-xs">Amistoso (Próximo e Caloroso)</SelectItem>
-                  <SelectItem value="direto" className="text-xs">Direto (Curto e Objetivo)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {modo === "classico" ? (
-              <>
-                <div>
-                  <Label>Foco Principal</Label>
-                  <Select value={foco} onValueChange={(v) => { setFoco(v as Foco); setEditado(""); }}>
-                    <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="geral">Diagnóstico Geral</SelectItem>
-                      <SelectItem value="site">Presença Web & Site</SelectItem>
-                      <SelectItem value="instagram">Instagram & Conteúdo</SelectItem>
-                      <SelectItem value="atendimento">Atendimento & Conversão</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Elegância & Sutileza</Label>
-                  <Select value={elegancia} onValueChange={(v) => setElegancia(v as Elegancia)}>
-                    <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="sutil">Muito Sutil (Sem vender diretamente)</SelectItem>
-                      <SelectItem value="elegante">Elegante e Sofisticado</SelectItem>
-                      <SelectItem value="equilibrado">Equilibrado</SelectItem>
-                      <SelectItem value="direto">Direto e Respeitoso</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button className="w-full text-xs" disabled={!empresa || loadingVar} onClick={gerarOpcoes}>
-                  <Wand2 className="h-3.5 w-3.5 mr-1.5" />
-                  {loadingVar ? "Escrevendo opções com IA..." : "Gerar Múltiplas Variações com IA"}
-                </Button>
-              </>
-            ) : (
-              <div className="space-y-3 pt-1 border-t border-border/50">
-                <div className="rounded-md border border-amber-500/20 bg-amber-500/5 p-3 text-[11px] space-y-1.5">
-                  <div className="font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
-                    <Flame className="h-3.5 w-3.5" /> Framework DMAM Ativo
+                <div className="pt-3 border-t border-border/50 text-[11px] text-muted-foreground space-y-1.5">
+                  <div className="font-semibold text-foreground flex items-center gap-1">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                    Posicionamento 360 Integrado
                   </div>
-                  <p className="text-muted-foreground leading-relaxed">
-                    Gera abordagens sob 4 ângulos psicológicos complementares:
+                  <p className="leading-relaxed">
+                    A abordagem prescreve soluções integradas (Branding, Embalagens, Digital, Vídeos, Sites e Sistemas de Gestão) focadas em gerar lucro.
                   </p>
-                  <ul className="space-y-1 text-muted-foreground list-disc list-inside">
-                    <li><strong className="text-foreground">Dores:</strong> Problema imediato ➔ Solução rápida</li>
-                    <li><strong className="text-foreground">Medos:</strong> Risco de não mudar ➔ Segurança/Estabilidade</li>
-                    <li><strong className="text-foreground">Ambições:</strong> Onde querem chegar ➔ Aceleração</li>
-                    <li><strong className="text-foreground">Maturidade:</strong> Capacidade ➔ Onboarding sob medida</li>
-                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Painel do Editor da Mensagem */}
+            <Card className="border-border/60 shadow-sm flex flex-col justify-between">
+              <CardHeader className="pb-3 border-b border-border/50 flex-row items-center justify-between flex-wrap gap-2">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    {dossier?.abordagensPorCanal[canal]?.titulo || `Mensagem para ${CANAIS.find((c) => c.value === canal)?.label}`}
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    {dossier?.dimensaoEstrategica.tomRecomendadoAbordagem
+                      ? `Tom recomendado: ${dossier.dimensaoEstrategica.tomRecomendadoAbordagem}`
+                      : "Personalizada com base no diagnóstico do negócio."}
+                  </CardDescription>
                 </div>
 
-                <Button
-                  className="w-full bg-gradient-to-r from-amber-600 to-primary hover:from-amber-700 hover:to-primary/90 text-white text-xs font-medium"
-                  disabled={!empresa || loadingDMAM}
-                  onClick={gerarDMAM_comIA}
-                >
-                  <Bot className="h-4 w-4 mr-1.5 animate-pulse" />
-                  {loadingDMAM ? "IA estruturando os 4 pilares..." : "🤖 Gerar 4 Pilares com IA"}
-                </Button>
-              </div>
-            )}
-
-            {empresa && (
-              <div className="rounded-md border border-border/60 bg-muted/30 p-3 space-y-1">
-                <div className="font-semibold text-foreground text-xs">{empresa.nome}</div>
-                <div className="text-muted-foreground text-[11px]">
-                  {empresa.segmento} · {empresa.cidade}/RS
-                </div>
-                <div className="flex items-center gap-2 pt-1">
-                  <Badge variant="outline" className="text-[10px]">
-                    Score: {empresa.score}/100
-                  </Badge>
-                  <Badge variant="secondary" className="text-[10px]">
-                    Site: {empresa.statusSite}
-                  </Badge>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* COLUNA DIREITA: CONTEÚDO GERADO & EDITOR */}
-        <div className="space-y-5">
-          {/* Card Principal de Visualização & Edição */}
-          <Card className="border-border/60 shadow-sm">
-            <CardHeader className="flex-row items-center justify-between pb-3 flex-wrap gap-2">
-              <div>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  Mensagem Pronta para Envio
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Texto formatado para {CANAIS.find((c) => c.value === canal)?.label}.
-                </CardDescription>
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap">
-                <Button size="sm" variant="outline" onClick={regen} className="text-xs">
-                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Regenerar
-                </Button>
-                {modo === "classico" && (
+                <div className="flex items-center gap-2 flex-wrap">
                   <Button
                     size="sm"
-                    variant="secondary"
-                    disabled={!empresa || loadingIA}
-                    onClick={async () => {
-                      if (!empresa) return;
-                      setLoadingIA(true);
-                      try {
-                        const r = await gerarAbordagemIA({ data: { empresa: toCtx(empresa), canal, tom, foco } });
-                        setEditado(r);
-                        toast.success("Mensagem gerada com IA");
-                      } catch (e) {
-                        toast.error((e as Error).message);
-                      } finally {
-                        setLoadingIA(false);
-                      }
+                    variant="outline"
+                    onClick={() => {
+                      navigator.clipboard.writeText(textoEditado);
+                      toast.success("Mensagem copiada para a área de transferência!");
                     }}
                     className="text-xs"
                   >
-                    <Sparkles className="h-3.5 w-3.5 mr-1.5" /> {loadingIA ? "Gerando..." : "Gerar com IA"}
+                    <Copy className="h-3.5 w-3.5 mr-1.5" />
+                    Copiar
                   </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!waFinal}
-                  title={waFinal ? "Abrir WhatsApp com esta mensagem" : "Empresa sem WhatsApp/telefone"}
-                  onClick={() => waFinal && window.open(waFinal, "_blank", "noopener")}
-                  className="text-xs text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10"
-                >
-                  <Send className="h-3.5 w-3.5 mr-1.5" /> Enviar WhatsApp
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(finalTxt);
-                    toast.success("Mensagem copiada para a área de transferência!");
-                  }}
-                  className="text-xs"
-                >
-                  <Copy className="h-3.5 w-3.5 mr-1.5" /> Copiar
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Textarea
-                value={finalTxt}
-                onChange={(e) => setEditado(e.target.value)}
-                rows={12}
-                className="font-mono text-xs sm:text-sm leading-relaxed"
-                placeholder="A mensagem gerada aparecerá aqui..."
-              />
-              <p className="text-[11px] text-muted-foreground">
-                💡 <strong>Dica de Fechamento:</strong> Sempre revise antes de disparar. Mantenha tom consultivo, mencione o nome do interlocutor e foque em abrir diálogo.
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* MATRIZ DMAM: CARDS DOS 4 PILARES */}
-          {modo === "dmam" && matrizDMAM && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div>
-                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                    <Flame className="h-4 w-4 text-amber-500" />
-                    Matriz Estratégica DMAM ({empresa?.nome || "Empresa"})
-                  </h2>
-                  <p className="text-xs text-muted-foreground">
-                    Escolha um dos 4 ângulos consultivos abaixo ou a mensagem integrada completa para aplicar no editor:
-                  </p>
+                  <Button
+                    size="sm"
+                    disabled={!waFinal}
+                    title={waFinal ? "Abrir WhatsApp com esta mensagem" : "Empresa sem WhatsApp cadastrado"}
+                    onClick={() => waFinal && window.open(waFinal, "_blank", "noopener")}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
+                  >
+                    <Send className="h-3.5 w-3.5 mr-1.5" />
+                    Enviar no WhatsApp
+                  </Button>
                 </div>
+              </CardHeader>
 
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setEditado(matrizDMAM.mensagemIntegradaCompleta);
-                    setPilarAtivo("integrada");
-                    toast.success("Mensagem Integrada (4 Pilares) aplicada no editor!");
-                  }}
-                  className="text-xs border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 text-amber-700 dark:text-amber-400"
-                >
-                  <Layers className="h-3.5 w-3.5 mr-1.5" />
-                  Usar Narrativa Integrada Completa
-                </Button>
+              <CardContent className="space-y-4 pt-4 flex-1 flex flex-col">
+                <Textarea
+                  value={textoEditado}
+                  onChange={(e) => setTextoEditado(e.target.value)}
+                  rows={14}
+                  className="font-mono text-xs sm:text-sm leading-relaxed flex-1"
+                  placeholder="A mensagem gerada com IA aparecerá aqui..."
+                />
+
+                {/* Box de Insights Psicológicos de Apoio */}
+                {dossier && (
+                  <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-foreground flex items-center gap-1.5">
+                        <BrainCircuit className="h-3.5 w-3.5 text-purple-500" />
+                        Gatilhos Emocionais Aplicados Nesta Abordagem:
+                      </span>
+                      <Badge variant="outline" className="text-[10px]">
+                        Custo da Inação: {dossier.dimensaoOperacional.impactoFinanceiroCustoInacao}
+                      </Badge>
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+                      <div>
+                        <strong className="text-foreground">⚡ Dor Imediata Tratada:</strong>{" "}
+                        {dossier.dimensaoPsicologica.doresAtuais[0] || "Gargalo de conversão e atendimento"}
+                      </div>
+                      <div>
+                        <strong className="text-foreground">🛡️ Medo Neutralizado:</strong>{" "}
+                        {dossier.dimensaoPsicologica.medosERiscos[0] || "Perda de fatia de mercado para concorrentes"}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* ------------------------------------------------------------------- */}
+        {/* ABA 2: DOSSIÊ PSICOLÓGICO & OPERACIONAL (3 DIMENSÕES) */}
+        {/* ------------------------------------------------------------------- */}
+        <TabsContent value="dossier" className="space-y-4 mt-0">
+          {!dossier ? (
+            <Card className="border-border/60 p-8 text-center space-y-3">
+              <Bot className="h-10 w-10 mx-auto text-muted-foreground animate-pulse" />
+              <div className="text-sm font-semibold">Nenhum dossiê gerado ainda para esta empresa</div>
+              <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                Clique no botão <strong>"Pesquisar Web & Gerar Dossiê com IA"</strong> acima para varrer a internet, analisar a empresa e montar o raio-x corporativo completo.
+              </p>
+              <Button size="sm" onClick={executarPesquisaEDossier} disabled={loadingIA}>
+                Iniciar Pesquisa & Dossiê
+              </Button>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {/* Resumo da Pesquisa em Tempo Real */}
+              <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4 space-y-2 text-xs">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-2">
+                    <Search className="h-4 w-4" />
+                    Pesquisa Web & Setor em Tempo Real (SerpApi)
+                  </div>
+                  <span className="text-[11px] text-muted-foreground">
+                    Termo: <code>{dossier.pesquisaWebRealizada.termoBuscado}</code>
+                  </span>
+                </div>
+                <p className="text-muted-foreground text-xs leading-relaxed">
+                  {dossier.pesquisaWebRealizada.resumoMercadoLocal}
+                </p>
+                {dossier.pesquisaWebRealizada.fontesEncontradas.length > 0 && (
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground pt-1">
+                    <span>Fontes consultadas:</span>
+                    {dossier.pesquisaWebRealizada.fontesEncontradas.map((f, idx) => (
+                      <a
+                        key={idx}
+                        href={f}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary hover:underline flex items-center gap-1"
+                      >
+                        Fonte {idx + 1}
+                        <ExternalLink className="h-2.5 w-2.5" />
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {/* Grid com os 4 Pilares */}
-              <div className="grid md:grid-cols-2 gap-4">
-                {/* 1. DORES */}
-                <Card className="border-border/60 border-t-4 border-t-amber-500 flex flex-col justify-between shadow-sm">
+              {/* 3 Dimensões em Grid */}
+              <div className="grid lg:grid-cols-3 gap-4">
+                {/* DIMENSÃO 1: FATORES PSICOLÓGICOS */}
+                <Card className="border-border/60 border-t-4 border-t-purple-500">
                   <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-sm flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
-                        <AlertCircle className="h-4 w-4" />
-                        Dores: O Problema Imediato
-                      </CardTitle>
-                      <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-500/30">
-                        Solução Rápida
-                      </Badge>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground font-medium">
-                      🎯 <em>{matrizDMAM.dores.diretiva}</em>
-                    </p>
+                    <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-purple-700 dark:text-purple-400">
+                      <BrainCircuit className="h-4 w-4" />
+                      1. Fatores Psicológicos & Emocionais
+                    </CardTitle>
+                    <CardDescription className="text-xs">O lado humano do decisor B2B</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-3 flex-1 flex flex-col justify-between text-xs">
-                    <div className="space-y-2">
-                      <div className="rounded bg-muted/40 p-2 text-[11px] text-muted-foreground">
-                        <strong>Diagnóstico:</strong> {matrizDMAM.dores.diagnostico}
+                  <CardContent className="space-y-3 text-xs">
+                    <div>
+                      <div className="font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1 text-[11px]">
+                        <AlertCircle className="h-3.5 w-3.5" /> Dores Diárias Atuais:
                       </div>
-                      <div className="rounded-md border border-border/60 bg-background/80 p-3 font-mono text-[11px] whitespace-pre-wrap leading-relaxed">
-                        {matrizDMAM.dores.texto}
-                      </div>
+                      <ul className="list-disc list-inside text-muted-foreground text-[11px] space-y-1 mt-1">
+                        {dossier.dimensaoPsicologica.doresAtuais.map((d, i) => (
+                          <li key={i}>{d}</li>
+                        ))}
+                      </ul>
                     </div>
-                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/40">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          setEditado(matrizDMAM.dores.texto);
-                          setPilarAtivo("dores");
-                          toast.success("Abordagem focada em Dores aplicada no editor!");
-                        }}
-                        className="text-xs"
-                      >
-                        <Check className="h-3.5 w-3.5 mr-1" /> Usar esta
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          navigator.clipboard.writeText(matrizDMAM.dores.texto);
-                          toast.success("Texto copiado!");
-                        }}
-                        className="text-xs"
-                      >
-                        <Copy className="h-3.5 w-3.5 mr-1" /> Copiar
-                      </Button>
+
+                    <div>
+                      <div className="font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1 text-[11px]">
+                        <ShieldAlert className="h-3.5 w-3.5" /> Medos & Riscos da Inação:
+                      </div>
+                      <ul className="list-disc list-inside text-muted-foreground text-[11px] space-y-1 mt-1">
+                        {dossier.dimensaoPsicologica.medosERiscos.map((m, i) => (
+                          <li key={i}>{m}</li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div>
+                      <div className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 text-[11px]">
+                        <TrendingUp className="h-3.5 w-3.5" /> Desejos & Ambições:
+                      </div>
+                      <ul className="list-disc list-inside text-muted-foreground text-[11px] space-y-1 mt-1">
+                        {dossier.dimensaoPsicologica.desejosEAmbicoes.map((a, i) => (
+                          <li key={i}>{a}</li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div>
+                      <div className="font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1 text-[11px]">
+                        <AlertCircle className="h-3.5 w-3.5" /> Frustrações Passadas com Agências:
+                      </div>
+                      <ul className="list-disc list-inside text-muted-foreground text-[11px] space-y-1 mt-1">
+                        {dossier.dimensaoPsicologica.frustracoesPassadas.map((f, i) => (
+                          <li key={i}>{f}</li>
+                        ))}
+                      </ul>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* 2. MEDOS */}
-                <Card className="border-border/60 border-t-4 border-t-rose-500 flex flex-col justify-between shadow-sm">
+                {/* DIMENSÃO 2: DIAGNÓSTICO OPERACIONAL & FINANCEIRO */}
+                <Card className="border-border/60 border-t-4 border-t-blue-500">
                   <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-sm flex items-center gap-1.5 text-rose-700 dark:text-rose-400">
-                        <ShieldAlert className="h-4 w-4" />
-                        Medos: Risco de Não Mudar
-                      </CardTitle>
-                      <Badge variant="outline" className="text-[10px] bg-rose-500/10 text-rose-600 border-rose-500/30">
-                        Segurança & Estabilidade
-                      </Badge>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground font-medium">
-                      🎯 <em>{matrizDMAM.medos.diretiva}</em>
-                    </p>
+                    <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-blue-700 dark:text-blue-400">
+                      <Settings2 className="h-4 w-4" />
+                      2. Diagnóstico Operacional & Financeiro
+                    </CardTitle>
+                    <CardDescription className="text-xs">A lógica e viabilidade do negócio</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-3 flex-1 flex flex-col justify-between text-xs">
-                    <div className="space-y-2">
-                      <div className="rounded bg-muted/40 p-2 text-[11px] text-muted-foreground">
-                        <strong>Diagnóstico:</strong> {matrizDMAM.medos.diagnostico}
-                      </div>
-                      <div className="rounded-md border border-border/60 bg-background/80 p-3 font-mono text-[11px] whitespace-pre-wrap leading-relaxed">
-                        {matrizDMAM.medos.texto}
-                      </div>
+                  <CardContent className="space-y-3 text-xs">
+                    <div>
+                      <div className="font-semibold text-foreground text-[11px]">Gargalos de Processo & Vendas:</div>
+                      <ul className="list-disc list-inside text-muted-foreground text-[11px] space-y-1 mt-1">
+                        {dossier.dimensaoOperacional.gargalosProcesso.map((g, i) => (
+                          <li key={i}>{g}</li>
+                        ))}
+                      </ul>
                     </div>
-                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/40">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          setEditado(matrizDMAM.medos.texto);
-                          setPilarAtivo("medos");
-                          toast.success("Abordagem focada em Medos aplicada no editor!");
-                        }}
-                        className="text-xs"
-                      >
-                        <Check className="h-3.5 w-3.5 mr-1" /> Usar esta
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          navigator.clipboard.writeText(matrizDMAM.medos.texto);
-                          toast.success("Texto copiado!");
-                        }}
-                        className="text-xs"
-                      >
-                        <Copy className="h-3.5 w-3.5 mr-1" /> Copiar
-                      </Button>
+
+                    <div className="rounded-md border border-rose-500/20 bg-rose-500/5 p-2.5 space-y-1">
+                      <div className="font-semibold text-rose-700 dark:text-rose-400 text-[11px]">
+                        Impacto Financeiro (Custo da Inação):
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        {dossier.dimensaoOperacional.impactoFinanceiroCustoInacao}
+                      </p>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-semibold text-foreground">Nível de Maturidade:</span>
+                        <Badge variant="outline" className="capitalize text-[10px]">
+                          {dossier.dimensaoOperacional.nivelMaturidade.replace("_", " ")}
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                        {dossier.dimensaoOperacional.justificativaMaturidade}
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* 3. AMBIÇÕES */}
-                <Card className="border-border/60 border-t-4 border-t-emerald-500 flex flex-col justify-between shadow-sm">
+                {/* DIMENSÃO 3: ALINHAMENTO ESTRATÉGICO */}
+                <Card className="border-border/60 border-t-4 border-t-emerald-500">
                   <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-sm flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
-                        <TrendingUp className="h-4 w-4" />
-                        Ambições: Onde Querem Chegar
-                      </CardTitle>
-                      <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
-                        Aceleração do Crescimento
-                      </Badge>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground font-medium">
-                      🎯 <em>{matrizDMAM.ambicoes.diretiva}</em>
-                    </p>
+                    <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
+                      <TrendingUp className="h-4 w-4" />
+                      3. Alinhamento Estratégico & Futuro
+                    </CardTitle>
+                    <CardDescription className="text-xs">Objetivos de longo prazo</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-3 flex-1 flex flex-col justify-between text-xs">
-                    <div className="space-y-2">
-                      <div className="rounded bg-muted/40 p-2 text-[11px] text-muted-foreground">
-                        <strong>Diagnóstico:</strong> {matrizDMAM.ambicoes.diagnostico}
-                      </div>
-                      <div className="rounded-md border border-border/60 bg-background/80 p-3 font-mono text-[11px] whitespace-pre-wrap leading-relaxed">
-                        {matrizDMAM.ambicoes.texto}
-                      </div>
+                  <CardContent className="space-y-3 text-xs">
+                    <div>
+                      <div className="font-semibold text-foreground text-[11px]">Metas de Crescimento & Expansão:</div>
+                      <ul className="list-disc list-inside text-muted-foreground text-[11px] space-y-1 mt-1">
+                        {dossier.dimensaoEstrategica.metasCrescimento.map((m, i) => (
+                          <li key={i}>{m}</li>
+                        ))}
+                      </ul>
                     </div>
-                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/40">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          setEditado(matrizDMAM.ambicoes.texto);
-                          setPilarAtivo("ambicoes");
-                          toast.success("Abordagem focada em Ambições aplicada no editor!");
-                        }}
-                        className="text-xs"
-                      >
-                        <Check className="h-3.5 w-3.5 mr-1" /> Usar esta
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          navigator.clipboard.writeText(matrizDMAM.ambicoes.texto);
-                          toast.success("Texto copiado!");
-                        }}
-                        className="text-xs"
-                      >
-                        <Copy className="h-3.5 w-3.5 mr-1" /> Copiar
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
 
-                {/* 4. MATURIDADE */}
-                <Card className="border-border/60 border-t-4 border-t-blue-500 flex flex-col justify-between shadow-sm">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-sm flex items-center gap-1.5 text-blue-700 dark:text-blue-400">
-                        <Gauge className="h-4 w-4" />
-                        Maturidade: Capacidade de Implementação
-                      </CardTitle>
-                      <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-600 border-blue-500/30">
-                        Suporte & Onboarding Sob Medida
-                      </Badge>
+                    <div>
+                      <div className="font-semibold text-foreground text-[11px]">Cultura Organizacional & Decisores:</div>
+                      <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                        {dossier.dimensaoEstrategica.culturaOrganizacional}
+                      </p>
                     </div>
-                    <p className="text-[11px] text-muted-foreground font-medium">
-                      🎯 <em>{matrizDMAM.maturidade.diretiva}</em>
-                    </p>
-                  </CardHeader>
-                  <CardContent className="space-y-3 flex-1 flex flex-col justify-between text-xs">
-                    <div className="space-y-2">
-                      <div className="rounded bg-muted/40 p-2 text-[11px] text-muted-foreground">
-                        <strong>Diagnóstico:</strong> {matrizDMAM.maturidade.diagnostico}
+
+                    <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 p-2.5 space-y-1">
+                      <div className="font-semibold text-emerald-700 dark:text-emerald-400 text-[11px]">
+                        Tom Ideal da Abordagem:
                       </div>
-                      <div className="rounded-md border border-border/60 bg-background/80 p-3 font-mono text-[11px] whitespace-pre-wrap leading-relaxed">
-                        {matrizDMAM.maturidade.texto}
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/40">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          setEditado(matrizDMAM.maturidade.texto);
-                          setPilarAtivo("maturidade");
-                          toast.success("Abordagem focada em Maturidade aplicada no editor!");
-                        }}
-                        className="text-xs"
-                      >
-                        <Check className="h-3.5 w-3.5 mr-1" /> Usar esta
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          navigator.clipboard.writeText(matrizDMAM.maturidade.texto);
-                          toast.success("Texto copiado!");
-                        }}
-                        className="text-xs"
-                      >
-                        <Copy className="h-3.5 w-3.5 mr-1" /> Copiar
-                      </Button>
+                      <p className="text-[11px] text-muted-foreground">
+                        {dossier.dimensaoEstrategica.tomRecomendadoAbordagem}
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
               </div>
             </div>
           )}
+        </TabsContent>
 
-          {/* MODO CLÁSSICO: VARIAÇÕES DE ABORDAGEM */}
-          {modo === "classico" && variacoes.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-semibold tracking-tight">
-                Opções geradas com ChatGPT ({variacoes.length})
+        {/* ------------------------------------------------------------------- */}
+        {/* ABA 3: SISTEMAS DE GESTÃO & AUTOMAÇÃO OPERACIONAL */}
+        {/* ------------------------------------------------------------------- */}
+        <TabsContent value="sistemas" className="space-y-4 mt-0">
+          <div className="rounded-lg border border-border/60 bg-card p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <Settings2 className="h-5 w-5 text-blue-500" />
+              <h2 className="text-base font-semibold text-foreground">
+                Sistemas de Gestão Recomendados para {empresa?.nome || "a Empresa"}
               </h2>
-              <div className="grid md:grid-cols-2 gap-3">
-                {variacoes.map((v, i) => {
-                  const wa = waSendUrl(waNumero, v.texto);
-                  return (
-                    <Card key={i} className="border-border/60 flex flex-col">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm flex items-center gap-2">
-                          <Badge variant="secondary" className="text-[10px]">{i + 1}</Badge>
-                          {v.estilo}
-                        </CardTitle>
-                        <p className="text-xs text-muted-foreground mt-1">{v.resumo}</p>
-                        {v.assunto && (
-                          <p className="text-xs mt-1">
-                            <span className="text-muted-foreground">Assunto: </span>
-                            {v.assunto}
-                          </p>
-                        )}
-                      </CardHeader>
-                      <CardContent className="flex-1 flex flex-col gap-2">
-                        <p className="text-sm whitespace-pre-wrap rounded-md border border-border/60 bg-muted/30 p-3 flex-1">
-                          {v.texto}
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => {
-                              setEditado(v.assunto ? `Assunto: ${v.assunto}\n\n${v.texto}` : v.texto);
-                              toast.success("Opção aplicada no editor");
-                            }}
-                          >
-                            <Check className="h-3.5 w-3.5 mr-1.5" /> Usar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              navigator.clipboard.writeText(v.texto);
-                              toast.success("Texto copiado");
-                            }}
-                          >
-                            <Copy className="h-3.5 w-3.5 mr-1.5" /> Copiar
-                          </Button>
-                          <Button
-                            size="sm"
-                            disabled={!wa}
-                            title={wa ? "Abrir WhatsApp com esta mensagem" : "Empresa sem WhatsApp/telefone"}
-                            onClick={() => wa && window.open(wa, "_blank", "noopener")}
-                          >
-                            <Send className="h-3.5 w-3.5 mr-1.5" /> Enviar no WhatsApp
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
             </div>
-          )}
-        </div>
-      </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Além de cuidar de toda a comunicação visual e digital, nossa agência implanta sistemas práticos para organizar a operação, automatizar atendimentos e aumentar a conversão de vendas.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-4">
+            {dossier?.dimensaoOperacional.sistemasGestaoRecomendados.map((sis, i) => (
+              <Card key={i} className="border-border/60 flex flex-col justify-between shadow-sm">
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4 text-primary" />
+                      {sis.nome}
+                    </CardTitle>
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] capitalize ${
+                        sis.aplicabilidade === "essencial"
+                          ? "bg-rose-500/10 text-rose-600 border-rose-500/30"
+                          : "bg-blue-500/10 text-blue-600 border-blue-500/30"
+                      }`}
+                    >
+                      {sis.aplicabilidade}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3 text-xs flex-1 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div>
+                      <span className="text-[11px] font-semibold text-foreground block">Benefício de Gestão:</span>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                        {sis.beneficioGestao}
+                      </p>
+                    </div>
+
+                    <div className="rounded bg-emerald-500/5 border border-emerald-500/20 p-2">
+                      <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 block">
+                        Impacto Direto no Lucro:
+                      </span>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                        {sis.impactoLucro}
+                      </p>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] uppercase text-muted-foreground font-semibold block">Exemplo de Uso:</span>
+                      <p className="text-[11px] text-muted-foreground italic mt-0.5">
+                        "{sis.exemploPratico}"
+                      </p>
+                    </div>
+                  </div>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setTextoEditado((prev) => `${prev}\n\n[Inclusão do Sistema: ${sis.nome} - ${sis.beneficioGestao}]`);
+                      setActiveTab("abordagens");
+                      toast.success(`Sistema ${sis.nome} adicionado ao rascunho de abordagem!`);
+                    }}
+                    className="w-full text-xs mt-2"
+                  >
+                    + Incluir na Abordagem
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* ------------------------------------------------------------------- */}
+        {/* ABA 4: PRESCRIÇÃO 360 & GERAÇÃO DE LUCRO */}
+        {/* ------------------------------------------------------------------- */}
+        <TabsContent value="prescricao" className="space-y-4 mt-0">
+          <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-emerald-600" />
+              <h2 className="text-base font-semibold text-foreground">
+                Prescrição de Comunicação 360 & Tratamento para Gerar Lucro
+              </h2>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {dossier?.prescricaoTratamentoLucro.resumoFinanceiroLucratividade ||
+                "Mapeamento de como tratar cada sintoma identificado na empresa através do mix de Comunicação 360 e Sistemas para maximizar margem e receita."}
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-4">
+            {dossier?.prescricaoTratamentoLucro.itensTratamento.map((item, idx) => (
+              <Card key={idx} className="border-border/60 shadow-sm flex flex-col justify-between">
+                <CardHeader className="pb-2">
+                  <Badge variant="outline" className="w-fit text-[10px] mb-1 bg-amber-500/10 text-amber-600 border-amber-500/30">
+                    Sintoma #{idx + 1}
+                  </Badge>
+                  <CardTitle className="text-xs font-semibold leading-snug">
+                    {item.sintomaIdentificado}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-xs flex-1 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="rounded bg-primary/5 border border-primary/20 p-2.5">
+                      <span className="text-[11px] font-semibold text-primary block">
+                        Solução 360 / Sistema Recomendado:
+                      </span>
+                      <span className="text-[11px] text-foreground font-medium block mt-0.5">
+                        {item.solucao360OuSistema}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-[11px] font-semibold text-foreground block">Como Tratar:</span>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                        {item.comoTratar}
+                      </p>
+                    </div>
+
+                    <div className="rounded bg-emerald-500/5 border border-emerald-500/20 p-2.5">
+                      <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 block">
+                        💰 Como Gera Mais Lucro:
+                      </span>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                        {item.comoGeraMaisLucro}
+                      </p>
+                    </div>
+                  </div>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setTextoEditado((prev) => `${prev}\n\n[Solução: ${item.solucao360OuSistema} - ${item.comoGeraMaisLucro}]`);
+                      setActiveTab("abordagens");
+                      toast.success(`Tratamento adicionado à mensagem de abordagem!`);
+                    }}
+                    className="w-full text-xs mt-2"
+                  >
+                    + Adicionar à Abordagem
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
-}
-
-function Label({ children }: { children: React.ReactNode }) {
-  return <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5 font-medium">{children}</div>;
 }
