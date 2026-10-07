@@ -32,34 +32,49 @@ interface WhatsAppContactModalProps {
 
 const TEMPLATES = [
   {
+    id: "dmam_dores",
+    titulo: "⚡ Dores: O Problema Imediato ➔ Solução Rápida",
+    descricao: "Mostre como sua solução resolve o problema rápido e estanca a perda de clientes",
+    gerar: (e: ContactableEmpresa) =>
+      `Olá! Tudo bem? Me chamo [Seu Nome]. Analisando o setor de ${e.segmento || "serviços"} em ${e.cidade || "sua região"}, notei que a ${e.nome} está perdendo clientes diariamente por falta de um canal rápido de conversão digital.\n\nEstruturamos uma solução rápida e pronta que resolve esse problema em poucos dias, colocando novos contatos no seu WhatsApp. Posso te mandar uma prévia de 2 minutos sem compromisso?`,
+  },
+  {
+    id: "dmam_medos",
+    titulo: "🛡️ Medos: O Risco de Não Mudar ➔ Segurança & Estabilidade",
+    descricao: "Mostre como sua solução traz segurança e protege sua fatia de mercado",
+    gerar: (e: ContactableEmpresa) =>
+      `Olá! Tudo bem? Acompanhando a movimentação de ${e.segmento || "empresas"} em ${e.cidade || "sua cidade"}, vemos concorrentes se digitalizando rápido para capturar sua base de clientes.\n\nPara a ${e.nome} não correr o risco de ficar para trás ou perder relevância, oferecemos uma infraestrutura sólida com total estabilidade e segurança. Teriam 5 minutos esta semana para conhecer como blindar seu posicionamento?`,
+  },
+  {
+    id: "dmam_ambicoes",
+    titulo: "🚀 Ambições: Onde Querem Chegar ➔ Aceleração do Crescimento",
+    descricao: "Mostre como sua solução acelera o crescimento e eleva o ticket médio",
+    gerar: (e: ContactableEmpresa) =>
+      `Olá, equipe da ${e.nome}! Tudo bem? Acompanho a excelência do trabalho de vocês e vejo uma oportunidade clara de acelerar o crescimento da empresa com captação de clientes de maior ticket médio em ${e.cidade || "sua região"}.\n\nDesenvolvemos um plano de aceleração digital focado em multiplicar resultados. Posso compartilhar um resumo de como podemos acelerar suas metas?`,
+  },
+  {
+    id: "dmam_maturidade",
+    titulo: "🎯 Maturidade: Capacidade de Implementação ➔ Suporte Sob Medida",
+    descricao: "Adapte o suporte e onboarding à rotina da empresa sem sobrecarga técnica",
+    gerar: (e: ContactableEmpresa) =>
+      `Olá! Falo com o gestor da ${e.nome}? Sabemos que a rotina da empresa é corrida e sobra pouco tempo para processos técnicos complexos.\n\nPor isso, nosso modelo é 100% chave na mão: cuidamos de toda a implementação com suporte humanizado e onboarding guiado, sem tomar o seu tempo. Podemos agendar uma conversa rápida para você conhecer como facilitamos tudo?`,
+  },
+  {
     id: "gargalo_vendas",
-    titulo: "📊 Diagnóstico de Gargalo & Perda para Concorrentes",
+    titulo: "📊 Diagnóstico de Gargalo Comercial",
     descricao: "Abordagem consultiva mostrando clientes perdidos nas buscas locais",
     gerar: (e: ContactableEmpresa) =>
       `Olá! Tudo bem? Me chamo [Seu Nome]. Estive analisando o fluxo de busca de clientes para o setor de ${e.segmento || "serviços"} em ${e.cidade || "sua região"} e notei que a ${e.nome} está perdendo vendas prontas para concorrentes por falta de um canal rápido de conversão e atendimento digital.\n\nPreparamos um diagnóstico rápido de 2 minutos apontando exatamente onde está esse gargalo de faturamento. Posso compartilhar com você por aqui?`,
   },
   {
     id: "erros_conversao",
-    titulo: "🔍 Auditoria de Conversão & Otimização de ROI",
+    titulo: "🔍 Auditoria de Conversão & ROI",
     descricao: "Foco nos erros técnicos e falhas que impedem o visitante de fechar negócio",
     gerar: (e: ContactableEmpresa) =>
       `Olá! Falo com o responsável comercial ou gestor da ${e.nome}? Estive analisando a presença digital de vocês e identifiquei 2 falhas críticas que fazem clientes desistirem da compra antes mesmo de entrar em contato.\n\nNosso foco não é 'site bonito', e sim gerar vendas previsíveis e retorno sobre investimento para ${e.segmento || "sua empresa"}. Gostaria de ver esse diagnóstico sem compromisso?`,
   },
-  {
-    id: "trafego_resultado",
-    titulo: "📈 Captação de Clientes & Vendas Previsíveis",
-    descricao: "Foco em orçamentos qualificados e geração direta de receita",
-    gerar: (e: ContactableEmpresa) =>
-      `Olá, equipe da ${e.nome}! Tudo bem? Analisando o mercado de ${e.cidade || "sua cidade"}, vimos que há uma demanda diária de pessoas buscando por ${e.segmento || "seus serviços"}, mas que hoje acabam comprando de outras empresas por falta de posicionamento estratégico.\n\nTrabalhamos com geração direta de orçamentos e receita no seu WhatsApp. Quando vocês teriam 5 minutos esta semana para avaliarmos os números da sua região?`,
-  },
-  {
-    id: "contato_decisor",
-    titulo: "💼 Abordagem Direta ao Sócio / Diretor",
-    descricao: "Contato executivo focado em redução de custos de aquisição e eficiência",
-    gerar: (e: ContactableEmpresa) =>
-      `Olá! Gostaria de falar com o sócio ou diretor responsável pela estratégia de crescimento da ${e.nome}. Identificamos oportunidades claras no funil de captação de vocês em ${e.cidade || "sua região"} para aumentar o fechamento de novos clientes sem desperdício de verba. Quem seria a pessoa indicada para conversarmos?`,
-  },
 ];
+
 
 export function limparNumeroWhatsApp(telefone?: string): string {
   if (!telefone) return "";

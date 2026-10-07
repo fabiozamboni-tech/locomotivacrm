@@ -465,3 +465,176 @@ Regras: valores numéricos inteiros em reais, sem texto; minimo < recomendado < 
       { role: "user", content: user },
     ]);
   });
+
+// -------- FRAMEWORK ESTRATÉGICO DMAM (Dores, Medos, Ambições, Maturidade) --------
+import type { ItemDMAM, MatrizDMAMResult } from "./dmam-framework";
+
+export const gerarMatrizDMAM_IA = createServerFn({ method: "POST" })
+  .inputValidator(
+    (data: {
+      empresa: EmpresaCtx;
+      canal: "whatsapp" | "email" | "instagram" | "ligacao" | "curta";
+      tom?: "consultivo" | "formal" | "amistoso" | "direto";
+      nomeAgencia?: string;
+    }) => data,
+  )
+  .handler(async ({ data }): Promise<MatrizDMAMResult> => {
+    const { chatJSON } = await import("./ai-gateway.server");
+    const agencia = data.nomeAgencia?.trim() || "[Nome da sua agência]";
+    const canal = data.canal || "whatsapp";
+    const tom = data.tom || "consultivo";
+
+    const canalDesc: Record<string, string> = {
+      whatsapp: "WhatsApp (objetiva, humana, 5-8 linhas, quebras de linha limpas)",
+      email: "E-mail (com Assunto atrativo na primeira linha, corpo estruturado e escaneável)",
+      instagram: "Direct do Instagram (coloquial, 4-6 linhas, sem parecer robô)",
+      ligacao: "Roteiro de ligação comercial (4 passos objetivos para abrir conversa)",
+      curta: "Mensagem super curta (2-3 frases para iniciar contato)",
+    };
+
+    const sys = `Você é o principal estrategista de prospecção consultiva B2B de uma agência de tecnologia, design e presença digital da Serra Gaúcha (RS).
+Você domina com maestria a metodologia de vendas 'DMAM' (Dores, Medos, Ambições, Maturidade) e escreve mensagens reais, humanas e de alta conversão.
+
+ESTRUTURA METODOLÓGICA OBRIGATÓRIA (4 PILARES):
+1. DORES (O problema imediato):
+   - Foco: O gargalo urgente que a empresa enfrenta hoje (ex: perda de clientes por falta de site ou atendimento lento).
+   - Diretriz central: Mostre como sua solução resolve o problema RÁPIDO.
+2. MEDOS (O risco de não mudar):
+   - Foco: O risco concreto da inação (ex: perder espaço para concorrentes na cidade/região, obsolescência).
+   - Diretriz central: Mostre como sua solução traz SEGURANÇA, ESTABILIDADE e proteção.
+3. AMBIÇÕES (Onde eles querem chegar):
+   - Foco: A visão de futuro e crescimento (ex: elevar ticket médio, expandir para novas cidades, autoridade de marca).
+   - Diretriz central: Mostre como sua solução ACELERA e multiplica esse crescimento.
+4. MATURIDADE (A capacidade de implementação):
+   - Foco: A capacidade de execução e o tempo escasso da equipe do cliente.
+   - Diretriz central: Adapte o SUPORTE e o ONBOARDING à realidade deles (solução guiada, chave na mão, sem atritos técnicos).
+
+5. MENSAGEM INTEGRADA:
+   - Uma abordagem magistral completa articulando Dores + Medos + Ambições + Suporte/Onboarding em uma narrativa fluida.`;
+
+    const user = `Gere os 4 textos de abordagem baseados no Framework DMAM para o canal "${canalDesc[canal]}" e tom "${tom}", customizados para a empresa abaixo.
+Assine as mensagens como "${agencia}". Se mencionar o interlocutor, use "[Nome do contato]".
+
+Dados da Empresa:
+${ctxTxt(data.empresa)}
+
+Retorne um JSON com esta estrutura EXATA:
+{
+  "empresaNome": "${data.empresa.nome}",
+  "segmento": "${data.empresa.segmento}",
+  "cidade": "${data.empresa.cidade}",
+  "dores": {
+    "pilar": "dores",
+    "titulo": "⚡ Dores: Resolução Imediata do Problema",
+    "rotulo": "Problema Imediato ➔ Solução Rápida",
+    "diretiva": "Mostre como sua solução resolve o problema rápido.",
+    "diagnostico": "1-2 frases resumindo a dor imediata identificada nesta empresa",
+    "solucaoProposta": "1-2 frases mostrando a solução rápida da agência",
+    "texto": "Texto pronto e completo da mensagem para enviar no canal ${canal}",
+    "assuntoEmail": "Assunto instigante para o e-mail (se aplicável)",
+    "explicacaoConsultiva": "Por que esta abordagem de Dores funciona para este perfil"
+  },
+  "medos": {
+    "pilar": "medos",
+    "titulo": "🛡️ Medos: Risco de Não Mudar & Segurança",
+    "rotulo": "Risco de Não Mudar ➔ Segurança e Estabilidade",
+    "diretiva": "Mostre como sua solução traz segurança e estabilidade.",
+    "diagnostico": "1-2 frases sobre o risco de ficarem para trás ou desprotegidos",
+    "solucaoProposta": "1-2 frases destacando segurança e estabilidade garantidas",
+    "texto": "Texto pronto e completo da mensagem para enviar no canal ${canal}",
+    "assuntoEmail": "Assunto instigante para o e-mail (se aplicável)",
+    "explicacaoConsultiva": "Por que esta abordagem de Medos funciona para este perfil"
+  },
+  "ambicoes": {
+    "pilar": "ambicoes",
+    "titulo": "🚀 Ambições: Aceleração de Crescimento",
+    "rotulo": "Onde Querem Chegar ➔ Aceleração do Crescimento",
+    "diretiva": "Mostre como sua solução acelera o crescimento.",
+    "diagnostico": "1-2 frases sobre o potencial de expansão e ambição de mercado",
+    "solucaoProposta": "1-2 frases sobre como a agência acelera esse salto",
+    "texto": "Texto pronto e completo da mensagem para enviar no canal ${canal}",
+    "assuntoEmail": "Assunto instigante para o e-mail (se aplicável)",
+    "explicacaoConsultiva": "Por que esta abordagem de Ambições funciona para este perfil"
+  },
+  "maturidade": {
+    "pilar": "maturidade",
+    "titulo": "🎯 Maturidade: Suporte & Onboarding Sob Medida",
+    "rotulo": "Capacidade de Implementação ➔ Suporte e Onboarding Adaptado",
+    "diretiva": "Adapte o suporte e o onboarding à realidade deles.",
+    "diagnostico": "1-2 frases sobre a prontidão operacional e rotina ocupada do cliente",
+    "solucaoProposta": "1-2 frases sobre a entrega chave na mão e suporte humanizado",
+    "texto": "Texto pronto e completo da mensagem para enviar no canal ${canal}",
+    "assuntoEmail": "Assunto instigante para o e-mail (se aplicável)",
+    "explicacaoConsultiva": "Por que esta abordagem de Maturidade quebra as objeções de tempo/capacidade"
+  },
+  "mensagemIntegradaCompleta": "Texto de abordagem master integrando de forma coesa os 4 pilares (Dores + Medos + Ambições + Suporte/Maturidade) no formato ${canal}."
+}`;
+
+    try {
+      return await chatJSON<MatrizDMAMResult>([
+        { role: "system", content: sys },
+        { role: "user", content: user },
+      ]);
+    } catch (err) {
+      console.warn("Falha na geração via IA, utilizando gerador determinístico DMAM:", err);
+      const { gerarMatrizDMAM } = await import("./dmam-framework");
+      return gerarMatrizDMAM(
+        {
+          id: "temp",
+          nome: data.empresa.nome,
+          segmento: data.empresa.segmento,
+          cidade: data.empresa.cidade,
+          endereco: data.empresa.bairro ? `${data.empresa.bairro}, ${data.empresa.cidade}` : data.empresa.cidade,
+          statusSite: data.empresa.statusSite as any,
+          statusInstagram: data.empresa.statusInstagram as any,
+          score: data.empresa.score,
+          telefone: data.empresa.telefone,
+          whatsapp: data.empresa.whatsapp,
+          email: data.empresa.email,
+          site: data.empresa.site,
+          instagram: data.empresa.instagram,
+          observacoes: data.empresa.observacoes,
+          ultimaAnalise: new Date().toISOString(),
+          tags: [],
+          crmStage: "identificado",
+          diagnostico: {
+            site: {
+              responsivo: true,
+              ssl: true,
+              velocidade: "boa",
+              cta: true,
+              formulario: true,
+              whatsappBtn: true,
+              seoBasico: true,
+              presencaGoogle: true,
+              identidadeConsistente: true,
+              qualidadePercebida: 7,
+            },
+            instagram: {
+              diasDesdeUltimoPost: 5,
+              frequencia: "media",
+              qualidadeVisual: 7,
+              consistenciaMarca: 7,
+              engajamentoAparente: "medio",
+              bioForte: true,
+            },
+            atendimento: {
+              contatoFacil: true,
+              multiplosCanais: true,
+              respostaRapida: true,
+              provaSocial: true,
+              clarezaServicos: true,
+            },
+          },
+          historico: [],
+          origem: "manual",
+        },
+
+
+        canal,
+        tom,
+        agencia,
+      );
+    }
+  });
+

@@ -32,8 +32,36 @@ interface InstagramDmModalProps {
 
 const INSTAGRAM_TEMPLATES = [
   {
+    id: "dmam_dores",
+    titulo: "⚡ Dores: O Problema Imediato ➔ Solução Rápida",
+    descricao: "Mostre como sua solução resolve o gargalo de conversão rápido",
+    gerar: (p: ContactableInstagramProfile) =>
+      `Oi, equipe da ${p.nome}! 👋\n\nNotamos que vocês têm um perfil de qualidade, mas quem chega aqui em busca de ${p.segmento || "seus serviços"} não encontra um canal ágil e rápido para fechar negócio.\n\nEstruturamos uma solução rápida que resolve isso em poucos dias para captar contatos no ar. Posso te mandar uma demonstração de 2 minutos por aqui?`,
+  },
+  {
+    id: "dmam_medos",
+    titulo: "🛡️ Medos: O Risco de Não Mudar ➔ Segurança & Estabilidade",
+    descricao: "Mostre como sua solução traz segurança contra o avanço da concorrência",
+    gerar: (p: ContactableInstagramProfile) =>
+      `Olá! Tudo bem? 🛡️ Observando o mercado de ${p.segmento || "empresas"} em ${p.cidade || "sua região"}, vemos concorrentes se posicionando forte para captar a atenção dos seus clientes.\n\nPara a ${p.nome} não correr o risco de perder espaço, criamos estratégias de blindagem digital que trazem estabilidade e segurança. Topam trocar uma ideia rápida?`,
+  },
+  {
+    id: "dmam_ambicoes",
+    titulo: "🚀 Ambições: Onde Querem Chegar ➔ Aceleração do Crescimento",
+    descricao: "Mostre como sua solução acelera o crescimento e atrai clientes premium",
+    gerar: (p: ContactableInstagramProfile) =>
+      `Oi, ${p.nome}! 🚀 Parabéns pelo posicionamento. Vemos um potencial enorme para vocês acelerarem o crescimento e atraírem clientes de maior ticket médio.\n\nDesenvolvemos um plano de aceleração sob medida para marcas com a ambição de vocês. Posso te enviar um resumo da metodologia?`,
+  },
+  {
+    id: "dmam_maturidade",
+    titulo: "🎯 Maturidade: Capacidade de Implementação ➔ Suporte Sob Medida",
+    descricao: "Adapte o onboarding e suporte à rotina da equipe sem atrito técnico",
+    gerar: (p: ContactableInstagramProfile) =>
+      `Oi, ${p.nome}! 👋 Sabemos o quanto a operação da empresa é corrida. Por isso, nosso modelo é 100% chave na mão: cuidamos de toda a implementação com suporte dedicado, sem exigir tempo da sua equipe.\n\nPosso te mostrar como nosso suporte se adapta à sua realidade?`,
+  },
+  {
     id: "gargalo_bio_conversao",
-    titulo: "📊 Gargalo no Perfil: Tráfego sem Conversão em Vendas",
+    titulo: "📊 Diagnóstico de Gargalo no Perfil",
     descricao: "Diagnóstico apontando perda de vendas na bio para concorrentes",
     gerar: (p: ContactableInstagramProfile) =>
       `Olá, equipe da ${p.nome}! 👋\n\nEstive analisando o perfil de vocês e notei um gargalo crítico: vocês produzem um ótimo conteúdo, mas o fluxo da bio não direciona o visitante para fechar negócio e acaba fazendo a ${p.nome} perder vendas para concorrentes de ${p.cidade || "sua região"} que já têm canais diretos de conversão.\n\nPreparamos um diagnóstico rápido de 2 minutos mostrando como corrigir esse vazamento de faturamento. Posso te enviar por aqui?`,
@@ -45,21 +73,8 @@ const INSTAGRAM_TEMPLATES = [
     gerar: (p: ContactableInstagramProfile) =>
       `Oi ${p.nome}! Tudo bem? 🎯\n\nFizemos uma análise comparativa do setor de ${p.segmento || "empresas"} em ${p.cidade || "sua cidade"} e encontramos 2 falhas na jornada digital que fazem clientes interessados desistirem antes de chamar no WhatsApp.\n\nNosso foco não é vender 'site bonito', e sim estruturar processos que geram retorno sobre investimento real. Gostariam de ver esses 2 pontos sem nenhum compromisso?`,
   },
-  {
-    id: "aquisicao_previsivel",
-    titulo: "📈 Sistema de Aquisição Previsível & Faturamento",
-    descricao: "Otimização de seguidores e visitantes em orçamentos diários",
-    gerar: (p: ContactableInstagramProfile) =>
-      `Olá, equipe da ${p.nome}! 👏\n\nAcompanhamos o trabalho de vocês e identificamos que o perfil tem potencial para gerar pelo menos o dobro de orçamentos diários com pequenos ajustes no fluxo de atendimento e conversão.\n\nTopariam receber um áudio ou resumo de 3 minutos mostrando o que os líderes do seu segmento estão fazendo para vender no automático?`,
-  },
-  {
-    id: "contato_decisor_dm",
-    titulo: "💼 Abordagem Direta ao Sócio / Gestor",
-    descricao: "Contato executivo para alcançar quem decide sobre vendas e crescimento",
-    gerar: (p: ContactableInstagramProfile) =>
-      `Oi ${p.nome}! 👏 Quem é o sócio ou responsável pelas decisões comerciais e estratégicas da empresa por aí com quem eu possa trocar uma ideia rápida de 3 minutos sobre oportunidades de receita em ${p.cidade || "sua região"}?`,
-  },
 ];
+
 
 export function limparUsernameInstagram(handleOrUrl?: string): string {
   if (!handleOrUrl) return "";
