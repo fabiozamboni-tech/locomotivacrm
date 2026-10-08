@@ -20,6 +20,9 @@ import {
   type SistemaGestaoItem,
   type TratamentoSintomaItem,
 } from "@/lib/dossier-360.functions";
+import { consultarQsaDecisores, type DecisoresResult, type SocioDecisor } from "@/lib/qsa-decisores.functions";
+import { CopilotoObjecoesModal } from "@/components/copiloto-objecoes-modal";
+import { CadenciaModal } from "@/components/cadencia-modal";
 import { whatsappUrl } from "@/lib/links";
 import {
   Copy,
@@ -54,6 +57,9 @@ import {
   BrainCircuit,
   Settings2,
   Calendar,
+  Users,
+  Building,
+  UserCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -90,7 +96,38 @@ function AbordagemPage() {
   const [nomeAgencia, setNomeAgencia] = useState("nossa agência de Comunicação 360 & Tecnologia");
   const [textoEditado, setTextoEditado] = useState("");
 
+  // Modais e Decisores
+  const [openCopilotoObjecoes, setOpenCopilotoObjecoes] = useState(false);
+  const [openCadenciaModal, setOpenCadenciaModal] = useState(false);
+  const [decisoresData, setDecisoresData] = useState<DecisoresResult | null>(null);
+  const [loadingQSA, setLoadingQSA] = useState(false);
+  const [nomeDecisorSelecionado, setNomeDecisorSelecionado] = useState("");
+
   const empresa = empresas.find((e) => e.id === selected);
+
+  // Executa a busca de sócios e administradores (QSA)
+  const buscarDecisoresQSA = async () => {
+    if (!empresa) return;
+    setLoadingQSA(true);
+    try {
+      const res = await consultarQsaDecisores({
+        data: {
+          cnpj: empresa.cnpj,
+          nomeEmpresa: empresa.nome,
+          cidade: empresa.cidade,
+        },
+      });
+      setDecisoresData(res);
+      if (res.decisorPrincipal?.nome) {
+        setNomeDecisorSelecionado(res.decisorPrincipal.nome);
+      }
+      toast.success(`Sócios e administradores de ${empresa.nome} identificados!`);
+    } catch (e) {
+      toast.error("Não foi possível obter dados de sócios da Receita Federal.");
+    } finally {
+      setLoadingQSA(false);
+    }
+  };
 
   // Executa a análise com IA e pesquisa web em tempo real
   const executarPesquisaEDossier = async () => {
@@ -143,15 +180,35 @@ function AbordagemPage() {
     if (empresa && !dossier) {
       executarPesquisaEDossier();
     }
+    if (empresa) {
+      buscarDecisoresQSA();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
+
+  // Injetar o nome do decisor no texto de abordagem
+  const aplicarDecisorAoTexto = (nome: string) => {
+    setNomeDecisorSelecionado(nome);
+    setTextoEditado((prev) => {
+      let mod = prev;
+      if (mod.includes("[Nome do contato]")) {
+        mod = mod.replaceAll("[Nome do contato]", nome);
+      } else if (mod.includes("[Nome do Decisor]")) {
+        mod = mod.replaceAll("[Nome do Decisor]", nome);
+      } else if (mod.startsWith("Olá") || mod.startsWith("Oi")) {
+        mod = mod.replace(/^(Olá|Oi)[^!,\n]*/i, `$1, ${nome}`);
+      }
+      return mod;
+    });
+    toast.success(`Nome "${nome}" aplicado ao texto de abordagem!`);
+  };
 
   const waNumero = empresa?.whatsapp || empresa?.telefone;
   const waFinal = waSendUrl(waNumero, textoEditado);
 
   return (
     <div className="px-4 md:px-8 py-6 md:py-8 space-y-6 max-w-[1480px]">
-      {/* CABEÇALHO */}
+      {/* CABEÇALHO COM BOTÕES DE AÇÃO ESTRATÉGICA */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/60 pb-5">
         <div>
           <div className="flex items-center gap-2.5">
@@ -165,7 +222,45 @@ function AbordagemPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Módulo 5: Copiloto de Objeções */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setOpenCopilotoObjecoes(true)}
+            className="text-xs h-9 gap-1.5 border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10"
+          >
+            <BrainCircuit className="h-4 w-4 text-amber-500" />
+            💬 Copiloto de Objeções
+          </Button>
+
+          {/* Módulo 3: Cadência Multicanal */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setOpenCadenciaModal(true)}
+            className="text-xs h-9 gap-1.5 border-indigo-500/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/10"
+          >
+            <Calendar className="h-4 w-4 text-indigo-500" />
+            🚀 Cadência D+0 a D+8
+          </Button>
+
+          {/* Módulo 1: Link Micro-Auditoria */}
+          {empresa && (
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="text-xs h-9 gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+            >
+              <a href={`/auditoria/${empresa.id}`} target="_blank" rel="noreferrer">
+                <ExternalLink className="h-3.5 w-3.5" />
+                🔗 Micro-Auditoria Pública
+              </a>
+            </Button>
+          )}
+
+          {/* Botão de Pesquisa ao Vivo com IA */}
           <Button
             onClick={executarPesquisaEDossier}
             disabled={!empresa || loadingIA}
@@ -176,18 +271,18 @@ function AbordagemPage() {
             ) : (
               <Search className="h-4 w-4 mr-2" />
             )}
-            {loadingIA ? "Pesquisando Web & Gerando Dossiê..." : "🔍 Pesquisar Web & Gerar Dossiê com IA"}
+            {loadingIA ? "Pesquisando Web & Gerando Dossiê..." : "🔍 Pesquisar Web & Gerar Dossiê"}
           </Button>
         </div>
       </div>
 
       {/* SELEÇÃO E RESUMO DA EMPRESA */}
-      <div className="grid md:grid-cols-[380px_1fr] gap-4 items-center">
+      <div className="grid md:grid-cols-[340px_1fr] gap-4 items-center">
         <div className="space-y-1.5">
           <label className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
             Empresa-Alvo para Prospecção
           </label>
-          <Select value={selected} onValueChange={(v) => { setSelected(v); setDossier(null); }}>
+          <Select value={selected} onValueChange={(v) => { setSelected(v); setDossier(null); setDecisoresData(null); }}>
             <SelectTrigger className="text-xs h-9 bg-card">
               <SelectValue placeholder="Selecione uma empresa" />
             </SelectTrigger>
@@ -219,6 +314,80 @@ function AbordagemPage() {
           </div>
         )}
       </div>
+
+      {/* MÓDULO 2: DESCOBERTA DE DECISORES (QSA RECEITA FEDERAL + LINKEDIN) */}
+      {empresa && (
+        <Card className="border-indigo-500/20 bg-gradient-to-r from-card via-indigo-500/5 to-card shadow-sm">
+          <CardHeader className="py-2.5 px-4">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-indigo-500" />
+                <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-2">
+                  Sócios & Decisores Identificados (QSA / Receita Federal)
+                  {loadingQSA && <RefreshCw className="h-3 w-3 animate-spin text-muted-foreground" />}
+                </CardTitle>
+              </div>
+
+              <div className="text-[11px] text-muted-foreground">
+                Clique no sócio para personalizar a abordagem ou pesquise seu LinkedIn
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="px-4 pb-3 pt-0">
+            {decisoresData && decisoresData.decisores.length > 0 ? (
+              <div className="flex items-center gap-2 flex-wrap">
+                {decisoresData.decisores.map((decisor, idx) => {
+                  const isSelected = nomeDecisorSelecionado === decisor.nome;
+                  return (
+                    <div
+                      key={idx}
+                      className={`flex items-center gap-2 p-1.5 px-2.5 rounded-lg border text-xs transition-all ${
+                        isSelected
+                          ? "border-indigo-500 bg-indigo-500/10 text-indigo-900 dark:text-indigo-200 font-medium"
+                          : "border-border/60 bg-card hover:border-indigo-500/40"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => aplicarDecisorAoTexto(decisor.nome)}
+                        className="flex items-center gap-1.5 text-left"
+                      >
+                        <UserCheck className={`h-3.5 w-3.5 ${isSelected ? "text-indigo-600" : "text-muted-foreground"}`} />
+                        <span>{decisor.nome}</span>
+                        <span className="text-[10px] text-muted-foreground">({decisor.cargo})</span>
+                      </button>
+
+                      <a
+                        href={decisor.linkedinSearchUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-muted-foreground hover:text-blue-600 p-0.5 rounded hover:bg-muted"
+                        title="Buscar perfil no LinkedIn"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex items-center justify-between text-xs text-muted-foreground py-1">
+                <span>Nenhum sócio carregado automaticamente ainda.</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={buscarDecisoresQSA}
+                  disabled={loadingQSA}
+                  className="h-7 text-xs text-indigo-600 hover:text-indigo-700"
+                >
+                  Consultar Sócios via BrasilAPI
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* NAVEGAÇÃO DE ABAS PRINCIPAIS */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-4">
@@ -298,306 +467,258 @@ function AbordagemPage() {
                 <div>
                   <CardTitle className="text-base flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-primary" />
-                    {dossier?.abordagensPorCanal[canal]?.titulo || `Mensagem para ${CANAIS.find((c) => c.value === canal)?.label}`}
+                    Texto Estratégico de Abordagem ({CANAIS.find((c) => c.value === canal)?.label})
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    {dossier?.dimensaoEstrategica.tomRecomendadoAbordagem
-                      ? `Tom recomendado: ${dossier.dimensaoEstrategica.tomRecomendadoAbordagem}`
-                      : "Personalizada com base no diagnóstico do negócio."}
+                    Gerado com base no perfil corporativo e nas dores reais da empresa.
                   </CardDescription>
                 </div>
 
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
                   <Button
-                    size="sm"
                     variant="outline"
+                    size="sm"
                     onClick={() => {
                       navigator.clipboard.writeText(textoEditado);
                       toast.success("Mensagem copiada para a área de transferência!");
                     }}
-                    className="text-xs"
+                    className="h-8 text-xs gap-1.5"
                   >
-                    <Copy className="h-3.5 w-3.5 mr-1.5" />
+                    <Copy className="h-3.5 w-3.5" />
                     Copiar
                   </Button>
-                  <Button
-                    size="sm"
-                    disabled={!waFinal}
-                    title={waFinal ? "Abrir WhatsApp com esta mensagem" : "Empresa sem WhatsApp cadastrado"}
-                    onClick={() => waFinal && window.open(waFinal, "_blank", "noopener")}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
-                  >
-                    <Send className="h-3.5 w-3.5 mr-1.5" />
-                    Enviar no WhatsApp
-                  </Button>
+
+                  {waFinal && canal === "whatsapp" && (
+                    <Button
+                      asChild
+                      size="sm"
+                      className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+                    >
+                      <a href={waFinal} target="_blank" rel="noreferrer">
+                        <Send className="h-3.5 w-3.5" />
+                        Disparar no WhatsApp
+                      </a>
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
 
-              <CardContent className="space-y-4 pt-4 flex-1 flex flex-col">
+              <CardContent className="pt-4 space-y-4 flex-1 flex flex-col">
                 <Textarea
                   value={textoEditado}
                   onChange={(e) => setTextoEditado(e.target.value)}
-                  rows={14}
-                  className="font-mono text-xs sm:text-sm leading-relaxed flex-1"
-                  placeholder="A mensagem gerada com IA aparecerá aqui..."
+                  rows={13}
+                  className="font-mono text-xs md:text-sm leading-relaxed flex-1 min-h-[280px]"
                 />
 
-                {/* Box de Insights Psicológicos de Apoio */}
-                {dossier && (
-                  <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-foreground flex items-center gap-1.5">
-                        <BrainCircuit className="h-3.5 w-3.5 text-purple-500" />
-                        Gatilhos Emocionais Aplicados Nesta Abordagem:
-                      </span>
-                      <Badge variant="outline" className="text-[10px]">
-                        Custo da Inação: {dossier.dimensaoOperacional.impactoFinanceiroCustoInacao}
-                      </Badge>
-                    </div>
-                    <div className="grid sm:grid-cols-2 gap-2 text-[11px] text-muted-foreground">
-                      <div>
-                        <strong className="text-foreground">⚡ Dor Imediata Tratada:</strong>{" "}
-                        {dossier.dimensaoPsicologica.doresAtuais[0] || "Gargalo de conversão e atendimento"}
-                      </div>
-                      <div>
-                        <strong className="text-foreground">🛡️ Medo Neutralizado:</strong>{" "}
-                        {dossier.dimensaoPsicologica.medosERiscos[0] || "Perda de fatia de mercado para concorrentes"}
-                      </div>
-                    </div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground flex-wrap gap-2 pt-2 border-t">
+                  <div className="flex items-center gap-2">
+                    <span>💡 <strong>Dica de Fechamento:</strong> Posicione a agência como parceira de lucro e crescimento sustentável.</span>
                   </div>
-                )}
+                  <span>{textoEditado.length} caracteres</span>
+                </div>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
         {/* ------------------------------------------------------------------- */}
-        {/* ABA 2: DOSSIÊ PSICOLÓGICO & OPERACIONAL (3 DIMENSÕES) */}
+        {/* ABA 2: DOSSIÊ 3 DIMENSÕES (PSICOLÓGICO, OPERACIONAL, ESTRATÉGICO) */}
         {/* ------------------------------------------------------------------- */}
-        <TabsContent value="dossier" className="space-y-4 mt-0">
-          {!dossier ? (
-            <Card className="border-border/60 p-8 text-center space-y-3">
-              <Bot className="h-10 w-10 mx-auto text-muted-foreground animate-pulse" />
-              <div className="text-sm font-semibold">Nenhum dossiê gerado ainda para esta empresa</div>
-              <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                Clique no botão <strong>"Pesquisar Web & Gerar Dossiê com IA"</strong> acima para varrer a internet, analisar a empresa e montar o raio-x corporativo completo.
-              </p>
-              <Button size="sm" onClick={executarPesquisaEDossier} disabled={loadingIA}>
-                Iniciar Pesquisa & Dossiê
-              </Button>
-            </Card>
+        <TabsContent value="dossier" className="space-y-5 mt-0">
+          {dossier ? (
+            <div className="space-y-5">
+              {/* DIMENSÃO 1: FATORES PSICOLÓGICOS E EMOCIONAIS */}
+              <Card className="border-purple-500/20 bg-purple-500/5 shadow-sm">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <BrainCircuit className="h-5 w-5 text-purple-600" />
+                    <div>
+                      <CardTitle className="text-base font-bold text-foreground">
+                        Dimensão 1: Fatores Psicológicos & Emocionais dos Decisores
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        Compreensão profunda das tensões emocionais, riscos percebidos e ambições de crescimento.
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Dores Atuais */}
+                  <div className="p-3.5 rounded-lg border border-purple-200 dark:border-purple-900 bg-card space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">
+                      <Flame className="h-4 w-4 text-red-500" />
+                      Dores Atuais Imediatas
+                    </div>
+                    <ul className="text-xs text-muted-foreground space-y-1.5 list-disc pl-4 leading-relaxed">
+                      {dossier.dimensaoPsicologica.doresAtuais.map((d: string, i: number) => (
+                        <li key={i}>{d}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Medos & Riscos */}
+                  <div className="p-3.5 rounded-lg border border-purple-200 dark:border-purple-900 bg-card space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">
+                      <ShieldAlert className="h-4 w-4 text-amber-500" />
+                      Medos & Riscos de Não Mudar
+                    </div>
+                    <ul className="text-xs text-muted-foreground space-y-1.5 list-disc pl-4 leading-relaxed">
+                      {dossier.dimensaoPsicologica.medosERiscos.map((m: string, i: number) => (
+                        <li key={i}>{m}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Desejos & Ambições */}
+                  <div className="p-3.5 rounded-lg border border-purple-200 dark:border-purple-900 bg-card space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">
+                      <TrendingUp className="h-4 w-4 text-emerald-500" />
+                      Desejos & Ambições Futuras
+                    </div>
+                    <ul className="text-xs text-muted-foreground space-y-1.5 list-disc pl-4 leading-relaxed">
+                      {dossier.dimensaoPsicologica.desejosEAmbicoes.map((a: string, i: number) => (
+                        <li key={i}>{a}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Frustrações Passadas */}
+                  <div className="p-3.5 rounded-lg border border-purple-200 dark:border-purple-900 bg-card space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">
+                      <AlertCircle className="h-4 w-4 text-blue-500" />
+                      Frustrações Anteriores
+                    </div>
+                    <ul className="text-xs text-muted-foreground space-y-1.5 list-disc pl-4 leading-relaxed">
+                      {dossier.dimensaoPsicologica.frustracoesPassadas.map((f: string, i: number) => (
+                        <li key={i}>{f}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* DIMENSÃO 2: CENÁRIO OPERACIONAL E FINANCEIRO */}
+              <Card className="border-blue-500/20 bg-blue-500/5 shadow-sm">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-blue-600" />
+                    <div>
+                      <CardTitle className="text-base font-bold text-foreground">
+                        Dimensão 2: Cenário Operacional & Impacto Financeiro
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        Gargalos diários de processos e o custo financeiro da inação.
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="grid md:grid-cols-3 gap-4">
+                  <div className="p-4 rounded-lg border border-blue-200 dark:border-blue-900 bg-card space-y-2">
+                    <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider block">
+                      Gargalos de Processo & Vendas
+                    </span>
+                    <ul className="text-xs text-muted-foreground space-y-1.5 list-disc pl-4 leading-relaxed">
+                      {dossier.dimensaoOperacional.gargalosProcesso.map((g: string, i: number) => (
+                        <li key={i}>{g}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="p-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 space-y-2">
+                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider block">
+                      💰 Custo da Inação (Perda Estimada)
+                    </span>
+                    <p className="text-xs text-foreground font-medium leading-relaxed">
+                      {dossier.dimensaoOperacional.impactoFinanceiroCustoInacao}
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-lg border border-blue-200 dark:border-blue-900 bg-card space-y-2">
+                    <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider block">
+                      Maturidade & Capacidade de Implementação
+                    </span>
+                    <Badge variant="outline" className="mb-1 text-xs">{dossier.dimensaoOperacional.nivelMaturidade}</Badge>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {dossier.dimensaoOperacional.justificativaMaturidade}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* DIMENSÃO 3: ALINHAMENTO ESTRATÉGICO */}
+              <Card className="border-border/60 shadow-sm">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <Gauge className="h-5 w-5 text-primary" />
+                    <div>
+                      <CardTitle className="text-base font-bold text-foreground">
+                        Dimensão 3: Alinhamento Estratégico & Cultura do Negócio
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        Adequação da linguagem ao perfil regional e corporativo.
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="grid md:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-lg border bg-muted/30 space-y-1.5">
+                    <span className="text-xs font-semibold text-foreground block">Metas de Crescimento:</span>
+                    <ul className="text-xs text-muted-foreground space-y-1 list-disc pl-4 leading-relaxed">
+                      {dossier.dimensaoEstrategica.metasCrescimento.map((meta: string, i: number) => (
+                        <li key={i}>{meta}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="p-4 rounded-lg border bg-muted/30 space-y-1.5">
+                    <span className="text-xs font-semibold text-foreground block">Perfil de Cultura Organizacional:</span>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {dossier.dimensaoEstrategica.culturaOrganizacional}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           ) : (
-            <div className="space-y-4">
-              {/* Resumo da Pesquisa em Tempo Real */}
-              <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4 space-y-2 text-xs">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-2">
-                    <Search className="h-4 w-4" />
-                    Pesquisa Web & Setor em Tempo Real (SerpApi)
-                  </div>
-                  <span className="text-[11px] text-muted-foreground">
-                    Termo: <code>{dossier.pesquisaWebRealizada.termoBuscado}</code>
-                  </span>
-                </div>
-                <p className="text-muted-foreground text-xs leading-relaxed">
-                  {dossier.pesquisaWebRealizada.resumoMercadoLocal}
-                </p>
-                {dossier.pesquisaWebRealizada.fontesEncontradas.length > 0 && (
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground pt-1">
-                    <span>Fontes consultadas:</span>
-                    {dossier.pesquisaWebRealizada.fontesEncontradas.map((f, idx) => (
-                      <a
-                        key={idx}
-                        href={f}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-primary hover:underline flex items-center gap-1"
-                      >
-                        Fonte {idx + 1}
-                        <ExternalLink className="h-2.5 w-2.5" />
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* 3 Dimensões em Grid */}
-              <div className="grid lg:grid-cols-3 gap-4">
-                {/* DIMENSÃO 1: FATORES PSICOLÓGICOS */}
-                <Card className="border-border/60 border-t-4 border-t-purple-500">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-purple-700 dark:text-purple-400">
-                      <BrainCircuit className="h-4 w-4" />
-                      1. Fatores Psicológicos & Emocionais
-                    </CardTitle>
-                    <CardDescription className="text-xs">O lado humano do decisor B2B</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3 text-xs">
-                    <div>
-                      <div className="font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1 text-[11px]">
-                        <AlertCircle className="h-3.5 w-3.5" /> Dores Diárias Atuais:
-                      </div>
-                      <ul className="list-disc list-inside text-muted-foreground text-[11px] space-y-1 mt-1">
-                        {dossier.dimensaoPsicologica.doresAtuais.map((d, i) => (
-                          <li key={i}>{d}</li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div>
-                      <div className="font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1 text-[11px]">
-                        <ShieldAlert className="h-3.5 w-3.5" /> Medos & Riscos da Inação:
-                      </div>
-                      <ul className="list-disc list-inside text-muted-foreground text-[11px] space-y-1 mt-1">
-                        {dossier.dimensaoPsicologica.medosERiscos.map((m, i) => (
-                          <li key={i}>{m}</li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div>
-                      <div className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 text-[11px]">
-                        <TrendingUp className="h-3.5 w-3.5" /> Desejos & Ambições:
-                      </div>
-                      <ul className="list-disc list-inside text-muted-foreground text-[11px] space-y-1 mt-1">
-                        {dossier.dimensaoPsicologica.desejosEAmbicoes.map((a, i) => (
-                          <li key={i}>{a}</li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div>
-                      <div className="font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1 text-[11px]">
-                        <AlertCircle className="h-3.5 w-3.5" /> Frustrações Passadas com Agências:
-                      </div>
-                      <ul className="list-disc list-inside text-muted-foreground text-[11px] space-y-1 mt-1">
-                        {dossier.dimensaoPsicologica.frustracoesPassadas.map((f, i) => (
-                          <li key={i}>{f}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* DIMENSÃO 2: DIAGNÓSTICO OPERACIONAL & FINANCEIRO */}
-                <Card className="border-border/60 border-t-4 border-t-blue-500">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-blue-700 dark:text-blue-400">
-                      <Settings2 className="h-4 w-4" />
-                      2. Diagnóstico Operacional & Financeiro
-                    </CardTitle>
-                    <CardDescription className="text-xs">A lógica e viabilidade do negócio</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3 text-xs">
-                    <div>
-                      <div className="font-semibold text-foreground text-[11px]">Gargalos de Processo & Vendas:</div>
-                      <ul className="list-disc list-inside text-muted-foreground text-[11px] space-y-1 mt-1">
-                        {dossier.dimensaoOperacional.gargalosProcesso.map((g, i) => (
-                          <li key={i}>{g}</li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div className="rounded-md border border-rose-500/20 bg-rose-500/5 p-2.5 space-y-1">
-                      <div className="font-semibold text-rose-700 dark:text-rose-400 text-[11px]">
-                        Impacto Financeiro (Custo da Inação):
-                      </div>
-                      <p className="text-[11px] text-muted-foreground leading-relaxed">
-                        {dossier.dimensaoOperacional.impactoFinanceiroCustoInacao}
-                      </p>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="font-semibold text-foreground">Nível de Maturidade:</span>
-                        <Badge variant="outline" className="capitalize text-[10px]">
-                          {dossier.dimensaoOperacional.nivelMaturidade.replace("_", " ")}
-                        </Badge>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
-                        {dossier.dimensaoOperacional.justificativaMaturidade}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* DIMENSÃO 3: ALINHAMENTO ESTRATÉGICO */}
-                <Card className="border-border/60 border-t-4 border-t-emerald-500">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
-                      <TrendingUp className="h-4 w-4" />
-                      3. Alinhamento Estratégico & Futuro
-                    </CardTitle>
-                    <CardDescription className="text-xs">Objetivos de longo prazo</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3 text-xs">
-                    <div>
-                      <div className="font-semibold text-foreground text-[11px]">Metas de Crescimento & Expansão:</div>
-                      <ul className="list-disc list-inside text-muted-foreground text-[11px] space-y-1 mt-1">
-                        {dossier.dimensaoEstrategica.metasCrescimento.map((m, i) => (
-                          <li key={i}>{m}</li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div>
-                      <div className="font-semibold text-foreground text-[11px]">Cultura Organizacional & Decisores:</div>
-                      <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
-                        {dossier.dimensaoEstrategica.culturaOrganizacional}
-                      </p>
-                    </div>
-
-                    <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 p-2.5 space-y-1">
-                      <div className="font-semibold text-emerald-700 dark:text-emerald-400 text-[11px]">
-                        Tom Ideal da Abordagem:
-                      </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        {dossier.dimensaoEstrategica.tomRecomendadoAbordagem}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+            <div className="p-8 text-center border rounded-lg bg-muted/20">
+              <Bot className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+              <p className="text-sm font-medium">Nenhum dossiê gerado ainda.</p>
+              <p className="text-xs text-muted-foreground mt-1">Clique em "Pesquisar Web & Gerar Dossiê com IA" para mapear os 3 eixos psicológicos e operacionais.</p>
             </div>
           )}
         </TabsContent>
 
         {/* ------------------------------------------------------------------- */}
-        {/* ABA 3: SISTEMAS DE GESTÃO & AUTOMAÇÃO OPERACIONAL */}
+        {/* ABA 3: SISTEMAS DE GESTÃO & AUTOMAÇÃO */}
         {/* ------------------------------------------------------------------- */}
         <TabsContent value="sistemas" className="space-y-4 mt-0">
-          <div className="rounded-lg border border-border/60 bg-card p-4 space-y-2">
+          <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4 space-y-2">
             <div className="flex items-center gap-2">
-              <Settings2 className="h-5 w-5 text-blue-500" />
+              <Settings2 className="h-5 w-5 text-blue-600" />
               <h2 className="text-base font-semibold text-foreground">
-                Sistemas de Gestão Recomendados para {empresa?.nome || "a Empresa"}
+                Sistemas de Gestão & Automação Recomendados para a Empresa
               </h2>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Além de cuidar de toda a comunicação visual e digital, nossa agência implanta sistemas práticos para organizar a operação, automatizar atendimentos e aumentar a conversão de vendas.
+              Além de comunicação e design, a agência oferece softwares e ferramentas para organizar as vendas, atendimento e rotina da empresa, tornando a parceria indispensável.
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-4">
-            {dossier?.dimensaoOperacional.sistemasGestaoRecomendados.map((sis, i) => (
-              <Card key={i} className="border-border/60 flex flex-col justify-between shadow-sm">
+            {dossier?.dimensaoOperacional.sistemasGestaoRecomendados.map((sis, idx) => (
+              <Card key={idx} className="border-border/60 shadow-sm flex flex-col justify-between">
                 <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                      <BarChart3 className="h-4 w-4 text-primary" />
-                      {sis.nome}
-                    </CardTitle>
-                    <Badge
-                      variant="outline"
-                      className={`text-[10px] capitalize ${
-                        sis.aplicabilidade === "essencial"
-                          ? "bg-rose-500/10 text-rose-600 border-rose-500/30"
-                          : "bg-blue-500/10 text-blue-600 border-blue-500/30"
-                      }`}
-                    >
-                      {sis.aplicabilidade}
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-600 border-blue-500/30">
+                      {sis.categoria}
                     </Badge>
                   </div>
+                  <CardTitle className="text-sm font-bold text-foreground">
+                    {sis.nome}
+                  </CardTitle>
+                  <CardDescription className="text-xs mt-1">
+                    {sis.beneficioGestao}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 text-xs flex-1 flex flex-col justify-between">
                   <div className="space-y-2">
@@ -717,6 +838,22 @@ function AbordagemPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* MODAIS ESTRATÉGICOS (MÓDULOS 3 E 5) */}
+      <CopilotoObjecoesModal
+        empresa={empresa}
+        open={openCopilotoObjecoes}
+        onOpenChange={setOpenCopilotoObjecoes}
+        nomeAgencia={nomeAgencia}
+      />
+
+      <CadenciaModal
+        empresa={empresa}
+        open={openCadenciaModal}
+        onOpenChange={setOpenCadenciaModal}
+        nomeDecisorPadrao={nomeDecisorSelecionado || "Gestor(a)"}
+        nomeAgencia={nomeAgencia}
+      />
     </div>
   );
 }

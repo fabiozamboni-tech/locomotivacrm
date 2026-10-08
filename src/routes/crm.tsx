@@ -17,7 +17,14 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
+  Flame,
+  BrainCircuit,
+  Calendar,
+  Zap,
 } from "lucide-react";
+import { TimingRadarCard } from "@/components/timing-radar-card";
+import { CopilotoObjecoesModal } from "@/components/copiloto-objecoes-modal";
+import { CadenciaModal } from "@/components/cadencia-modal";
 import {
   DndContext,
   PointerSensor,
@@ -97,6 +104,12 @@ function CrmPage() {
   const [promptsId, setPromptsId] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overStage, setOverStage] = useState<CrmStage | null>(null);
+
+  // Módulos Estratégicos
+  const [showRadar, setShowRadar] = useState(false);
+  const [cadenciaEmpresaId, setCadenciaEmpresaId] = useState<string | null>(null);
+  const [copilotoEmpresaId, setCopilotoEmpresaId] = useState<string | null>(null);
+
   const promptsEmpresa = useMemo(
     () => empresas.find((e) => e.id === promptsId) ?? null,
     [empresas, promptsId],
@@ -108,6 +121,14 @@ function CrmPage() {
   const draggingEmpresa = useMemo(
     () => empresas.find((e) => e.id === draggingId) ?? null,
     [empresas, draggingId],
+  );
+  const cadenciaEmpresa = useMemo(
+    () => empresas.find((e) => e.id === cadenciaEmpresaId) ?? null,
+    [empresas, cadenciaEmpresaId],
+  );
+  const copilotoEmpresa = useMemo(
+    () => empresas.find((e) => e.id === copilotoEmpresaId) ?? null,
+    [empresas, copilotoEmpresaId],
   );
 
   const grouped = useMemo(() => {
@@ -138,19 +159,38 @@ function CrmPage() {
 
   return (
     <div className="px-4 md:px-8 py-6 md:py-8 space-y-5 max-w-full">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Funil de prospecção</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Kanban comercial — arraste os cards entre etapas ou use o modal de abordagem.
           </p>
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
+        <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+          {/* Toggle do Radar de Timing Perfeito (Módulo 4) */}
+          <Button
+            variant={showRadar ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowRadar(!showRadar)}
+            className="h-8 text-xs gap-1.5 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+          >
+            <Flame className="h-3.5 w-3.5" />
+            {showRadar ? "Ocultar Radar de Timing" : "🔥 Radar de Timing & Sinais de Compra"}
+          </Button>
+
+          <span className="inline-flex items-center gap-1 ml-2">
             <span className="size-2 rounded-full bg-primary" /> {empresas.length} empresas no funil
           </span>
         </div>
       </div>
+
+      {/* Módulo 4: Radar de Timing Perfeito & Sinais de Compra */}
+      {showRadar && (
+        <TimingRadarCard
+          onSelectEmpresa={(id) => setOpenId(id)}
+          onOpenCadencia={(id) => setCadenciaEmpresaId(id)}
+        />
+      )}
 
       {empresas.length === 0 ? (
         <Card className="p-10 text-center border-dashed">
@@ -205,11 +245,25 @@ function CrmPage() {
         empresa={openEmpresa}
         open={!!openEmpresa}
         onOpenChange={(o) => !o && setOpenId(null)}
+        onOpenCopiloto={(id) => setCopilotoEmpresaId(id)}
+        onOpenCadencia={(id) => setCadenciaEmpresaId(id)}
       />
       <PromptsModal
         empresa={promptsEmpresa}
         open={!!promptsEmpresa}
         onOpenChange={(o) => !o && setPromptsId(null)}
+      />
+
+      {/* Modais Globais de Cadência e Copiloto */}
+      <CadenciaModal
+        empresa={cadenciaEmpresa || undefined}
+        open={!!cadenciaEmpresa}
+        onOpenChange={(o) => !o && setCadenciaEmpresaId(null)}
+      />
+      <CopilotoObjecoesModal
+        empresa={copilotoEmpresa || undefined}
+        open={!!copilotoEmpresa}
+        onOpenChange={(o) => !o && setCopilotoEmpresaId(null)}
       />
     </div>
   );
@@ -445,10 +499,14 @@ function EmpresaModal({
   empresa,
   open,
   onOpenChange,
+  onOpenCopiloto,
+  onOpenCadencia,
 }: {
   empresa: Empresa | null;
   open: boolean;
   onOpenChange: (o: boolean) => void;
+  onOpenCopiloto?: (id: string) => void;
+  onOpenCadencia?: (id: string) => void;
 }) {
   const { addHistorico } = useStore();
   const [canal, setCanal] = useState<Canal>("whatsapp");
@@ -518,6 +576,62 @@ function EmpresaModal({
             >
               Google Maps
             </ContactChip>
+          </div>
+
+          {/* BARRA DE ATALHOS ESTRATÉGICOS (MÓDULOS 1, 3, 5 E ABORDAGEM 360) */}
+          <div className="flex items-center gap-2 flex-wrap pt-3 border-t border-border/40 mt-3">
+            {onOpenCopiloto && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  onOpenChange(false);
+                  onOpenCopiloto(empresa.id);
+                }}
+                className="h-7 text-xs gap-1 border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10"
+              >
+                <BrainCircuit className="h-3.5 w-3.5 text-amber-500" />
+                Copiloto Objeções
+              </Button>
+            )}
+
+            {onOpenCadencia && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  onOpenChange(false);
+                  onOpenCadencia(empresa.id);
+                }}
+                className="h-7 text-xs gap-1 border-indigo-500/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/10"
+              >
+                <Calendar className="h-3.5 w-3.5 text-indigo-500" />
+                Cadência D+0 a D+8
+              </Button>
+            )}
+
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10"
+            >
+              <a href={`/auditoria/${empresa.id}`} target="_blank" rel="noreferrer">
+                <ExternalLink className="h-3 w-3" />
+                Micro-Auditoria
+              </a>
+            </Button>
+
+            <Button
+              asChild
+              size="sm"
+              className="h-7 text-xs gap-1 bg-gradient-to-r from-emerald-600 to-primary text-white"
+            >
+              <Link to="/abordagem" search={{ empresa: empresa.id }} onClick={() => onOpenChange(false)}>
+                <Zap className="h-3 w-3" />
+                Dossiê & Abordagem 360
+              </Link>
+            </Button>
           </div>
         </DialogHeader>
 
