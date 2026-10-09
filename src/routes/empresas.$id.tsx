@@ -39,6 +39,7 @@ import {
   Sparkles,
   Ban,
   Clock,
+  Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
@@ -53,6 +54,9 @@ import {
   googleMapsUrl,
   origemLink,
 } from "@/lib/links";
+import { PromptsModal } from "@/components/prompts-modal";
+import { EnviarEmailModal } from "@/components/enviar-email-modal";
+import { EnviarWhatsAppModal } from "@/components/enviar-whatsapp-modal";
 
 export const Route = createFileRoute("/empresas/$id")({
   component: EmpresaDetalhe,
@@ -94,6 +98,9 @@ function EmpresaDetalhe() {
   const [iaInsights, setIaInsights] = useState<AiInsights | null>(null);
   const [loadingSite, setLoadingSite] = useState(false);
   const [loadingIns, setLoadingIns] = useState(false);
+  const [openPrompts, setOpenPrompts] = useState(false);
+  const [openEmail, setOpenEmail] = useState(false);
+  const [openWhats, setOpenWhats] = useState(false);
 
   const detalhes = useMemo(() => (empresa ? calcularScore(empresa, weights) : null), [empresa, weights]);
   const insights = useMemo(() => (empresa ? gerarInsights(empresa) : null), [empresa]);
@@ -155,20 +162,75 @@ function EmpresaDetalhe() {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <div className={`text-xs ${cls.cor} font-medium`}>{cls.label}</div>
-            <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Score</div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            asChild
+            size="sm"
+            className="h-9 gap-1.5 bg-gradient-to-r from-emerald-600 to-primary text-white font-medium text-xs shadow-sm"
+          >
+            <Link to="/abordagem" search={{ empresa: empresa.id }}>
+              <Sparkles className="h-4 w-4" />
+              🎯 Dossiê & Abordagens 360
+            </Link>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setOpenPrompts(true)}
+            className="h-9 text-xs gap-1.5"
+          >
+            <Wand2 className="h-3.5 w-3.5 text-primary" />
+            Prompts IA
+          </Button>
+
+          {empresa.email && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setOpenEmail(true)}
+              className="h-9 text-xs gap-1.5"
+            >
+              <Mail className="h-3.5 w-3.5 text-blue-500" />
+              Enviar E-mail
+            </Button>
+          )}
+
+          {empresa.whatsapp && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setOpenWhats(true)}
+              className="h-9 text-xs gap-1.5 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10"
+            >
+              <MessageCircle className="h-3.5 w-3.5 text-emerald-500" />
+              WhatsApp Direto
+            </Button>
+          )}
+
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="h-9 text-xs gap-1.5"
+          >
+            <a href={`/auditoria/${empresa.id}`} target="_blank" rel="noreferrer">
+              <Globe className="h-3.5 w-3.5" />
+              Micro-Auditoria
+            </a>
+          </Button>
+
+          <div className="flex items-center gap-2 pl-2 border-l">
+            <ScoreBadge score={empresa.score} size="lg" />
+            <Select value={empresa.crmStage} onValueChange={(v) => { setStage(empresa.id, v as never); toast.success("Etapa atualizada"); }}>
+              <SelectTrigger className="w-[180px] h-9 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {CRM_STAGES_ORDER.map((s) => (
+                  <SelectItem key={s} value={s}>{CRM_STAGE_LABEL[s]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <ScoreBadge score={empresa.score} size="lg" />
-          <Select value={empresa.crmStage} onValueChange={(v) => { setStage(empresa.id, v as never); toast.success("Etapa atualizada"); }}>
-            <SelectTrigger className="w-[190px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {CRM_STAGES_ORDER.map((s) => (
-                <SelectItem key={s} value={s}>{CRM_STAGE_LABEL[s]}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       </div>
 
@@ -534,6 +596,24 @@ function EmpresaDetalhe() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <PromptsModal
+        empresa={empresa}
+        open={openPrompts}
+        onOpenChange={setOpenPrompts}
+      />
+
+      <EnviarEmailModal
+        empresa={empresa}
+        open={openEmail}
+        onOpenChange={setOpenEmail}
+      />
+
+      <EnviarWhatsAppModal
+        empresa={empresa}
+        open={openWhats}
+        onOpenChange={setOpenWhats}
+      />
     </div>
   );
 }

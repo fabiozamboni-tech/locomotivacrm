@@ -73,7 +73,7 @@ export function gerarItemDMAM(
   pilar: "dores" | "medos" | "ambicoes" | "maturidade",
   canal: Canal = "whatsapp",
   tom: Tom = "consultivo",
-  nomeAgencia = "nossa agência",
+  nomeAgencia = "Locomotiva Comunicação",
 ): ItemDMAM {
   const nome = empresa.nome;
   const cidade = empresa.cidade;
@@ -147,11 +147,11 @@ export function gerarItemDMAM(
     if (canal === "whatsapp" || canal === "curta") {
       texto = `Olá, ${contato}! Tudo bem?\n\nAcompanho a qualidade da ${nome} e vejo um potencial enorme para vocês darem o próximo salto de crescimento em ${cidade} e além.\n\nCom uma estrutura digital de alto nível, é possível atrair clientes com ticket médio bem mais alto e acelerar suas metas de faturamento.\n\nTopa uma conversa rápida de 10 minutos para eu te apresentar nosso plano de aceleração digital desenhado para empresas com a ambição da ${nome}?\n\nUm abraço,\n${nomeAgencia}`;
     } else if (canal === "email") {
-      texto = `Assunto: Plano de aceleração digital e crescimento para a ${nome}\n\nOlá, ${contato},\n\nEmpresas de destaque como a ${nome} têm tudo para liderar não apenas em ${cidade}, mas expandir sua participação de mercado em todo o estado.\n\nNossa agência é especializada em acelerar o crescimento de negócios através de estratégias digitais de alto impacto — combinando design premium, atração de clientes qualificados e conversão contínua.\n\nGostaria de apresentar um plano estratégico voltado para os próximos objetivos de expansão da ${nome}.\n\nQual o melhor dia para conversarmos por 15 minutos?\n\nAtenciosamente,\n${nomeAgencia}`;
+      texto = `Assunto: Plano de aceleração digital e crescimento para a ${nome}\n\nOlá, ${contato},\n\nA ${nome} possui forte potencial de mercado para expandir sua participação em ${cidade} e em escala regional.\n\nA ${nomeAgencia} atua na estruturação de canais comerciais e digitais de alta conversão — integrando comunicação 360, design premium e captação qualificada.\n\nEstruturamos um diagnóstico direcionado aos gargalos de captação e aos objetivos de expansão da ${nome}.\n\nQual o melhor dia para conversarmos por 15 minutos?\n\nAtenciosamente,\n${nomeAgencia}`;
     } else if (canal === "instagram") {
-      texto = `Oi, ${contato}! O trabalho da ${nome} é excelente. Vemos uma oportunidade clara de acelerar o crescimento de vocês com um posicionamento digital premium que atrai clientes de maior ticket.\n\nPosso te mandar um resumo da nossa metodologia de aceleração?`;
+      texto = `Oi, ${contato}! Analisando o posicionamento da ${nome}, identificamos oportunidades concretas para acelerar a captação de clientes de maior ticket médio.\n\nPosso compartilhar o resumo do diagnóstico com você?`;
     } else {
-      texto = `1. Conexão com ambição: "Oi, ${contato}, falo da ${nomeAgencia}. Estive estudando o posicionamento da ${nome} e vejo uma oportunidade clara de dobrar a captação de clientes qualificados."\n2. Crescimento acelerado: "Nosso objetivo é acelerar a meta de faturamento de vocês com estratégias digitais comprovadas."\n3. Convite executivo: "Você teria disponibilidade na quinta-feira para uma demonstração executiva?"`;
+      texto = `1. Conexão com ambição: "Oi, ${contato}, falo da ${nomeAgencia}. Mapeamos o mercado de ${segmento} em ${cidade} e identificamos alavancas de crescimento para a ${nome}."\n2. Crescimento acelerado: "Nosso foco é estruturar a comunicação e os canais de venda para acelerar o faturamento."\n3. Convite executivo: "Você teria disponibilidade na quinta-feira para uma breve apresentação?"`;
     }
 
     return {
@@ -173,13 +173,13 @@ export function gerarItemDMAM(
 
   let texto = "";
   if (canal === "whatsapp" || canal === "curta") {
-    texto = `Olá, ${contato}! Tudo bem?\n\nSabemos que a rotina de quem gerencia a ${nome} em ${cidade} é muito corrida e não sobra tempo para lidar com configurações técnicas ou processos complexos de marketing.\n\nPor isso, nosso modelo é 100% 'chave na mão': nós cuidamos de toda a implementação, suporte e onboarding de forma personalizada, para você focar apenas em atender os novos clientes.\n\nPodemos bater um papo leve para eu te mostrar como nosso suporte se adapta à sua realidade?\n\nUm abraço,\n${nomeAgencia}`;
+    texto = `Olá, ${contato}! Tudo bem?\n\nSabemos que a rotina operacional da ${nome} em ${cidade} exige foco total e não permite perda de tempo com implementações complexas.\n\nPor isso, na ${nomeAgencia} operamos no modelo 'chave na mão': assumimos toda a estruturação técnica, suporte e implementação, permitindo que sua equipe foque exclusivamente no atendimento às novas demandas.\n\nPodemos agendar 10 minutos para demonstrar como adaptamos esse onboarding à sua rotina?\n\nUm abraço,\n${nomeAgencia}`;
   } else if (canal === "email") {
-    texto = `Assunto: Implementação digital sob medida e suporte dedicado para a ${nome}\n\nOlá, ${contato},\n\nUm dos maiores desafios que ouvimos de empresários do setor de ${segmento} em ${cidade} é a falta de tempo e suporte adequado para implementar melhorias digitais sem sobrecarregar a equipe interna.\n\nNa ${nomeAgencia}, adaptamos todo o processo de onboarding, implantação e suporte à realidade operacional da ${nome}. Nós assumimos todo o trabalho técnico pesado e entregamos a solução funcionando com treinamento prático e direto.\n\nFico à disposição para apresentar nosso modelo de suporte humanizado.\n\nAtenciosamente,\n${nomeAgencia}`;
+    texto = `Assunto: Implementação digital sob medida e suporte dedicado para a ${nome}\n\nOlá, ${contato},\n\nUm dos principais desafios em empresas do setor de ${segmento} em ${cidade} é a sobrecarga da equipe ao tentar implementar novas tecnologias e estratégias de comunicação.\n\nNa ${nomeAgencia}, adaptamos o processo de implantação e suporte à realidade operacional da ${nome}, assumindo o desenvolvimento e entregando os canais prontos para gerar resultado imediato.\n\nFico à disposição para apresentar nosso modelo de suporte e implementação.\n\nAtenciosamente,\n${nomeAgencia}`;
   } else if (canal === "instagram") {
-    texto = `Oi, ${contato}! Sabemos o quanto a operação da ${nome} exige tempo. Por isso desenvolvemos projetos com suporte total e implementação guiada, sem que vocês precisem se preocupar com a parte técnica.\n\nPosso te mostrar como funciona nosso acompanhamento passo a passo?`;
+    texto = `Oi, ${contato}! Sabemos o quanto a operação da ${nome} exige tempo. Desenvolvemos projetos com implementação 100% gerenciada para não sobrecarregar sua equipe interna.\n\nPosso te mostrar como funciona nosso fluxo de trabalho?`;
   } else {
-    texto = `1. Empatia com a rotina: "Olá, ${contato}, sei que seu tempo é precioso na operação da ${nome}."\n2. Onboarding adaptado: "Entro em contato porque nosso diferencial é cuidar de 100% da parte técnica, com suporte guiado e sem complicar sua rotina."\n3. Próximo passo simples: "Podemos agendar 5 minutos só para você conhecer como facilitamos todo o processo?"`;
+    texto = `1. Empatia operacional: "Olá, ${contato}, falo da ${nomeAgencia}."\n2. Onboarding adaptado: "Cuidamos de 100% da implementação técnica para que sua equipe não tenha sobrecarga operacional."\n3. Próximo passo simples: "Podemos agendar 5 minutos só para você conhecer como facilitamos todo o processo?"`;
   }
 
   return {
@@ -202,7 +202,7 @@ export function gerarMatrizDMAM(
   empresa: Empresa,
   canal: Canal = "whatsapp",
   tom: Tom = "consultivo",
-  nomeAgencia = "nossa agência",
+  nomeAgencia = "Locomotiva Comunicação",
 ): MatrizDMAMResult {
   const dores = gerarItemDMAM(empresa, "dores", canal, tom, nomeAgencia);
   const medos = gerarItemDMAM(empresa, "medos", canal, tom, nomeAgencia);

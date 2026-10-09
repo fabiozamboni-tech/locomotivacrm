@@ -4,12 +4,29 @@ import { useStore } from "@/lib/store";
 import { useServerFn } from "@tanstack/react-start";
 import { testApiConnection, type ApiTestResult } from "@/lib/api-status.functions";
 import { getApiSettings, saveApiSetting, type ApiSettingsMap } from "@/lib/api-settings";
+import {
+  getComunicacaoSettings,
+  saveComunicacaoSettings,
+  type ComunicacaoSettings,
+  type RespostaAutomaticaItem,
+} from "@/lib/comunicacao-settings";
+import {
+  enviarEmailDireto_ServerFn,
+  dispararWhatsApp_ServerFn,
+} from "@/lib/comunicacao.functions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CIDADES_RS_FOCO, SEGMENTOS } from "@/lib/mock-data";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { DEFAULT_WEIGHTS, type ScoreWeights } from "@/lib/scoring";
 import { toast } from "sonner";
 import {
@@ -28,6 +45,13 @@ import {
   RefreshCw,
   Eye,
   EyeOff,
+  Mail,
+  MessageCircle,
+  Sliders,
+  Send,
+  Plus,
+  Trash2,
+  Zap,
 } from "lucide-react";
 
 export const Route = createFileRoute("/configuracoes")({
@@ -53,15 +77,25 @@ function ConfiguracoesPage() {
   const { weights, setWeights, resetPlataforma, carregarDemo, empresas } = useStore();
   const testConn = useServerFn(testApiConnection);
 
+  // APIs
   const [settings, setSettings] = useState<ApiSettingsMap>(getApiSettings());
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [testResults, setTestResults] = useState<Record<string, ApiTestResult>>({});
   const [testing, setTesting] = useState<Record<string, boolean>>({});
   const [testingAll, setTestingAll] = useState(false);
 
+  // E-mail e WhatsApp
+  const [comunicacao, setComunicacao] = useState<ComunicacaoSettings>(getComunicacaoSettings());
+  const [showSmtpPass, setShowSmtpPass] = useState(false);
+  const [testEmailPara, setTestEmailPara] = useState("");
+  const [testandoEmail, setTestandoEmail] = useState(false);
+  const [testWhatsNumero, setTestWhatsNumero] = useState("");
+  const [testandoWhats, setTestandoWhats] = useState(false);
+
   useEffect(() => {
     const cur = getApiSettings();
     setSettings(cur);
+    setComunicacao(getComunicacaoSettings());
     testSingleApi("serpapi", cur.serpapi.key);
     testSingleApi("brasilapi");
     testSingleApi("registrobr");
@@ -100,14 +134,14 @@ function ConfiguracoesPage() {
         },
       });
       setTestResults((prev) => ({ ...prev, [provider]: res }));
-    } catch (err: any) {
+    } catch (e: any) {
       setTestResults((prev) => ({
         ...prev,
         [provider]: {
           provider: provider as any,
           status: "error",
           latencyMs: 0,
-          message: err.message || "Erro ao testar API",
+          message: e.message || "Falha na requisição",
         },
       }));
     } finally {
@@ -117,457 +151,725 @@ function ConfiguracoesPage() {
 
   const testAllApis = async () => {
     setTestingAll(true);
+    const providers = Object.keys(settings);
+    for (const p of providers) {
+      await testSingleApi(p, settings[p as keyof ApiSettingsMap].key);
+    }
+    setTestingAll(false);
+    toast.success("Diagnóstico de todas as APIs finalizado!");
+  };
+
+  // Salvar configurações de E-mail
+  const handleSaveEmailSettings = () => {
+    const updated = saveComunicacaoSettings({ email: comunicacao.email });
+    setComunicacao(updated);
+    toast.success("Configurações de E-mail / SMTP salvas com sucesso!");
+  };
+
+  // Testar envio de E-mail
+  const handleTestarEnvioEmail = async () => {
+    if (!testEmailPara.trim() || !testEmailPara.includes("@")) {
+      toast.error("Informe um e-mail de destino válido para o teste.");
+      return;
+    }
+    setTestandoEmail(true);
     try {
-      const providers = ["serpapi", "apify", "brasilapi", "registrobr", "openstreetmap"];
-      for (const p of providers) {
-        await testSingleApi(p, settings[p as keyof ApiSettingsMap]?.key);
+      const res = await enviarEmailDireto_ServerFn({
+        data: {
+          para: testEmailPara.trim(),
+          assunto: "Teste de Conexão SMTP — Locomotiva Comunicação",
+          corpoTexto: "Olá!\n\nEste é um e-mail de verificação disparado pelo CRM da Locomotiva Comunicação. O servidor SMTP e as assinaturas corporativas estão operando normalmente!",
+          config: comunicacao.email,
+        },
+      });
+      if (res.sucesso) {
+        toast.success(res.detalhes || "E-mail de teste enviado com sucesso!");
+      } else {
+        toast.error(res.erro || "Falha ao enviar e-mail de teste.");
       }
-      toast.success("Diagnóstico de todas as APIs concluído!");
+    } catch (err: any) {
+      toast.error(`Erro: ${err.message}`);
     } finally {
-      setTestingAll(false);
+      setTestandoEmail(false);
     }
   };
 
-  const renderStatusBadge = (provider: string) => {
-    const isTesting = testing[provider];
-    const res = testResults[provider];
+  // Salvar configurações de WhatsApp
+  const handleSaveWhatsAppSettings = () => {
+    const updated = saveComunicacaoSettings({ whatsapp: comunicacao.whatsapp });
+    setComunicacao(updated);
+    toast.success("Configurações de WhatsApp e Respostas Automáticas salvas!");
+  };
 
-    if (isTesting) {
-      return (
-        <Badge variant="outline" className="bg-muted text-muted-foreground animate-pulse text-[11px] gap-1">
-          <Loader2 className="h-3 w-3 animate-spin text-primary" />
-          Testando...
-        </Badge>
-      );
+  // Testar disparo de WhatsApp
+  const handleTestarDisparoWhats = async () => {
+    const num = testWhatsNumero.replace(/\D/g, "");
+    if (num.length < 10) {
+      toast.error("Informe um número de WhatsApp válido com DDD.");
+      return;
     }
-
-    if (!res) {
-      return (
-        <Badge variant="outline" className="text-[11px] text-muted-foreground">
-          Não testada
-        </Badge>
-      );
+    setTestandoWhats(true);
+    try {
+      const res = await dispararWhatsApp_ServerFn({
+        data: {
+          numero: num,
+          mensagem: "Olá! Este é um teste de comunicação da Locomotiva Comunicação. Canal configurado e pronto para prospecção!",
+          gatewayTipo: comunicacao.whatsapp.gatewayTipo,
+          apiUrl: comunicacao.whatsapp.apiUrl,
+          apiKey: comunicacao.whatsapp.apiKey,
+        },
+      });
+      if (res.sucesso) {
+        toast.success(res.detalhes || "Mensagem de teste enviada com sucesso!");
+        if (res.directUrl) window.open(res.directUrl, "_blank");
+      } else {
+        toast.error(res.erro || "Falha no envio.");
+        if (res.directUrl) window.open(res.directUrl, "_blank");
+      }
+    } catch (err: any) {
+      toast.error(`Erro: ${err.message}`);
+    } finally {
+      setTestandoWhats(false);
     }
+  };
 
-    if (res.status === "online") {
-      return (
-        <Badge
-          variant="outline"
-          className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-[11px] gap-1"
-        >
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />
-          Ativa & Operando ({res.latencyMs}ms)
-        </Badge>
-      );
-    }
+  // Gerenciamento de Respostas Automáticas
+  const handleAddResposta = () => {
+    const nova: RespostaAutomaticaItem = {
+      id: `resp_${Date.now()}`,
+      titulo: "Novo Script Rápido",
+      gatilho: "Gatilho de Venda",
+      texto: "Texto da resposta automática da Locomotiva Comunicação...",
+    };
+    const updatedResps = [...comunicacao.whatsapp.respostasAutomaticas, nova];
+    setComunicacao((prev) => ({
+      ...prev,
+      whatsapp: { ...prev.whatsapp, respostasAutomaticas: updatedResps },
+    }));
+  };
 
-    if (res.status === "unconfigured") {
-      return (
-        <Badge
-          variant="outline"
-          className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 text-[11px] gap-1"
-        >
-          <AlertCircle className="h-3 w-3" />
-          Motor Aberto / Sem Chave
-        </Badge>
-      );
-    }
-
-    return (
-      <Badge
-        variant="outline"
-        className="bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30 text-[11px] gap-1"
-      >
-        <XCircle className="h-3 w-3" />
-        {res.status === "unauthorized" ? "Chave Inválida (401)" : "Erro Conexão"}
-      </Badge>
+  const handleUpdateResposta = (id: string, campo: keyof RespostaAutomaticaItem, val: string) => {
+    const updatedResps = comunicacao.whatsapp.respostasAutomaticas.map((r) =>
+      r.id === id ? { ...r, [campo]: val } : r,
     );
+    setComunicacao((prev) => ({
+      ...prev,
+      whatsapp: { ...prev.whatsapp, respostasAutomaticas: updatedResps },
+    }));
+  };
+
+  const handleDeleteResposta = (id: string) => {
+    const updatedResps = comunicacao.whatsapp.respostasAutomaticas.filter((r) => r.id !== id);
+    setComunicacao((prev) => ({
+      ...prev,
+      whatsapp: { ...prev.whatsapp, respostasAutomaticas: updatedResps },
+    }));
+    toast.info("Script removido da lista.");
   };
 
   return (
-    <div className="px-4 md:px-8 py-6 md:py-8 space-y-6 max-w-[1200px]">
+    <div className="px-4 md:px-8 py-6 md:py-8 space-y-6 max-w-[1400px]">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Configurações do Sistema</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Gerencie chaves de APIs, status de conexão em tempo real, pesos de score e regras da plataforma.
+          Gerenciamento de APIs, servidor de E-mail (SMTP), canal de WhatsApp e critérios de prospecção da <strong>Locomotiva Comunicação</strong>.
         </p>
       </div>
 
-      {/* =================================================================== */}
-      {/* SEÇÃO 1: CENTRAL DE APIS & CONEXÕES ATIVAS */}
-      {/* =================================================================== */}
-      <Card className="border-border/60">
-        <CardHeader className="pb-3 border-b border-border/40">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <CardTitle className="text-base font-bold flex items-center gap-2">
-                <Key className="h-4 w-4 text-primary" />
-                Central de Cadastro e Status de APIs
+      <Tabs defaultValue="email" className="space-y-4">
+        <TabsList className="bg-muted/60 p-1 border border-border/60 rounded-lg flex-wrap h-auto gap-1">
+          <TabsTrigger value="email" className="text-xs py-1.5 px-3 flex items-center gap-1.5">
+            <Mail className="h-3.5 w-3.5 text-blue-500" />
+            E-mail & SMTP
+          </TabsTrigger>
+          <TabsTrigger value="whatsapp" className="text-xs py-1.5 px-3 flex items-center gap-1.5">
+            <MessageCircle className="h-3.5 w-3.5 text-emerald-500" />
+            WhatsApp & Automações
+          </TabsTrigger>
+          <TabsTrigger value="apis" className="text-xs py-1.5 px-3 flex items-center gap-1.5">
+            <Server className="h-3.5 w-3.5 text-indigo-500" />
+            APIs de Pesquisa & Enriquecimento
+          </TabsTrigger>
+          <TabsTrigger value="scoring" className="text-xs py-1.5 px-3 flex items-center gap-1.5">
+            <Sliders className="h-3.5 w-3.5 text-amber-500" />
+            Critérios de Score & Banco
+          </TabsTrigger>
+        </TabsList>
+
+        {/* ------------------------------------------------------------------- */}
+        {/* ABA 1: E-MAIL & SMTP */}
+        {/* ------------------------------------------------------------------- */}
+        <TabsContent value="email" className="space-y-4 mt-0">
+          <Card className="border-blue-500/20 bg-gradient-to-br from-card to-blue-500/5 shadow-sm">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600">
+                  <Mail className="h-5 w-5" />
+                </div>
+                <div>
+                  <CardTitle className="text-base font-bold">Servidor SMTP & Assinaturas Corporativas</CardTitle>
+                  <CardDescription className="text-xs">
+                    Configure o servidor para envio direto de e-mails executivos sem abrir cliente externo.
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-4 pt-2">
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
+                    Host SMTP:
+                  </label>
+                  <Input
+                    value={comunicacao.email.host}
+                    onChange={(e) =>
+                      setComunicacao((prev) => ({
+                        ...prev,
+                        email: { ...prev.email, host: e.target.value },
+                      }))
+                    }
+                    placeholder="smtp.gmail.com ou smtp.locomotiva.com.br"
+                    className="text-xs font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
+                    Porta SMTP:
+                  </label>
+                  <Input
+                    type="number"
+                    value={comunicacao.email.port}
+                    onChange={(e) =>
+                      setComunicacao((prev) => ({
+                        ...prev,
+                        email: { ...prev.email, port: Number(e.target.value) || 587 },
+                      }))
+                    }
+                    placeholder="587 ou 465"
+                    className="text-xs font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
+                    Usuário / E-mail de Login:
+                  </label>
+                  <Input
+                    value={comunicacao.email.user}
+                    onChange={(e) =>
+                      setComunicacao((prev) => ({
+                        ...prev,
+                        email: { ...prev.email, user: e.target.value },
+                      }))
+                    }
+                    placeholder="seuemail@empresa.com.br"
+                    className="text-xs font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
+                    Senha / App Password:
+                  </label>
+                  <div className="relative">
+                    <Input
+                      type={showSmtpPass ? "text" : "password"}
+                      value={comunicacao.email.pass}
+                      onChange={(e) =>
+                        setComunicacao((prev) => ({
+                          ...prev,
+                          email: { ...prev.email, pass: e.target.value },
+                        }))
+                      }
+                      placeholder="••••••••••••"
+                      className="text-xs font-mono pr-8"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSmtpPass(!showSmtpPass)}
+                      className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showSmtpPass ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-3 pt-2">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
+                    Nome do Remetente:
+                  </label>
+                  <Input
+                    value={comunicacao.email.fromName}
+                    onChange={(e) =>
+                      setComunicacao((prev) => ({
+                        ...prev,
+                        email: { ...prev.email, fromName: e.target.value },
+                      }))
+                    }
+                    placeholder="Locomotiva Comunicação"
+                    className="text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
+                    E-mail do Remetente (From):
+                  </label>
+                  <Input
+                    value={comunicacao.email.fromEmail}
+                    onChange={(e) =>
+                      setComunicacao((prev) => ({
+                        ...prev,
+                        email: { ...prev.email, fromEmail: e.target.value },
+                      }))
+                    }
+                    placeholder="contato@locomotivacomunicacao.com.br"
+                    className="text-xs font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Template do Topo e Assinatura */}
+              <div className="grid md:grid-cols-2 gap-3 pt-2">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
+                    HTML do Topo / Cabeçalho do E-mail:
+                  </label>
+                  <Textarea
+                    value={comunicacao.email.headerHtml}
+                    onChange={(e) =>
+                      setComunicacao((prev) => ({
+                        ...prev,
+                        email: { ...prev.email, headerHtml: e.target.value },
+                      }))
+                    }
+                    rows={4}
+                    className="text-xs font-mono leading-relaxed"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
+                    HTML da Assinatura Padrão:
+                  </label>
+                  <Textarea
+                    value={comunicacao.email.signatureHtml}
+                    onChange={(e) =>
+                      setComunicacao((prev) => ({
+                        ...prev,
+                        email: { ...prev.email, signatureHtml: e.target.value },
+                      }))
+                    }
+                    rows={4}
+                    className="text-xs font-mono leading-relaxed"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 pt-3 border-t flex-wrap">
+                <Button onClick={handleSaveEmailSettings} className="gap-1.5 text-xs">
+                  Salvar Configurações de E-mail
+                </Button>
+
+                {/* Teste de Envio */}
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="email"
+                    value={testEmailPara}
+                    onChange={(e) => setTestEmailPara(e.target.value)}
+                    placeholder="E-mail para receber teste"
+                    className="text-xs w-64 h-8"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleTestarEnvioEmail}
+                    disabled={testandoEmail}
+                    className="text-xs h-8 gap-1"
+                  >
+                    <Send className={`h-3 w-3 ${testandoEmail ? "animate-spin" : ""}`} />
+                    {testandoEmail ? "Enviando..." : "Testar SMTP"}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------------------------- */}
+        {/* ABA 2: WHATSAPP & AUTOMAÇÕES */}
+        {/* ------------------------------------------------------------------- */}
+        <TabsContent value="whatsapp" className="space-y-4 mt-0">
+          <Card className="border-emerald-500/20 bg-gradient-to-br from-card to-emerald-500/5 shadow-sm">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600">
+                    <MessageCircle className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-bold">Canal WhatsApp & Respostas Automáticas</CardTitle>
+                    <CardDescription className="text-xs">
+                      Configure o número oficial da Locomotiva Comunicação, gateways e respostas rápidas.
+                    </CardDescription>
+                  </div>
+                </div>
+
+                <Button onClick={handleAddResposta} size="sm" variant="outline" className="text-xs gap-1 h-8">
+                  <Plus className="h-3 w-3" /> Adicionar Resposta Rápida
+                </Button>
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-4 pt-2">
+              <div className="grid md:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
+                    Número da Locomotiva (com DDD):
+                  </label>
+                  <Input
+                    value={comunicacao.whatsapp.numeroAgencia}
+                    onChange={(e) =>
+                      setComunicacao((prev) => ({
+                        ...prev,
+                        whatsapp: { ...prev.whatsapp, numeroAgencia: e.target.value },
+                      }))
+                    }
+                    placeholder="Ex: 54999990000"
+                    className="text-xs font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
+                    Tipo de Integração / Gateway:
+                  </label>
+                  <Select
+                    value={comunicacao.whatsapp.gatewayTipo}
+                    onValueChange={(v: any) =>
+                      setComunicacao((prev) => ({
+                        ...prev,
+                        whatsapp: { ...prev.whatsapp, gatewayTipo: v },
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="text-xs h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="web_link">WhatsApp Web / Desktop Oficial</SelectItem>
+                      <SelectItem value="zapi">Z-API Gateway</SelectItem>
+                      <SelectItem value="evolution_api">Evolution API</SelectItem>
+                      <SelectItem value="custom_webhook">Webhook Customizado (HTTP POST)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
+                    URL da API / Webhook (se aplicável):
+                  </label>
+                  <Input
+                    value={comunicacao.whatsapp.apiUrl ?? ""}
+                    onChange={(e) =>
+                      setComunicacao((prev) => ({
+                        ...prev,
+                        whatsapp: { ...prev.whatsapp, apiUrl: e.target.value },
+                      }))
+                    }
+                    placeholder="https://api.gateway.com/send-message"
+                    className="text-xs font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Lista de Respostas Automáticas / Scripts */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-amber-500" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-foreground">
+                    Respostas Rápidas & Gatilhos Comerciais ({comunicacao.whatsapp.respostasAutomaticas.length})
+                  </span>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-3">
+                  {comunicacao.whatsapp.respostasAutomaticas.map((resp) => (
+                    <div key={resp.id} className="p-3 rounded-lg border bg-card space-y-2 relative shadow-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <Input
+                          value={resp.titulo}
+                          onChange={(e) => handleUpdateResposta(resp.id, "titulo", e.target.value)}
+                          placeholder="Título do script"
+                          className="h-7 text-xs font-semibold"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteResposta(resp.id)}
+                          className="text-muted-foreground hover:text-red-500 p-1"
+                          title="Remover script"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+
+                      <Input
+                        value={resp.gatilho}
+                        onChange={(e) => handleUpdateResposta(resp.id, "gatilho", e.target.value)}
+                        placeholder="Gatilho (ex: Objeção de Preço, Primeiro Contato)"
+                        className="h-6 text-[11px] font-mono text-muted-foreground"
+                      />
+
+                      <Textarea
+                        value={resp.texto}
+                        onChange={(e) => handleUpdateResposta(resp.id, "texto", e.target.value)}
+                        rows={3}
+                        className="text-xs leading-relaxed font-sans"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 pt-3 border-t flex-wrap">
+                <Button onClick={handleSaveWhatsAppSettings} className="gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white">
+                  Salvar Configurações de WhatsApp
+                </Button>
+
+                {/* Teste de Disparo */}
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={testWhatsNumero}
+                    onChange={(e) => setTestWhatsNumero(e.target.value)}
+                    placeholder="WhatsApp para teste (DDD+número)"
+                    className="text-xs w-56 h-8 font-mono"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleTestarDisparoWhats}
+                    disabled={testandoWhats}
+                    className="text-xs h-8 gap-1"
+                  >
+                    <Send className={`h-3 w-3 ${testandoWhats ? "animate-spin" : ""}`} />
+                    {testandoWhats ? "Disparando..." : "Testar Disparo"}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------------------------- */}
+        {/* ABA 3: APIS DE PESQUISA & ENRIQUECIMENTO */}
+        {/* ------------------------------------------------------------------- */}
+        <TabsContent value="apis" className="space-y-4 mt-0">
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Server className="h-4 w-4 text-primary" />
+                    APIs de Enriquecimento de Dados & IA
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Configure e monitore as integrações para prospecção automatizada de empresas.
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={testAllApis}
+                  disabled={testingAll}
+                  className="gap-1.5 text-xs"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${testingAll ? "animate-spin" : ""}`} />
+                  Testar Todas as APIs
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3">
+                {Object.entries(settings).map(([provider, conf]) => {
+                  const result = testResults[provider];
+                  const isTesting = testing[provider];
+
+                  return (
+                    <div
+                      key={provider}
+                      className="p-3.5 rounded-lg border border-border/60 bg-card hover:border-border transition-colors space-y-2.5"
+                    >
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-xs uppercase tracking-wider text-foreground">
+                            {conf.label}
+                          </span>
+                          <span className="text-xs text-muted-foreground">({conf.description})</span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {isTesting ? (
+                            <Badge variant="outline" className="text-xs gap-1 border-blue-500/30 text-blue-500">
+                              <Loader2 className="h-3 w-3 animate-spin" /> Testando...
+                            </Badge>
+                          ) : result ? (
+                            <Badge
+                              variant="outline"
+                              className={`text-xs gap-1 ${
+                                result.status === "online"
+                                  ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                                  : result.status === "unconfigured"
+                                    ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                                    : "bg-red-500/10 text-red-600 border-red-500/30"
+                              }`}
+                            >
+                              {result.status === "online" ? (
+                                <CheckCircle2 className="h-3 w-3" />
+                              ) : (
+                                <XCircle className="h-3 w-3" />
+                              )}
+                              {result.status === "online" ? "Ativa & Operante" : result.message}
+                            </Badge>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {conf.requiresKey && (
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-1">
+                            <Input
+                              type={showKeys[provider] ? "text" : "password"}
+                              value={conf.key || ""}
+                              onChange={(e) => handleKeyChange(provider as any, e.target.value)}
+                              placeholder={`Chave da API ${conf.label}`}
+                              className="text-xs font-mono pr-8"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => toggleShowKey(provider)}
+                              className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                            >
+                              {showKeys[provider] ? (
+                                <EyeOff className="h-3.5 w-3.5" />
+                              ) : (
+                                <Eye className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => handleSaveKey(provider as any)}
+                            className="text-xs h-9 px-3"
+                          >
+                            Salvar
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => testSingleApi(provider, conf.key)}
+                            disabled={isTesting}
+                            className="text-xs h-9 px-3"
+                          >
+                            Testar
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------------------------- */}
+        {/* ABA 4: CRITÉRIOS DE SCORE & BANCO */}
+        {/* ------------------------------------------------------------------- */}
+        <TabsContent value="scoring" className="space-y-4 mt-0">
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">Critérios de Pontuação do Score Digital</CardTitle>
+                  <CardDescription className="text-xs">
+                    Ajuste o peso de cada falha na presença digital para classificar os leads.
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setWeights(DEFAULT_WEIGHTS)}
+                  className="gap-1 text-xs"
+                >
+                  <RotateCcw className="h-3 w-3" /> Restaurar Padrão
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {Object.entries(weights).map(([k, val]) => (
+                  <div key={k} className="p-2.5 rounded-md border flex items-center justify-between gap-2 text-xs">
+                    <span className="text-muted-foreground">{LABELS[k as keyof ScoreWeights] || k}</span>
+                    <Input
+                      type="number"
+                      value={val}
+                      onChange={(e) =>
+                        setWeights({
+                          ...weights,
+                          [k]: Number(e.target.value) || 0,
+                        })
+                      }
+                      className="w-16 h-7 text-xs font-mono text-right"
+                    />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-destructive/30 bg-destructive/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-destructive flex items-center gap-1.5">
+                <AlertTriangle className="h-4 w-4" /> Zona de Gestão de Dados
               </CardTitle>
-              <CardDescription className="text-xs mt-0.5">
-                Cadastre e teste suas chaves de API. O status em tempo real mostra latência, cotas e conectividade.
-              </CardDescription>
-            </div>
-
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={testAllApis}
-              disabled={testingAll}
-              className="text-xs h-8"
-            >
-              {testingAll ? (
-                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin text-primary" />
-              ) : (
-                <RefreshCw className="h-3.5 w-3.5 mr-1.5 text-primary" />
-              )}
-              Testar Todas as APIs
-            </Button>
-          </div>
-        </CardHeader>
-
-        <CardContent className="p-4 sm:p-5 space-y-4">
-          {/* SERPAPI */}
-          <div className="rounded-lg border border-border/60 p-4 space-y-3 bg-card">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                  <Globe className="h-4 w-4" />
-                </div>
-                <div>
-                  <div className="text-sm font-semibold flex items-center gap-2">
-                    SerpApi (Google Maps, Instagram, LinkedIn, TikTok, Facebook)
-                    <Badge variant="secondary" className="text-[10px]">Oficial</Badge>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Motor principal de scraping com dados reais e filtros avançados.
-                  </div>
-                </div>
-              </div>
-
-              <div>{renderStatusBadge("serpapi")}</div>
-            </div>
-
-            {testResults.serpapi?.details && testResults.serpapi.status === "online" && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-2.5 rounded-md bg-emerald-500/5 border border-emerald-500/20 text-xs">
-                <div>
-                  <span className="text-muted-foreground block text-[10px]">Conta:</span>
-                  <span className="font-semibold text-foreground truncate block">
-                    {testResults.serpapi.details.accountEmail}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block text-[10px]">Plano:</span>
-                  <span className="font-semibold text-foreground">
-                    {testResults.serpapi.details.plan}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block text-[10px]">Cota Restante:</span>
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                    {testResults.serpapi.details.remainingCredits} buscas
-                  </span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block text-[10px]">Consumo no Mês:</span>
-                  <span className="font-semibold text-foreground">
-                    {testResults.serpapi.details.usedCredits ?? 0} buscas
-                  </span>
-                </div>
-              </div>
-            )}
-
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <div className="relative flex-1">
-                <Input
-                  type={showKeys.serpapi ? "text" : "password"}
-                  placeholder="Chave SerpApi..."
-                  value={settings.serpapi.key}
-                  onChange={(e) => handleKeyChange("serpapi", e.target.value)}
-                  className="pr-10 text-xs font-mono h-9"
-                />
-                <button
-                  type="button"
-                  onClick={() => toggleShowKey("serpapi")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showKeys.serpapi ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2">
+            </CardHeader>
+            <CardContent className="space-y-2 text-xs">
+              <p className="text-muted-foreground">
+                Total de empresas cadastradas no CRM: <strong>{empresas.length}</strong>
+              </p>
+              <div className="flex items-center gap-2 pt-2">
                 <Button
-                  size="sm"
                   variant="outline"
-                  onClick={() => testSingleApi("serpapi", settings.serpapi.key)}
-                  disabled={testing.serpapi}
-                  className="text-xs h-9"
+                  size="sm"
+                  onClick={() => {
+                    carregarDemo();
+                    toast.success("Dados de demonstração carregados com sucesso!");
+                  }}
+                  className="text-xs"
                 >
-                  {testing.serpapi ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Testar"}
+                  Recarregar Empresas Demo
                 </Button>
                 <Button
+                  variant="destructive"
                   size="sm"
-                  onClick={() => handleSaveKey("serpapi")}
-                  className="text-xs h-9 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={() => {
+                    if (confirm("Tem certeza que deseja zerar a base de empresas?")) {
+                      resetPlataforma();
+                      toast.success("Base de dados limpa com sucesso!");
+                    }
+                  }}
+                  className="text-xs"
                 >
-                  Salvar Chave
+                  Limpar Todas as Empresas
                 </Button>
               </div>
-            </div>
-          </div>
-
-          {/* APIFY */}
-          <div className="rounded-lg border border-border/60 p-4 space-y-3 bg-card">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-lg bg-pink-500/10 text-pink-600 dark:text-pink-400">
-                  <Sparkles className="h-4 w-4" />
-                </div>
-                <div>
-                  <div className="text-sm font-semibold flex items-center gap-2">
-                    Apify (Instagram Actor Scraper)
-                    <Badge variant="secondary" className="text-[10px]">Opcional</Badge>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Scraping avançado com extração de posts e métricas.
-                  </div>
-                </div>
-              </div>
-
-              <div>{renderStatusBadge("apify")}</div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <div className="relative flex-1">
-                <Input
-                  type={showKeys.apify ? "text" : "password"}
-                  placeholder="Token Apify (apify_api_...)"
-                  value={settings.apify.key}
-                  onChange={(e) => handleKeyChange("apify", e.target.value)}
-                  className="pr-10 text-xs font-mono h-9"
-                />
-                <button
-                  type="button"
-                  onClick={() => toggleShowKey("apify")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showKeys.apify ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => testSingleApi("apify", settings.apify.key)}
-                  disabled={testing.apify || !settings.apify.key}
-                  className="text-xs h-9"
-                >
-                  {testing.apify ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Testar"}
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => handleSaveKey("apify")}
-                  className="text-xs h-9"
-                >
-                  Salvar Token
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* OPEN DATA PROVIDERS */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
-            {/* BrasilAPI */}
-            <div className="rounded-lg border border-border/60 p-3.5 bg-muted/10 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Database className="h-4 w-4 text-green-600" />
-                  <span className="font-semibold text-xs">BrasilAPI / Receita</span>
-                </div>
-                {renderStatusBadge("brasilapi")}
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                Dados oficiais da Receita Federal (CNPJ, QSA, Abertura).
-              </p>
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-emerald-600 font-medium">100% Gratuito</span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => testSingleApi("brasilapi")}
-                  disabled={testing.brasilapi}
-                  className="h-6 text-[10px] px-2"
-                >
-                  Testar
-                </Button>
-              </div>
-            </div>
-
-            {/* Registro.br */}
-            <div className="rounded-lg border border-border/60 p-3.5 bg-muted/10 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <ShieldCheck className="h-4 w-4 text-orange-500" />
-                  <span className="font-semibold text-xs">Registro.br RDAP</span>
-                </div>
-                {renderStatusBadge("registrobr")}
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                Diretório Whois oficial para expiração de domínios .br.
-              </p>
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-orange-600 font-medium">100% Gratuito</span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => testSingleApi("registrobr")}
-                  disabled={testing.registrobr}
-                  className="h-6 text-[10px] px-2"
-                >
-                  Testar
-                </Button>
-              </div>
-            </div>
-
-            {/* OpenStreetMap */}
-            <div className="rounded-lg border border-border/60 p-3.5 bg-muted/10 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Server className="h-4 w-4 text-blue-500" />
-                  <span className="font-semibold text-xs">OpenStreetMap</span>
-                </div>
-                {renderStatusBadge("openstreetmap")}
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                Motor Overpass aberto e global para geolocalização.
-              </p>
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-blue-600 font-medium">100% Gratuito</span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => testSingleApi("openstreetmap")}
-                  disabled={testing.openstreetmap}
-                  className="h-6 text-[10px] px-2"
-                >
-                  Testar
-                </Button>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* =================================================================== */}
-      {/* SEÇÃO 2: BASE DE DADOS */}
-      {/* =================================================================== */}
-      <Card className="border-amber-500/40 bg-amber-500/5">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Database className="h-4 w-4 text-amber-500" /> Base de dados da plataforma
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="text-sm text-muted-foreground">
-            A plataforma inicia vazia. Popule com dados reais via Google Places (Importação),
-            Firecrawl (Analisar site com IA), CSV ou cadastro manual. Atualmente há{" "}
-            <span className="font-semibold text-foreground">{empresas.length}</span> empresa(s) na base.
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => {
-                if (!confirm("Isso apagará TODAS as empresas da base local. Continuar?")) return;
-                resetPlataforma();
-                toast.success("Plataforma zerada");
-              }}
-            >
-              <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Zerar plataforma
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                carregarDemo();
-                toast.success("Dados de demonstração carregados");
-              }}
-            >
-              <AlertTriangle className="h-3.5 w-3.5 mr-1.5" /> Carregar dados de demonstração
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Os dados de demonstração são fictícios e servem apenas para exploração da interface. Não representam empresas reais.
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* =================================================================== */}
-      {/* SEÇÃO 3: PESOS DO SCORE DE OPORTUNIDADE */}
-      {/* =================================================================== */}
-      <Card className="border-border/60">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Pesos do score de oportunidade</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-2 gap-3">
-            {(Object.keys(weights) as (keyof ScoreWeights)[]).map((k) => (
-              <div key={k} className="flex items-center gap-3 rounded-md border border-border/60 p-3">
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{LABELS[k]}</div>
-                  <div className="text-xs text-muted-foreground">Peso aplicado quando o critério é verdadeiro</div>
-                </div>
-                <Input
-                  type="number"
-                  min={0}
-                  max={50}
-                  className="w-20 text-right"
-                  value={weights[k]}
-                  onChange={(e) => setWeights({ ...weights, [k]: Number(e.target.value) || 0 })}
-                />
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 flex justify-end">
-            <Button variant="outline" size="sm" onClick={() => { setWeights(DEFAULT_WEIGHTS); toast.success("Pesos restaurados"); }}>
-              Restaurar padrões
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* =================================================================== */}
-      {/* SEÇÃO 4: CIDADES & SEGMENTOS */}
-      {/* =================================================================== */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <Card className="border-border/60">
-          <CardHeader className="pb-2"><CardTitle className="text-base">Cidades prioritárias</CardTitle></CardHeader>
-          <CardContent className="flex flex-wrap gap-1.5">
-            {CIDADES_RS_FOCO.map((c) => <Badge key={c} variant="secondary" className="text-xs">{c}</Badge>)}
-          </CardContent>
-        </Card>
-        <Card className="border-border/60">
-          <CardHeader className="pb-2"><CardTitle className="text-base">Segmentos prioritários</CardTitle></CardHeader>
-          <CardContent className="flex flex-wrap gap-1.5">
-            {SEGMENTOS.map((s) => <Badge key={s} variant="outline" className="text-xs">{s}</Badge>)}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* =================================================================== */}
-      {/* SEÇÃO 5: TEMPLATE DE ABORDAGEM */}
-      {/* =================================================================== */}
-      <Card className="border-border/60">
-        <CardHeader className="pb-2"><CardTitle className="text-base">Template padrão de abordagem</CardTitle></CardHeader>
-        <CardContent>
-          <Textarea
-            defaultValue={"Olá, [nome]! Fiz uma análise da presença digital da [empresa] aqui em [cidade]. Notei 2 ou 3 ajustes rápidos que podem gerar mais contatos. Posso te enviar um resumo curto?"}
-            rows={5}
-          />
-          <p className="text-xs text-muted-foreground mt-2">Este template alimenta o módulo de abordagens. Variáveis aceitas: [nome], [empresa], [cidade].</p>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

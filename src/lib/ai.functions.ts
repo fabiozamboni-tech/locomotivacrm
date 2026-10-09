@@ -3,6 +3,7 @@ import type { Empresa } from "./mock-data";
 
 // Payload mínimo enviado do cliente (evita enviar objeto Empresa inteiro).
 export interface EmpresaCtx {
+  id?: string;
   nome: string;
   segmento: string;
   cidade: string;
@@ -20,6 +21,7 @@ export interface EmpresaCtx {
 
 export function toCtx(e: Empresa): EmpresaCtx {
   return {
+    id: e.id,
     nome: e.nome,
     segmento: e.segmento,
     cidade: e.cidade,

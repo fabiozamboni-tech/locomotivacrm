@@ -21,10 +21,15 @@ import {
   BrainCircuit,
   Calendar,
   Zap,
+  Mail,
+  MessageCircle,
 } from "lucide-react";
 import { TimingRadarCard } from "@/components/timing-radar-card";
 import { CopilotoObjecoesModal } from "@/components/copiloto-objecoes-modal";
 import { CadenciaModal } from "@/components/cadencia-modal";
+import { EnviarEmailModal } from "@/components/enviar-email-modal";
+import { EnviarWhatsAppModal } from "@/components/enviar-whatsapp-modal";
+import { PromptsModal } from "@/components/prompts-modal";
 import {
   DndContext,
   PointerSensor,
@@ -109,6 +114,8 @@ function CrmPage() {
   const [showRadar, setShowRadar] = useState(false);
   const [cadenciaEmpresaId, setCadenciaEmpresaId] = useState<string | null>(null);
   const [copilotoEmpresaId, setCopilotoEmpresaId] = useState<string | null>(null);
+  const [emailEmpresaId, setEmailEmpresaId] = useState<string | null>(null);
+  const [whatsEmpresaId, setWhatsEmpresaId] = useState<string | null>(null);
 
   const promptsEmpresa = useMemo(
     () => empresas.find((e) => e.id === promptsId) ?? null,
@@ -129,6 +136,14 @@ function CrmPage() {
   const copilotoEmpresa = useMemo(
     () => empresas.find((e) => e.id === copilotoEmpresaId) ?? null,
     [empresas, copilotoEmpresaId],
+  );
+  const emailEmpresa = useMemo(
+    () => empresas.find((e) => e.id === emailEmpresaId) ?? null,
+    [empresas, emailEmpresaId],
+  );
+  const whatsEmpresa = useMemo(
+    () => empresas.find((e) => e.id === whatsEmpresaId) ?? null,
+    [empresas, whatsEmpresaId],
   );
 
   const grouped = useMemo(() => {
@@ -247,6 +262,8 @@ function CrmPage() {
         onOpenChange={(o) => !o && setOpenId(null)}
         onOpenCopiloto={(id) => setCopilotoEmpresaId(id)}
         onOpenCadencia={(id) => setCadenciaEmpresaId(id)}
+        onOpenEmail={(id) => setEmailEmpresaId(id)}
+        onOpenWhats={(id) => setWhatsEmpresaId(id)}
       />
       <PromptsModal
         empresa={promptsEmpresa}
@@ -264,6 +281,18 @@ function CrmPage() {
         empresa={copilotoEmpresa || undefined}
         open={!!copilotoEmpresa}
         onOpenChange={(o) => !o && setCopilotoEmpresaId(null)}
+      />
+
+      {/* Modais de Disparo Direto de E-mail e WhatsApp */}
+      <EnviarEmailModal
+        empresa={emailEmpresa || undefined}
+        open={!!emailEmpresa}
+        onOpenChange={(o) => !o && setEmailEmpresaId(null)}
+      />
+      <EnviarWhatsAppModal
+        empresa={whatsEmpresa || undefined}
+        open={!!whatsEmpresa}
+        onOpenChange={(o) => !o && setWhatsEmpresaId(null)}
       />
     </div>
   );
@@ -400,21 +429,10 @@ function KanbanCard({
           <MapPin className="size-3.5" />
         </IconLink>
         <div className="flex-1" />
-        {onPrompts && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 px-2 text-[11px] gap-1"
-            onClick={onPrompts}
-            title="Gerar prompts com IA"
-          >
-            <Wand2 className="size-3" /> Prompts
-          </Button>
-        )}
         <Button
           size="sm"
           variant="secondary"
-          className="h-7 px-2 text-[11px] gap-1"
+          className="h-7 px-2.5 text-[11px] gap-1"
           onClick={onOpen}
         >
           <Sparkles className="size-3" /> Abordar
@@ -501,12 +519,16 @@ function EmpresaModal({
   onOpenChange,
   onOpenCopiloto,
   onOpenCadencia,
+  onOpenEmail,
+  onOpenWhats,
 }: {
   empresa: Empresa | null;
   open: boolean;
   onOpenChange: (o: boolean) => void;
   onOpenCopiloto?: (id: string) => void;
   onOpenCadencia?: (id: string) => void;
+  onOpenEmail?: (id: string) => void;
+  onOpenWhats?: (id: string) => void;
 }) {
   const { addHistorico } = useStore();
   const [canal, setCanal] = useState<Canal>("whatsapp");
@@ -578,7 +600,7 @@ function EmpresaModal({
             </ContactChip>
           </div>
 
-          {/* BARRA DE ATALHOS ESTRATÉGICOS (MÓDULOS 1, 3, 5 E ABORDAGEM 360) */}
+          {/* BARRA DE ATALHOS ESTRATÉGICOS (MÓDULOS 1, 3, 5 E DISPARO DIRETO) */}
           <div className="flex items-center gap-2 flex-wrap pt-3 border-t border-border/40 mt-3">
             {onOpenCopiloto && (
               <Button
@@ -607,6 +629,36 @@ function EmpresaModal({
               >
                 <Calendar className="h-3.5 w-3.5 text-indigo-500" />
                 Cadência D+0 a D+8
+              </Button>
+            )}
+
+            {empresa.email && onOpenEmail && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  onOpenChange(false);
+                  onOpenEmail(empresa.id);
+                }}
+                className="h-7 text-xs gap-1 text-blue-600 border-blue-500/30 hover:bg-blue-500/10"
+              >
+                <Mail className="h-3 w-3 text-blue-500" />
+                Disparar E-mail
+              </Button>
+            )}
+
+            {empresa.whatsapp && onOpenWhats && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  onOpenChange(false);
+                  onOpenWhats(empresa.id);
+                }}
+                className="h-7 text-xs gap-1 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10"
+              >
+                <MessageCircle className="h-3 w-3 text-emerald-500" />
+                WhatsApp Direto
               </Button>
             )}
 
@@ -844,128 +896,6 @@ function PromptSugestoes({
         ))}
       </div>
     </div>
-  );
-}
-
-const PROMPT_TIPOS: { value: TipoPrompt; label: string; desc: string }[] = [
-  { value: "site_novo", label: "Site novo", desc: "Briefing completo para criação de site" },
-  { value: "site_redesign", label: "Redesign de site", desc: "Considera problemas do site atual" },
-  { value: "ig_estrategia", label: "Estratégia Instagram", desc: "Posicionamento e pilares editoriais" },
-  { value: "ig_posts", label: "Ideias de posts", desc: "Calendário inicial de 30 dias" },
-];
-
-function PromptsModal({
-  empresa,
-  open,
-  onOpenChange,
-}: {
-  empresa: Empresa | null;
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
-}) {
-  const { addHistorico } = useStore();
-  const [tipo, setTipo] = useState<TipoPrompt>("site_novo");
-  const [iaTexto, setIaTexto] = useState<Record<string, string>>({});
-  const [loadingIA, setLoadingIA] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  const textoBase = useMemo(
-    () => (empresa ? gerarPrompt(empresa, tipo) : ""),
-    [empresa, tipo],
-  );
-  const iaKey = `${empresa?.id ?? ""}:${tipo}`;
-  const texto = iaTexto[iaKey] ?? textoBase;
-  const isIA = !!iaTexto[iaKey];
-
-  if (!empresa) return null;
-
-  const tipoLabel = PROMPT_TIPOS.find((t) => t.value === tipo)?.label ?? tipo;
-
-  const gerarIA = async () => {
-    setLoadingIA(true);
-    try {
-      const r = await gerarPromptIA({ data: { empresa: toCtx(empresa), tipo } });
-      setIaTexto((s) => ({ ...s, [iaKey]: r }));
-      toast.success("Prompt gerado com IA");
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setLoadingIA(false);
-    }
-  };
-
-  const copiar = async () => {
-    await navigator.clipboard.writeText(texto);
-    setCopied(true);
-    toast.success("Prompt copiado");
-    setTimeout(() => setCopied(false), 1500);
-  };
-
-  const salvarHistorico = () => {
-    const preview = texto.slice(0, 220).replace(/\s+/g, " ").trim();
-    addHistorico(empresa.id, {
-      data: new Date().toISOString().slice(0, 10),
-      tipo: "nota",
-      texto: `Prompt IA · ${tipoLabel}${isIA ? " (gerado com IA)" : " (template)"}: ${preview}${texto.length > 220 ? "…" : ""}`,
-    });
-    toast.success("Prompt salvo no histórico");
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl p-0 gap-0 overflow-hidden">
-        <DialogHeader className="p-5 pb-3 border-b bg-gradient-to-br from-primary/5 to-transparent">
-          <div className="min-w-0">
-            <DialogTitle className="text-xl truncate flex items-center gap-2">
-              <Wand2 className="size-4 text-primary" /> Prompts IA · {empresa.nome}
-            </DialogTitle>
-            <DialogDescription className="mt-1">
-              Briefings prontos para colar em ferramentas de IA — {empresa.segmento} · {empresa.cidade}
-            </DialogDescription>
-          </div>
-        </DialogHeader>
-
-        <Tabs value={tipo} onValueChange={(v) => setTipo(v as TipoPrompt)} className="w-full">
-          <TabsList className="rounded-none w-full justify-start px-5 h-10 border-b bg-transparent flex-wrap">
-            {PROMPT_TIPOS.map((t) => (
-              <TabsTrigger key={t.value} value={t.value} className="text-xs">
-                {t.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          {PROMPT_TIPOS.map((t) => (
-            <TabsContent key={t.value} value={t.value} className="m-0 p-5 space-y-3">
-              <p className="text-xs text-muted-foreground">{t.desc}</p>
-              <Textarea
-                value={texto}
-                readOnly
-                rows={16}
-                className="font-mono text-xs"
-              />
-              <div className="flex flex-wrap items-center gap-2">
-                <Button size="sm" onClick={gerarIA} disabled={loadingIA} className="gap-1.5">
-                  <Sparkles className="size-3.5" />
-                  {loadingIA ? "Gerando..." : isIA ? "Regenerar com IA" : "Gerar com IA"}
-                </Button>
-                <Button size="sm" variant="secondary" onClick={copiar} className="gap-1.5">
-                  {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-                  {copied ? "Copiado" : "Copiar"}
-                </Button>
-                <Button size="sm" variant="outline" onClick={salvarHistorico} className="gap-1.5">
-                  <Save className="size-3.5" /> Salvar no histórico
-                </Button>
-                {isIA && (
-                  <Badge variant="secondary" className="ml-auto text-[10px]">
-                    IA
-                  </Badge>
-                )}
-              </div>
-            </TabsContent>
-          ))}
-        </Tabs>
-      </DialogContent>
-    </Dialog>
   );
 }
 

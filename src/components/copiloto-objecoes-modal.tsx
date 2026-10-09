@@ -37,7 +37,7 @@ export function CopilotoObjecoesModal({
   empresa,
   open,
   onOpenChange,
-  nomeAgencia = "nossa agência",
+  nomeAgencia = "Locomotiva Comunicação",
 }: CopilotoObjecoesModalProps) {
   const [objecaoTexto, setObjecaoTexto] = useState<string>(
     "Achei o valor elevado para o momento da nossa empresa.",

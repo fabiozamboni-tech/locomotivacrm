@@ -1,4 +1,4 @@
-import { createFileRoute, useSearch } from "@tanstack/react-router";
+import { createFileRoute, useSearch, Link } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
 import { useStore } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -23,6 +23,8 @@ import {
 import { consultarQsaDecisores, type DecisoresResult, type SocioDecisor } from "@/lib/qsa-decisores.functions";
 import { CopilotoObjecoesModal } from "@/components/copiloto-objecoes-modal";
 import { CadenciaModal } from "@/components/cadencia-modal";
+import { EnviarEmailModal } from "@/components/enviar-email-modal";
+import { EnviarWhatsAppModal } from "@/components/enviar-whatsapp-modal";
 import { whatsappUrl } from "@/lib/links";
 import {
   Copy,
@@ -93,12 +95,14 @@ function AbordagemPage() {
   const [activeTab, setActiveTab] = useState<"dossier" | "sistemas" | "prescricao" | "abordagens">("abordagens");
   const [dossier, setDossier] = useState<Dossier360Result | null>(null);
   const [loadingIA, setLoadingIA] = useState(false);
-  const [nomeAgencia, setNomeAgencia] = useState("nossa agência de Comunicação 360 & Tecnologia");
+  const [nomeAgencia, setNomeAgencia] = useState("Locomotiva Comunicação");
   const [textoEditado, setTextoEditado] = useState("");
 
   // Modais e Decisores
   const [openCopilotoObjecoes, setOpenCopilotoObjecoes] = useState(false);
   const [openCadenciaModal, setOpenCadenciaModal] = useState(false);
+  const [openEmailModal, setOpenEmailModal] = useState(false);
+  const [openWhatsModal, setOpenWhatsModal] = useState(false);
   const [decisoresData, setDecisoresData] = useState<DecisoresResult | null>(null);
   const [loadingQSA, setLoadingQSA] = useState(false);
   const [nomeDecisorSelecionado, setNomeDecisorSelecionado] = useState("");
@@ -153,7 +157,7 @@ function AbordagemPage() {
           setTextoEditado(`Fala de Abertura:\n${item.falaAbertura}\n\nPergunta-Chave de Diagnóstico:\n${item.perguntaChaveDiagnostico}\n\nPassos da Reunião:\n${item.roteiroPassos.join("\n")}`);
         }
       }
-      toast.success(`Pesquisa e Dossiê 360 gerados com sucesso para ${empresa.nome}!`);
+      toast.success(`Dossiê 360 e abordagens gerados para ${empresa.nome}!`);
     } catch (e) {
       toast.error((e as Error).message || "Falha na análise com IA");
     } finally {
@@ -175,7 +179,7 @@ function AbordagemPage() {
     }
   }, [canal, dossier]);
 
-  // Carrega automaticamente o dossiê determinístico ao trocar de empresa se ainda não houver
+  // Carrega automaticamente o dossiê ao trocar de empresa se ainda não houver
   useEffect(() => {
     if (empresa && !dossier) {
       executarPesquisaEDossier();
@@ -212,7 +216,7 @@ function AbordagemPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/60 pb-5">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-bold tracking-tight">Inteligência de Vendas B2B & Comunicação 360</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Inteligência de Vendas B2B · Locomotiva Comunicação</h1>
             <Badge variant="secondary" className="text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-medium">
               Pesquisa em Tempo Real + IA
             </Badge>
@@ -223,6 +227,32 @@ function AbordagemPage() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Disparo de E-mail Direto */}
+          {empresa?.email && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setOpenEmailModal(true)}
+              className="text-xs h-9 gap-1.5 border-blue-500/30 text-blue-700 dark:text-blue-300 hover:bg-blue-500/10"
+            >
+              <Mail className="h-4 w-4 text-blue-500" />
+              📧 Disparar E-mail
+            </Button>
+          )}
+
+          {/* Disparo de WhatsApp Direto */}
+          {empresa?.whatsapp && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setOpenWhatsModal(true)}
+              className="text-xs h-9 gap-1.5 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10"
+            >
+              <MessageCircle className="h-4 w-4 text-emerald-500" />
+              💬 WhatsApp Direto
+            </Button>
+          )}
+
           {/* Módulo 5: Copiloto de Objeções */}
           <Button
             variant="outline"
@@ -231,7 +261,7 @@ function AbordagemPage() {
             className="text-xs h-9 gap-1.5 border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10"
           >
             <BrainCircuit className="h-4 w-4 text-amber-500" />
-            💬 Copiloto de Objeções
+            Copiloto Objeções
           </Button>
 
           {/* Módulo 3: Cadência Multicanal */}
@@ -242,7 +272,7 @@ function AbordagemPage() {
             className="text-xs h-9 gap-1.5 border-indigo-500/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/10"
           >
             <Calendar className="h-4 w-4 text-indigo-500" />
-            🚀 Cadência D+0 a D+8
+            Cadência D+0 a D+8
           </Button>
 
           {/* Módulo 1: Link Micro-Auditoria */}
@@ -255,7 +285,7 @@ function AbordagemPage() {
             >
               <a href={`/auditoria/${empresa.id}`} target="_blank" rel="noreferrer">
                 <ExternalLink className="h-3.5 w-3.5" />
-                🔗 Micro-Auditoria Pública
+                Micro-Auditoria
               </a>
             </Button>
           )}
@@ -398,7 +428,7 @@ function AbordagemPage() {
           </TabsTrigger>
           <TabsTrigger value="dossier" className="text-xs py-1.5 px-3 flex items-center gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
             <BrainCircuit className="h-3.5 w-3.5 text-purple-500" />
-            Dossiê Psicológico & Operacional (3 Dimensões)
+            Dossiê Psicológico & Abordagens Derivadas
           </TabsTrigger>
           <TabsTrigger value="sistemas" className="text-xs py-1.5 px-3 flex items-center gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
             <Settings2 className="h-3.5 w-3.5 text-blue-500" />
@@ -452,7 +482,7 @@ function AbordagemPage() {
                 <div className="pt-3 border-t border-border/50 text-[11px] text-muted-foreground space-y-1.5">
                   <div className="font-semibold text-foreground flex items-center gap-1">
                     <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    Posicionamento 360 Integrado
+                    Locomotiva 360 Integrada
                   </div>
                   <p className="leading-relaxed">
                     A abordagem prescreve soluções integradas (Branding, Embalagens, Digital, Vídeos, Sites e Sistemas de Gestão) focadas em gerar lucro.
@@ -470,7 +500,7 @@ function AbordagemPage() {
                     Texto Estratégico de Abordagem ({CANAIS.find((c) => c.value === canal)?.label})
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    Gerado com base no perfil corporativo e nas dores reais da empresa.
+                    Gerado com base no perfil corporativo e nas dores reais da empresa pela Locomotiva Comunicação.
                   </CardDescription>
                 </div>
 
@@ -488,7 +518,19 @@ function AbordagemPage() {
                     Copiar
                   </Button>
 
-                  {waFinal && canal === "whatsapp" && (
+                  {empresa?.email && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setOpenEmailModal(true)}
+                      className="h-8 text-xs gap-1.5 text-blue-600 border-blue-500/30 hover:bg-blue-500/10"
+                    >
+                      <Mail className="h-3.5 w-3.5 text-blue-500" />
+                      Enviar E-mail
+                    </Button>
+                  )}
+
+                  {waFinal && (
                     <Button
                       asChild
                       size="sm"
@@ -513,7 +555,7 @@ function AbordagemPage() {
 
                 <div className="flex items-center justify-between text-xs text-muted-foreground flex-wrap gap-2 pt-2 border-t">
                   <div className="flex items-center gap-2">
-                    <span>💡 <strong>Dica de Fechamento:</strong> Posicione a agência como parceira de lucro e crescimento sustentável.</span>
+                    <span>💡 <strong>Tom Consultivo:</strong> Diagnóstico direto e cálculo financeiro do custo da inação, sem bajulação vazia.</span>
                   </div>
                   <span>{textoEditado.length} caracteres</span>
                 </div>
@@ -523,7 +565,7 @@ function AbordagemPage() {
         </TabsContent>
 
         {/* ------------------------------------------------------------------- */}
-        {/* ABA 2: DOSSIÊ 3 DIMENSÕES (PSICOLÓGICO, OPERACIONAL, ESTRATÉGICO) */}
+        {/* ABA 2: DOSSIÊ 3 DIMENSÕES + ABORDAGENS DERIVADAS */}
         {/* ------------------------------------------------------------------- */}
         <TabsContent value="dossier" className="space-y-5 mt-0">
           {dossier ? (
@@ -597,6 +639,83 @@ function AbordagemPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* ABORDAGENS PRONTAS DERIVADAS DO DOSSIÊ PSICOLÓGICO */}
+              {dossier.abordagensPsicologicas && dossier.abordagensPsicologicas.length > 0 && (
+                <Card className="border-purple-500/30 bg-gradient-to-r from-purple-500/5 via-card to-purple-500/5 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-5 w-5 text-amber-500" />
+                      <div>
+                        <CardTitle className="text-base font-bold">
+                          Abordagens Estratégicas Derivadas do Dossiê Psicológico
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                          4 ângulos comerciais prontos baseados nas tensões emocionais e operacionais diagnosticadas pela Locomotiva Comunicação.
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="grid md:grid-cols-2 gap-4">
+                    {dossier.abordagensPsicologicas.map((ab) => (
+                      <div
+                        key={ab.id}
+                        className="p-4 rounded-xl border bg-card space-y-3 shadow-sm hover:border-primary/40 transition-all flex flex-col justify-between"
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <span className="font-semibold text-xs text-foreground">{ab.titulo}</span>
+                            <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-600 border-purple-500/30">
+                              {ab.gatilho}
+                            </Badge>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground font-medium">🎯 Foco: {ab.foco}</p>
+                          <div className="p-3 bg-muted/30 rounded-lg text-xs font-sans whitespace-pre-line leading-relaxed border">
+                            {ab.mensagem}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-1.5 pt-2 border-t flex-wrap">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              navigator.clipboard.writeText(ab.mensagem);
+                              toast.success("Abordagem copiada!");
+                            }}
+                            className="h-7 text-xs px-2 gap-1"
+                          >
+                            <Copy className="h-3 w-3" /> Copiar
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                              setTextoEditado(ab.mensagem);
+                              setActiveTab("abordagens");
+                              toast.success("Abordagem carregada no Editor Principal!");
+                            }}
+                            className="h-7 text-xs px-2 gap-1"
+                          >
+                            <ArrowRight className="h-3 w-3" /> Usar no Editor
+                          </Button>
+                          {waSendUrl(empresa?.whatsapp, ab.mensagem) && (
+                            <Button
+                              asChild
+                              size="sm"
+                              className="h-7 text-xs px-2 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                            >
+                              <a href={waSendUrl(empresa?.whatsapp, ab.mensagem)} target="_blank" rel="noreferrer">
+                                <Send className="h-3 w-3" /> WhatsApp
+                              </a>
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
 
               {/* DIMENSÃO 2: CENÁRIO OPERACIONAL E FINANCEIRO */}
               <Card className="border-blue-500/20 bg-blue-500/5 shadow-sm">
@@ -683,7 +802,7 @@ function AbordagemPage() {
             <div className="p-8 text-center border rounded-lg bg-muted/20">
               <Bot className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
               <p className="text-sm font-medium">Nenhum dossiê gerado ainda.</p>
-              <p className="text-xs text-muted-foreground mt-1">Clique em "Pesquisar Web & Gerar Dossiê com IA" para mapear os 3 eixos psicológicos e operacionais.</p>
+              <p className="text-xs text-muted-foreground mt-1">Clique em "Pesquisar Web & Gerar Dossiê" para mapear os 3 eixos psicológicos e operacionais.</p>
             </div>
           )}
         </TabsContent>
@@ -696,11 +815,11 @@ function AbordagemPage() {
             <div className="flex items-center gap-2">
               <Settings2 className="h-5 w-5 text-blue-600" />
               <h2 className="text-base font-semibold text-foreground">
-                Sistemas de Gestão & Automação Recomendados para a Empresa
+                Sistemas de Gestão & Automação Recomendados pela Locomotiva Comunicação
               </h2>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Além de comunicação e design, a agência oferece softwares e ferramentas para organizar as vendas, atendimento e rotina da empresa, tornando a parceria indispensável.
+              Além de comunicação e design, a Locomotiva entrega softwares e ferramentas para organizar as vendas, atendimento e rotina da empresa, tornando a parceria indispensável.
             </p>
           </div>
 
@@ -853,6 +972,21 @@ function AbordagemPage() {
         onOpenChange={setOpenCadenciaModal}
         nomeDecisorPadrao={nomeDecisorSelecionado || "Gestor(a)"}
         nomeAgencia={nomeAgencia}
+      />
+
+      {/* MODAIS DE ENVIO DIRETO DE E-MAIL E WHATSAPP */}
+      <EnviarEmailModal
+        empresa={empresa}
+        open={openEmailModal}
+        onOpenChange={setOpenEmailModal}
+        corpoPadrao={textoEditado}
+      />
+
+      <EnviarWhatsAppModal
+        empresa={empresa}
+        open={openWhatsModal}
+        onOpenChange={setOpenWhatsModal}
+        mensagemPadrao={textoEditado}
       />
     </div>
   );

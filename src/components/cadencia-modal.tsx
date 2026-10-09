@@ -40,7 +40,7 @@ export function CadenciaModal({
   open,
   onOpenChange,
   nomeDecisorPadrao = "Gestor(a)",
-  nomeAgencia = "nossa agência",
+  nomeAgencia = "Locomotiva Comunicação",
 }: CadenciaModalProps) {
   const [nomeDecisor, setNomeDecisor] = useState(nomeDecisorPadrao);
   const [copiadoDia, setCopiadoDia] = useState<number | null>(null);

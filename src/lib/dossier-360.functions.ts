@@ -19,6 +19,14 @@ export interface TratamentoSintomaItem {
   comoGeraMaisLucro: string;
 }
 
+export interface AbordagemPsicologicaItem {
+  id: "dor" | "medo_risco" | "ambicao" | "frustracao";
+  titulo: string;
+  gatilho: string;
+  foco: string;
+  mensagem: string;
+}
+
 export interface Dossier360Result {
   empresaNome: string;
   segmento: string;
@@ -34,6 +42,7 @@ export interface Dossier360Result {
     desejosEAmbicoes: string[];
     frustracoesPassadas: string[];
   };
+  abordagensPsicologicas: AbordagemPsicologicaItem[];
   dimensaoOperacional: {
     gargalosProcesso: string[];
     impactoFinanceiroCustoInacao: string;
@@ -153,14 +162,14 @@ export const gerarDossierEAbordagens360_IA = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }): Promise<Dossier360Result> => {
     const { chatJSON } = await import("./ai-gateway.server");
-    const agencia = data.nomeAgencia?.trim() || "nossa agência";
+    const agencia = data.nomeAgencia?.trim() || "Locomotiva Comunicação";
     const canal = data.canalPreferencial || "whatsapp";
 
     // 1. Pesquisa web em tempo real
     const webInfo = await pesquisarContextoWeb(data.empresa);
 
-    const sys = `Você é o Diretor Comercial & Estrategista Chefe de uma agência de alto nível especializada em COMUNICAÇÃO 360 & SISTEMAS DE GESTÃO na Serra Gaúcha (RS).
-O escopo completo da agência contempla:
+    const sys = `Você é o Diretor Comercial & Estrategista Chefe da LOCOMOTIVA COMUNICAÇÃO (agência de Comunicação 360 & Sistemas de Gestão na Serra Gaúcha/RS).
+O escopo completo da Locomotiva Comunicação contempla:
 - Identidade Visual & Branding Premium (Logotipo, manuais, posicionamento de autoridade);
 - Material Impresso & Papelaria Corporativa de Alto Padrão (Catálogos, pastas, cartões, folders);
 - Design de Embalagens, Rótulos e Pontos de Venda (Valorização do produto físico para elevar ticket médio);
@@ -169,8 +178,10 @@ O escopo completo da agência contempla:
 - Sites de Alta Conversão, Lojas Virtuais e Landing Pages responsivas com SEO;
 - Sistemas Customizados & Automação de Gestão (CRM de Vendas, Catálogo Digital de Pedidos B2B, Sistema de Agendamentos 24/7, Portais do Cliente e Automação de WhatsApp).
 
-OBJETIVO DA SUA ANÁLISE B2B:
-Você NUNCA escreve abordagens genéricas. Você mapeia com profundidade o lado humano (psicológico) e a lógica de negócios da empresa-alvo, apontando os problemas reais, como tratá-los com o ecossistema 360 e como isso gera MAIS LUCROS, REDUÇÃO DE CUSTOS e RETORNO FINANCEIRO (ROI) para o cliente.`;
+DIRETRIZ CRÍTICA DE TOM DE VOZ (NÃO SEJA PUXA-SACO):
+- NUNCA use bajulações, elogios vazios ou adulação excessiva (evite frases como 'sua empresa incrível', 'vocês são referência máxima absoluta', 'parabéns pelo trabalho maravilhoso').
+- Seja estritamente CONSULTIVO, DIRETO, ANALÍTICO, PROFISSIONAL e SEGURO.
+- Aponte os gargalos técnicos e de vendas com clareza, mostre o cálculo do custo da inação e apresente a solução da Locomotiva Comunicação como um investimento lógico de alto retorno financeiro (ROI).`;
 
     const user = `Analise detalhadamente a empresa abaixo com os dados cadastrais e resultados de pesquisa na internet:
 
@@ -220,6 +231,36 @@ Gere um dossiê JSON estruturado e completo com este formato EXATO:
       "Frustração 2 (ex: softwares complexos que a equipe não conseguiu usar)"
     ]
   },
+  "abordagensPsicologicas": [
+    {
+      "id": "dor",
+      "titulo": "1. Abordagem Direta: Foco na Dor Imediata",
+      "gatilho": "Dor Imediata & Alívio Rápido",
+      "foco": "Estancar a perda diária de orçamentos",
+      "mensagem": "Texto completo e direto de WhatsApp (sem puxa-saquismo) apontando o problema e convidando para ver a auditoria de 2 minutos."
+    },
+    {
+      "id": "medo_risco",
+      "titulo": "2. Abordagem Financeira: Foco no Custo da Inação",
+      "gatilho": "Risco Financeiro & Perda para Concorrentes",
+      "foco": "Quanto a empresa deixa na mesa todo mês",
+      "mensagem": "Texto executivo e pragmático mostrando o custo financeiro de adiar a modernização frente aos concorrentes da região."
+    },
+    {
+      "id": "ambicao",
+      "titulo": "3. Abordagem de Escala: Foco em Ambição & Liderança",
+      "gatilho": "Crescimento de Margem & Ticket Médio",
+      "foco": "Posicionamento premium para atrair clientes de maior valor",
+      "mensagem": "Texto focado em expansão, autoridade e aumento de margem de lucro com Comunicação 360."
+    },
+    {
+      "id": "frustracao",
+      "titulo": "4. Abordagem de Segurança: Foco em Solução Chave na Mão",
+      "gatilho": "Zero Sobrecarga & Execução Garantida",
+      "foco": "Eliminar o trauma de projetos que dão trabalho ou não vendem",
+      "mensagem": "Texto que quebra a desconfiança mostrando que a Locomotiva Comunicação assume todo o peso operacional e técnico."
+    }
+  ],
   "dimensaoOperacional": {
     "gargalosProcesso": [
       "Gargalo 1 no fluxo de apresentação da marca e captação de clientes",
@@ -301,191 +342,222 @@ Gere um dossiê JSON estruturado e completo com este formato EXATO:
     },
     "email": {
       "titulo": "E-mail Executivo para Decisores",
-      "assunto": "Assunto instigante sobre faturamento e posicionamento da ${data.empresa.nome}",
-      "focoPrincipal": "Diagnóstico do custo da inação + solução 360",
-      "texto": "Texto completo e estruturado para e-mail corporativo, com quebras de parágrafo limpas e call-to-action de 15 minutos."
+      "assunto": "Diagnóstico & Oportunidade de Lucro — ${data.empresa.nome}",
+      "focoPrincipal": "Demonstração de autoridade técnica e ROI",
+      "texto": "E-mail profissional, direto ao ponto, estruturado com tópicos e link para micro-auditoria."
     },
     "instagram": {
-      "titulo": "Direct de Instagram (Observacional & Autêntico)",
-      "ganchoAbertura": "Elogio ao trabalho + observação estratégica de conversão",
-      "texto": "Texto completo para direct, 4-6 linhas, sem parecer spam."
+      "titulo": "Direct de Instagram Direto",
+      "ganchoAbertura": "Ponto de atenção no fluxo de atendimento da ${data.empresa.nome}",
+      "texto": "Mensagem curta de Direct para o perfil do Instagram com objetivo de migrar para o WhatsApp do decisor."
     },
     "ligacaoReuniao": {
-      "titulo": "Roteiro de Ligação / Reunião de Fechamento",
-      "falaAbertura": "Fala inicial para o telefone abrindo a conversa em 30 segundos",
-      "perguntaChaveDiagnostico": "Pergunta cirúrgica que faz o cliente admitir a dor operacional",
+      "titulo": "Roteiro Consultivo de Reunião / Ligação",
+      "falaAbertura": "Fala inicial de 30 segundos para capturar a atenção do sócio/gestor.",
+      "perguntaChaveDiagnostico": "Pergunta cirúrgica que faz o decisor admitir o gargalo de vendas atual.",
       "roteiroPassos": [
-        "1. Gancho contextualizado sobre ${data.empresa.cidade}",
-        "2. Identificação do sintoma e custo da inação",
-        "3. Apresentação da solução 360 integrada",
-        "4. Fechamento para demonstração de 15 minutos"
+        "1. Validação do cenário atual e volume de propostas perdidas",
+        "2. Apresentação do custo financeiro da inação",
+        "3. Demonstração da solução integrada 360 + Sistemas",
+        "4. Proposta de fechamento com onboarding guiado"
       ]
     },
     "propostaValor360": {
-      "titulo": "Proposta de Valor & Pitch Executivo 360",
-      "resumoExecutivo": "Resumo em 3 frases de como a agência transforma a empresa em líder do setor",
-      "textoCompleto": "Texto completo da proposta de valor integrando Branding, Impressos, Digital, Vídeos, Site e Sistemas de Gestão."
+      "titulo": "Pitch de Proposta de Valor Integrada 360",
+      "resumoExecutivo": "Visão geral de como a Locomotiva Comunicação integra marca, materiais, canais digitais e sistemas em um único contrato chave na mão.",
+      "textoCompleto": "Texto completo de proposta consultiva pronta para apresentação."
     }
   }
 }`;
 
     try {
-      return await chatJSON<Dossier360Result>([
+      const parsed = await chatJSON<Dossier360Result>([
         { role: "system", content: sys },
         { role: "user", content: user },
       ]);
+      return parsed;
     } catch (err) {
-      console.warn("Falha na geração com IA do Dossiê 360, usando fallback analítico:", err);
-      return gerarDossierFallback(data.empresa, agencia);
+      console.warn("Falha no LLM para Dossiê 360, usando gerador determinístico inteligente:", err);
+      return gerarFallbackDossier(data.empresa, webInfo, agencia);
     }
   });
 
-/**
- * Fallback analítico determinístico para o Dossiê 360.
- */
-function gerarDossierFallback(empresa: EmpresaCtx, agencia: string): Dossier360Result {
+function gerarFallbackDossier(
+  empresa: EmpresaCtx,
+  webInfo: { snippets: string[]; fontes: string[]; resumoMercado: string },
+  agencia: string,
+): Dossier360Result {
   const nome = empresa.nome;
-  const cidade = empresa.cidade;
+  const cid = empresa.cidade;
   const seg = empresa.segmento;
-  const contato = "[Nome do contato]";
+  const auditLink = `https://locomotivacrm.com.br/auditoria/${empresa.id}`;
 
   return {
     empresaNome: nome,
     segmento: seg,
-    cidade,
+    cidade: cid,
     pesquisaWebRealizada: {
-      termoBuscado: `${nome} ${cidade}`,
-      fontesEncontradas: [
-        `https://www.google.com/search?q=${encodeURIComponent(`${nome} ${cidade}`)}`,
-      ],
-      resumoMercadoLocal: `Setor de ${seg} em ${cidade}/RS com forte potencial de valorização de marca e digitalização operacional.`,
+      termoBuscado: `${nome} ${cid} ${seg}`,
+      fontesEncontradas: webInfo.fontes.slice(0, 3),
+      resumoMercadoLocal: `Segmento de ${seg} em ${cid} com demanda ativa por atendimento ágil e presença profissional consistente.`,
     },
     dimensaoPsicologica: {
       doresAtuais: [
-        `Falta de padronização entre materiais impressos, embalagens e presença digital da ${nome}.`,
-        `Perda de orçamentos e clientes que buscam por ${seg} e não encontram atendimento rápido.`,
-        `Dependência de indicações ou processos manuais para captação de clientes.`,
+        `Gargalo na conversão de novos clientes em ${cid} por falta de canais digitais ágeis.`,
+        "Equipe perde tempo em atendimentos repetitivos e orçamentos que não fecham.",
+        "Comunicação visual e materiais não refletem o verdadeiro padrão de qualidade da empresa.",
       ],
       medosERiscos: [
-        `Risco de perder fatia de mercado para novos concorrentes modernizados em ${cidade} e região.`,
-        `Medo de investir em agências que só entregam postagens sem retorno financeiro real.`,
-        `Risco de desvalorização do produto e necessidade de competir apenas por preço baixo.`,
+        `Concorrentes de ${cid} e região ocuparem o mercado consumidor com marketing mais moderno.`,
+        "Passar percepção de amadorismo e ser pressionado a conceder descontos excessivos.",
+        "Gastar tempo e dinheiro com ações isoladas que não geram aumento de faturamento.",
       ],
       desejosEAmbicoes: [
-        `Tornar a ${nome} a marca número 1 e referência indiscutível em ${seg}.`,
-        `Atrair clientes qualificados e dispostos a pagar um ticket médio superior.`,
-        `Expandir atuação para todo o estado e canais corporativos com segurança.`,
+        `Tornar-se a marca de maior autoridade e preferência em ${seg} na região.`,
+        "Elevar o ticket médio e fechar orçamentos de maior margem de lucro com facilidade.",
+        "Processos comerciais organizados e rodando no piloto automático com sistemas.",
       ],
       frustracoesPassadas: [
-        `Experiências anteriores com soluções amadoras que não geraram leads nem vendas.`,
-        `Softwares complicados ou agências que não entenderam a rotina real do negócio.`,
+        "Experiências anteriores com prestadores que entregaram apenas posts sem impacto financeiro.",
+        "Softwares engessados que exigiram esforço e acabaram abandonados pela equipe.",
       ],
     },
+    abordagensPsicologicas: [
+      {
+        id: "dor",
+        titulo: "1. Abordagem Direta: Foco na Dor Imediata",
+        gatilho: "Dor Imediata & Alívio Rápido",
+        foco: "Estancar perda diária de orçamentos",
+        mensagem: `Olá, [Nome do contato]! Tudo bem?\n\nMe chamo [Seu Nome], da ${agencia}.\n\nAcompanho o setor de ${seg} em ${cid} e notei um gargalo na apresentação e canais da ${nome} que pode estar custando clientes prontos para comprar todos os dias.\n\nPreparamos uma análise de 2 minutos sobre isso (${auditLink}). Posso te apresentar os principais pontos em uma conversa rápida de 10 minutos?\n\nUm abraço,\n${agencia}`,
+      },
+      {
+        id: "medo_risco",
+        titulo: "2. Abordagem Financeira: Foco no Custo da Inação",
+        gatilho: "Risco Financeiro & Perda para Concorrentes",
+        foco: "Cálculo de perda mensal por adiar modernização",
+        mensagem: `Olá, [Nome do contato]!\n\nAnalisando o mercado de ${seg} em ${cid}, calculamos que empresas do seu porte deixam entre R$ 5.000 e R$ 15.000 na mesa todo mês por falta de canais de captação e CRM comercial ágil.\n\nA ${agencia} estruturou um plano para estancar esse vazamento de receita na ${nome}.\n\nVocê teria 10 minutos nesta quinta-feira para avaliarmos esses números juntos?\n\nAtenciosamente,\n${agencia}`,
+      },
+      {
+        id: "ambicao",
+        titulo: "3. Abordagem de Escala: Foco em Ambição & Liderança",
+        gatilho: "Crescimento de Margem & Autoridade",
+        foco: "Posicionamento premium para ticket médio superior",
+        mensagem: `Olá, [Nome do contato]!\n\nAcompanhando o potencial da ${nome} em ${cid}, vemos uma oportunidade clara de posicionar a marca no topo do segmento de ${seg}, permitindo atrair clientes de maior ticket e elevar a margem de lucro.\n\nTrabalhamos com o modelo Comunicação 360 + Sistemas de Gestão chave na mão.\n\nPodemos agendar uma call rápida de 10 minutos para conhecer os cases de expansão que aplicamos na região?`,
+      },
+      {
+        id: "frustracao",
+        titulo: "4. Abordagem de Segurança: Foco em Solução Chave na Mão",
+        gatilho: "Zero Sobrecarga & Execução Garantida",
+        foco: "Sem trabalho técnico para a equipe do cliente",
+        mensagem: `Olá, [Nome do contato]!\n\nSabemos que muitos empresários de ${cid} já se frustraram com agências que só vendem 'postzinhos' sem retorno, ou ferramentas complexas que ninguém usa.\n\nNa ${agencia}, nosso modelo é 100% focado em retorno financeiro: cuidamos de toda a parte técnica, design e automações para que você só receba os orçamentos prontos.\n\nConseguiu dar uma olhada na micro-auditoria que geramos para a ${nome} (${auditLink})?`,
+      },
+    ],
     dimensaoOperacional: {
       gargalosProcesso: [
-        `Fluxo de atendimento que depende de resposta manual sem centralização de leads.`,
-        `Apresentação comercial e catálogo que não transmitem todo o valor do produto.`,
+        "Falta de catálogo digital interativo para fechamento ágil de pedidos.",
+        "Tempo de resposta demorado no WhatsApp que afasta compradores decididos.",
+        "Ausência de CRM comercial para organizar follow-ups e orçamentos pendentes.",
       ],
-      impactoFinanceiroCustoInacao: `Estimativa de R$ 8.000 a R$ 25.000 mensais em vendas não convertidas por falta de presença 360 integrada.`,
+      impactoFinanceiroCustoInacao: "Perda estimada de R$ 5.000 a R$ 18.000 mensais em orçamentos não convertidos.",
       nivelMaturidade: "intermediaria",
-      justificativaMaturidade: `Empresa com produto consolidado e operação ativa, ideal para implantação rápida 'chave na mão' com suporte humanizado.`,
+      justificativaMaturidade: "A empresa possui boa reputação local, necessitando apenas da esteira de automação e modernização de marca para multiplicar o faturamento.",
       sistemasGestaoRecomendados: [
         {
           id: "crm_vendas",
-          nome: "CRM Comercial & Funil de Vendas",
+          nome: "CRM Comercial & Pipeline de Vendas",
           categoria: "crm",
           icone: "BarChart3",
-          beneficioGestao: "Centraliza todas as oportunidades em um painel visual, organizando o follow-up da equipe.",
-          impactoLucro: "Evita que orçamentos sejam esquecidos, aumentando o fechamento de propostas em até 40%.",
+          beneficioGestao: "Controle visual de todas as negociações em andamento com lembretes automáticos de retorno.",
+          impactoLucro: "Aumenta o fechamento de propostas em até 35% ao eliminar o esquecimento de clientes.",
           aplicabilidade: "essencial",
-          exemploPratico: "Acompanhamento passo a passo de cada cliente desde o primeiro contato até o pós-venda.",
+          exemploPratico: "A equipe visualiza em segundos quem pediu orçamento e precisa de contato hoje.",
         },
         {
           id: "catalogo_pedidos_b2b",
-          nome: "Catálogo Digital & Gestão de Pedidos",
+          nome: "Catálogo B2B & Central de Pedidos Online",
           categoria: "erp_pedidos",
           icone: "Package",
-          beneficioGestao: "Catálogo interativo com emissão direta de pedidos pelo smartphone dos clientes e representantes.",
-          impactoLucro: "Agiliza o processo de recompra e reduz 70% do tempo gasto enviando tabelas em PDF.",
+          beneficioGestao: "Apresentação visual interativa de produtos com emissão automática de pedidos.",
+          impactoLucro: "Reduz o tempo de atendimento em 70% e estimula recompra recorrente.",
           aplicabilidade: "alta",
-          exemploPratico: "Clientes e parceiros comerciais montam pedidos online 24 horas por dia.",
+          exemploPratico: "Clientes e vendedores montam orçamentos diretamente pelo celular 24h por dia.",
         },
         {
           id: "automacao_whats",
-          nome: "Automação de Atendimento & WhatsApp",
+          nome: "Automação de Atendimento & Triagem WhatsApp",
           categoria: "automacao_whats",
           icone: "MessageSquare",
-          beneficioGestao: "Triagem automática de dúvidas frequentes e direcionamento qualificado para o comercial.",
-          impactoLucro: "Reduz o tempo de espera do cliente de horas para segundos, estancando a perda de leads para concorrentes.",
+          beneficioGestao: "Triagem instantânea dos contatos com qualificação automática antes do atendente humano.",
+          impactoLucro: "Garante resposta em menos de 1 minuto, impedindo o lead de pesquisar concorrentes.",
           aplicabilidade: "alta",
-          exemploPratico: "Atendimento imediato e qualificação de clientes fora do horário comercial.",
+          exemploPratico: "Responde dúvidas frequentes e direciona o cliente pronto para fechar a compra.",
         },
       ],
     },
     dimensaoEstrategica: {
       metasCrescimento: [
-        `Aumentar o faturamento global e a margem de lucro por produto vendido.`,
-        `Fortalecer a autoridade institucional em todos os pontos de contato com o cliente.`,
+        `Dominar as buscas e preferência de compra no setor de ${seg} em ${cid}.`,
+        "Aumentar o volume de vendas mantendo uma operação enxuta e eficiente.",
       ],
-      culturaOrganizacional: `Liderança focada em solidez e resultados práticos, valorizando soluções completas que não demandem tempo excessivo de gestão.`,
-      tomRecomendadoAbordagem: `Consultivo, executivo e embasado em ROI, mostrando clareza de retorno.`,
+      culturaOrganizacional: "Gestão orientada a resultados práticos e eficiência operacional, que valoriza parcerias sérias e transparentes.",
+      tomRecomendadoAbordagem: "Consultivo, executivo e embasado em retorno financeiro, sem formalismos vazios.",
     },
     prescricaoTratamentoLucro: {
       itensTratamento: [
         {
-          sintomaIdentificado: `Comunicação fragmentada e sem canal digital de alta performance`,
-          solucao360OuSistema: `Branding 360 + Site de Alta Conversão`,
-          comoTratar: `Unificar a identidade visual desde materiais físicos até a presença online, com site focado em fechamento.`,
-          comoGeraMaisLucro: `Eleva a autoridade da marca e converte visitantes em orçamentos qualificados no automático.`,
+          sintomaIdentificado: "Canais digitais com baixa conversão e ausência de site moderno",
+          solucao360OuSistema: "Site de Alta Conversão + Identidade 360",
+          comoTratar: "Desenvolver uma página veloz com pontos claros de conversão e identidade marcante.",
+          comoGeraMaisLucro: "Transforma cliques em mensagens no WhatsApp comercial, gerando fluxo constante de leads.",
         },
         {
-          sintomaIdentificado: `Processo de vendas e orçamentos sem acompanhamento automatizado`,
-          solucao360OuSistema: `CRM Comercial + Automação de WhatsApp`,
-          comoTratar: `Implantar funil de vendas simples com alertas e respostas rápidas.`,
-          comoGeraMaisLucro: `Aumenta o percentual de fechamento de 15% para 35%, gerando receita imediata sobre os contatos que já chegam.`,
+          sintomaIdentificado: "Desorganização no fluxo de propostas e atendimento",
+          solucao360OuSistema: "CRM Comercial + Automação de WhatsApp",
+          comoTratar: "Implementar funil de vendas integrado com respostas automáticas e régua de acompanhamento.",
+          comoGeraMaisLucro: "Recupera até 40% das propostas que seriam esquecidas pela rotina corrida.",
         },
         {
-          sintomaIdentificado: `Embalagens e materiais impressos que não refletem a excelência do produto`,
-          solucao360OuSistema: `Design de Embalagens Premium + Catálogo Impresso/Digital`,
-          comoTratar: `Criar embalagens sofisticadas e materiais comerciais que causam impacto visual imediato.`,
-          comoGeraMaisLucro: `Permite elevar o ticket médio e posiciona a marca acima dos concorrentes que usam embalagens genéricas.`,
+          sintomaIdentificado: "Material impresso e embalagens sem diferenciação competitiva",
+          solucao360OuSistema: "Embalagens & Papelaria Corporativa de Alto Padrão",
+          comoTratar: "Desenvolver catálogos e embalagens com acabamento superior que transmitem segurança.",
+          comoGeraMaisLucro: "Permite praticar preços mais altos ao elevar a percepção de valor dos produtos.",
         },
       ],
-      resumoFinanceiroLucratividade: `A integração de Comunicação 360 com Sistemas de Gestão transforma a comunicação de um centro de custos para o principal motor de lucro líquido e expansão da ${nome}.`,
+      resumoFinanceiroLucratividade: "A implementação coordenada do ecossistema 360 estanca gargalos de captação e processos, convertendo mais vendas sem necessidade de aumentar a equipe.",
     },
     abordagensPorCanal: {
       whatsapp: {
-        titulo: "WhatsApp Consultivo de Alto Impacto",
-        ganchoAbertura: `Oportunidade de alavancagem comercial para ${nome} em ${cidade}`,
-        focoPrincipal: "Solução de gargalos + aumento de conversão e lucro",
-        texto: `Olá, ${contato}! Tudo bem?\n\nMe chamo [Seu Nome] e estive analisando o posicionamento da ${nome} aqui em ${cidade}.\n\nIdentificamos uma oportunidade clara para aumentar o faturamento de vocês integrando a comunicação da marca (identidade, embalagens e digital) com um sistema simples de CRM para estancar orçamentos perdidos.\n\nPreparamos um diagnóstico rápido de 3 minutos mostrando como nossos clientes do setor aumentaram a margem de lucro sem burocracia. Posso te enviar por aqui?\n\nUm abraço,\n${agencia}`,
+        titulo: "Mensagem Estratégica para WhatsApp (Direta & Consultiva)",
+        ganchoAbertura: `Oportunidade de otimização em ${cid}`,
+        focoPrincipal: "Estancar gargalos e acelerar orçamentos",
+        texto: `Olá, [Nome do contato]! Tudo bem?\n\nMe chamo [Seu Nome], da ${agencia}.\n\nAcompanho o mercado de ${seg} em ${cid} e estive analisando os canais da ${nome}. Notei alguns gargalos de captação que estão fazendo a empresa perder orçamentos para concorrentes da região.\n\nPreparamos uma análise de 2 minutos sobre como estancar essas perdas e automatizar o atendimento.\n\nPosso compartilhar o diagnóstico com você por aqui?\n\nUm abraço,\n${agencia}`,
       },
       email: {
-        titulo: "E-mail Executivo de Diagnóstico & Lucro",
-        assunto: `Diagnóstico Estratégico & Oportunidade de Crescimento — ${nome} (${cidade})`,
-        focoPrincipal: "Análise de ROI, Comunicação 360 e Sistemas",
-        texto: `Prezado(a) ${contato},\n\nAnalisamos a presença de mercado da ${nome} em ${cidade} e mapeamos pontos estratégicos onde a unificação da comunicação (branding, materiais físicos e digital) combinada com automação de gestão pode destravar novos recordes de faturamento.\n\nNossa agência é especialista em soluções 360 'chave na mão': cuidamos desde o design de embalagens e presença web até a implantação de sistemas de vendas (CRM e catálogo digital) que organizam sua operação e aumentam a margem de lucro.\n\nGostaria de compartilhar uma apresentação executiva de 15 minutos personalizada para a ${nome}.\n\nQual o melhor dia esta semana para conversarmos?\n\nAtenciosamente,\n${agencia}`,
+        titulo: "E-mail Executivo para Decisores",
+        assunto: `Micro-Auditoria & Oportunidades de Lucro — ${nome} (${cid})`,
+        focoPrincipal: "Diagnóstico técnico e retorno financeiro",
+        texto: `Olá, [Nome do contato],\n\nNossa equipe da ${agencia} realizou um mapeamento de mercado focado no segmento de ${seg} em ${cid}.\n\nIdentificamos que a ${nome} possui um excelente potencial, mas vem perdendo oportunidades de vendas devido a gargalos na presença digital e no fluxo de atendimento.\n\nEstruturamos um relatório executivo de 2 minutos com:\n1. Principais pontos de atrito identificados na marca e canais;\n2. Estimativa de faturamento que deixa de entrar mensalmente;\n3. Como resolver esses gargalos com Comunicação 360 e Sistemas de Gestão.\n\n👉 Você pode acessar o diagnóstico completo neste link:\n${auditLink}\n\nFicamos à disposição para uma rápida conversa de 10 minutos caso queira entender como aplicar essas soluções na prática.\n\nAtenciosamente,\n${agencia}\nlocomotivacomunicacao.com.br`,
       },
       instagram: {
-        titulo: "Direct do Instagram (Estratégico & Amistoso)",
-        ganchoAbertura: `Parabéns pelo trabalho + sugestão de conversão 360`,
-        texto: `Oi, ${contato}! 👋 Parabéns pelo trabalho da ${nome} em ${cidade}.\n\nIdentificamos que o posicionamento de vocês tem tudo para atrair clientes de ticket bem mais alto se integrado com uma estrutura 360 e atendimento automatizado.\n\nTopa uma conversa rápida para eu te mostrar como ajudamos empresas do setor a multiplicarem o retorno comercial?`,
+        titulo: "Direct de Instagram Direto",
+        ganchoAbertura: `Ponto de atenção nos canais da ${nome}`,
+        texto: `Olá, pessoal da ${nome}! Tudo bem?\n\nMe chamo [Seu Nome], da ${agencia}.\n\nEstive analisando o perfil de vocês e notei um detalhe no fluxo de atendimento que pode estar travando o contato de clientes que chegam por aqui.\n\nPreparamos uma análise rápida sobre isso. Qual o melhor WhatsApp ou e-mail do responsável para eu enviar o link?\n\nUm abraço!`,
       },
       ligacaoReuniao: {
-        titulo: "Roteiro de Ligação / Reunião Consultiva",
-        falaAbertura: `"Olá, ${contato}, aqui é da ${agencia}. Estou ligando porque estudei o setor de ${seg} em ${cidade} e identifiquei um potencial claro de aumento de faturamento para a ${nome}."`,
-        perguntaChaveDiagnostico: `"Hoje, quanto vocês estimam que deixam de faturar por falta de um canal 100% integrado que atenda e acompanhe o cliente no mesmo instante?"`,
+        titulo: "Roteiro Consultivo de Reunião / Ligação",
+        falaAbertura: `Olá, [Nome do contato]! Me chamo [Seu Nome], da ${agencia}. Estou ligando rapidamente porque acompanho o mercado de ${seg} aqui em ${cid} e identifiquei 2 gargalos na presença da ${nome} que estão fazendo clientes prontos irem para a concorrência.`,
+        perguntaChaveDiagnostico: "Hoje, quando um cliente pede um orçamento pelo WhatsApp ou site, quanto tempo em média a sua equipe leva para responder e enviar a proposta final?",
         roteiroPassos: [
-          `1. Conexão imediata com a realidade de ${cidade} e o segmento de ${seg}`,
-          `2. Apontar o custo invisível de processos manuais e comunicação fragmentada`,
-          `3. Mostrar como a solução 360 (Branding, Web e Sistemas) resolve rápido`,
-          `4. Fechamento de compromisso para demonstração executiva de 15 minutos`,
+          "1. Abertura: Confirmar se o tempo de resposta e follow-up hoje é um desafio.",
+          "2. Apresentação do Custo da Inação: Mostrar que cada hora de demora reduz 50% a chance de fechar a venda.",
+          "3. Solução 360 + Sistemas: Apresentar a Locomotiva Comunicação cuidando da marca, site, catálogo e CRM.",
+          "4. Fechamento: Convidar para demonstração prática guiada de 15 minutos sem compromisso.",
         ],
       },
       propostaValor360: {
-        titulo: "Pitch de Proposta de Valor 360",
-        resumoExecutivo: `A ${agencia} desenvolve toda a cadeia de comunicação e sistemas para a ${nome}, gerando valor de ponta a ponta sem sobrecarregar a rotina dos sócios.`,
-        textoCompleto: `A proposta da ${agencia} para a ${nome} integra:\n\n1. BRANDING & EMBALAGENS: Identidade visual de alto padrão e embalagens sofisticadas para elevar o ticket médio e a autoridade de mercado.\n\n2. PRESENÇA DIGITAL & VÍDEOS: Site de alta conversão, redes sociais estratégicas e vídeos institucionais cinematográficos.\n\n3. SISTEMAS DE GESTÃO & CRM: Implantação de funil de vendas automatizado, catálogo de pedidos e suporte humanizado para sua equipe vender mais em menos tempo.\n\nResultado: Mais lucro líquido, clientes qualificados e tranquilidade operacional para os tomadores de decisão.`,
+        titulo: "Pitch de Proposta de Valor Integrada Locomotiva 360",
+        resumoExecutivo: "Ecossistema completo que unifica design premium, produção de materiais, canais digitais de alta conversão e sistemas de gestão operacional em uma única mensalidade chave na mão.",
+        textoCompleto: `PROPOSTA DE VALOR INTEGRADA — LOCOMOTIVA COMUNICAÇÃO\n\nPara: ${nome} (${cid}/RS)\nSegmento: ${seg}\n\n1. O PROBLEMA CENTRAL:\nEmpresas em crescimento sofrem ao contratar fornecedores fragmentados (um faz o post, outro o site, outro o sistema), gerando retrabalho, perda de padrão e custos elevados sem aumento real de vendas.\n\n2. A SOLUÇÃO LOCOMOTIVA 360:\nA Locomotiva Comunicação assume toda a esteira de marketing e processos da ${nome}:\n- Branding & Identidade Visual de Alto Impacto\n- Materiais Impressos, Catálogos e Embalagens Comerciais\n- Sites de Alta Conversão & Redes Sociais Estratégicas\n- CRM Comercial & Automação de WhatsApp para Vendas\n\n3. RESULTADO ESPERADO:\n- Aumento de 30% a 50% na taxa de conversão de orçamentos;\n- Economia de mais de 20 horas mensais da equipe com automação de atendimento;\n- Posicionamento líder incontestável no mercado de ${cid}.\n\nEntre em contato conosco para iniciarmos a implantação: locomotivacomunicacao.com.br`,
       },
     },
   };
