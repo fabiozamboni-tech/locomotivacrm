@@ -4,6 +4,7 @@ import { z } from "zod";
 const EmpresaInput = z.object({
   nome: z.string(),
   segmento: z.string(),
+  areaAtuacao: z.string().optional(),
   cidade: z.string(),
   site: z.string().optional(),
   instagram: z.string().optional(),
@@ -38,9 +39,16 @@ export interface AjustesBusca {
   termos?: string[];
 }
 
-export function sementesPadrao(segmento: string, cidade: string) {
+export function sementesPadrao(segmento: string, cidade: string, areaAtuacao?: string) {
   const seg = segmento.toLowerCase();
-  return [`${seg} ${cidade}`, `${seg} em ${cidade}`, `melhor ${seg} ${cidade}`, `${seg} perto de mim`];
+  const list = [`${seg} ${cidade}`, `${seg} em ${cidade}`, `melhor ${seg} ${cidade}`, `${seg} perto de mim`];
+  if (areaAtuacao) {
+    const limpo = areaAtuacao.split(/[,\-–\.]/)[0].trim().toLowerCase();
+    if (limpo && limpo.length > 3 && limpo !== seg) {
+      list.unshift(`${limpo} em ${cidade}`);
+    }
+  }
+  return list;
 }
 
 async function autocomplete(q: string): Promise<string[]> {

@@ -40,6 +40,7 @@ import {
   Ban,
   Clock,
   Wand2,
+  Building2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
@@ -55,6 +56,7 @@ import {
   origemLink,
 } from "@/lib/links";
 import { PromptsModal } from "@/components/prompts-modal";
+import { EmpresaCadastroModal } from "@/components/empresa-cadastro-modal";
 import { EnviarEmailModal } from "@/components/enviar-email-modal";
 import { EnviarWhatsAppModal } from "@/components/enviar-whatsapp-modal";
 
@@ -101,6 +103,7 @@ function EmpresaDetalhe() {
   const [openPrompts, setOpenPrompts] = useState(false);
   const [openEmail, setOpenEmail] = useState(false);
   const [openWhats, setOpenWhats] = useState(false);
+  const [openCadastro, setOpenCadastro] = useState(false);
 
   const detalhes = useMemo(() => (empresa ? calcularScore(empresa, weights) : null), [empresa, weights]);
   const insights = useMemo(() => (empresa ? gerarInsights(empresa) : null), [empresa]);
@@ -172,6 +175,16 @@ function EmpresaDetalhe() {
               <Sparkles className="h-4 w-4" />
               🎯 Dossiê & Abordagens 360
             </Link>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setOpenCadastro(true)}
+            className="h-9 text-xs gap-1.5 border-blue-500/30 text-blue-600 hover:bg-blue-500/10"
+          >
+            <Building2 className="h-3.5 w-3.5 text-blue-500" />
+            Editar Cadastro
           </Button>
 
           <Button
@@ -250,6 +263,15 @@ function EmpresaDetalhe() {
             <CardHeader className="pb-2"><CardTitle className="text-base">Resumo executivo</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm leading-relaxed">{insights.resumo}</p>
+              {empresa.areaAtuacao && (
+                <div className="p-3 rounded-lg border border-primary/20 bg-primary/5 text-xs space-y-1">
+                  <div className="font-semibold text-primary flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Área de Atuação & Especialidade
+                  </div>
+                  <p className="text-muted-foreground leading-relaxed">{empresa.areaAtuacao}</p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <InfoLine icon={Phone} label="Telefone" value={empresa.telefone} href={telUrl(empresa.telefone)} />
                 <InfoLine icon={MessageCircle} label="WhatsApp" value={empresa.whatsapp} href={whatsappUrl(empresa.whatsapp)} accent="emerald" />
@@ -596,6 +618,12 @@ function EmpresaDetalhe() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <EmpresaCadastroModal
+        empresa={empresa}
+        open={openCadastro}
+        onOpenChange={setOpenCadastro}
+      />
 
       <PromptsModal
         empresa={empresa}

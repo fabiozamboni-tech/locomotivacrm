@@ -38,7 +38,7 @@ const OPCOES: { value: Pilar; label: string }[] = [
 
 function RelatorioPage() {
   const { empresa: empresaId } = useSearch({ from: "/relatorio" });
-  const { empresas, addHistorico } = useStore();
+  const { empresas, addHistorico, updateEmpresa } = useStore();
   const [sel, setSel] = useState(empresaId ?? empresas[0]?.id ?? "");
   const [pilares, setPilares] = useState<Pilar[]>(["site", "comunicacao", "redes", "branding"]);
   const [loading, setLoading] = useState(false);
@@ -51,9 +51,17 @@ function RelatorioPage() {
 
   useEffect(() => {
     if (!empresa) return;
-    setSementesTxt(sementesPadrao(empresa.segmento, empresa.cidade).join("\n"));
-    setConsulta(`${empresa.segmento} em ${empresa.cidade}`);
-    setTermosTxt("");
+    setSementesTxt(
+      empresa.buscasPartida?.trim() ||
+      sementesPadrao(empresa.segmento, empresa.cidade, empresa.areaAtuacao).join("\n")
+    );
+    setConsulta(
+      empresa.buscaGoogleMaps?.trim() ||
+      (empresa.areaAtuacao
+        ? `${empresa.areaAtuacao.split(/[,\-–\.]/)[0].trim()} em ${empresa.cidade}`
+        : `${empresa.segmento} em ${empresa.cidade}`)
+    );
+    setTermosTxt(empresa.termosEncontrados?.trim() || "");
     setRes(null);
   }, [empresa?.id]);
 
@@ -67,9 +75,16 @@ function RelatorioPage() {
       const r = await gerar({
         data: {
           empresa: {
-            nome: empresa.nome, segmento: empresa.segmento, cidade: empresa.cidade,
-            site: empresa.site, instagram: empresa.instagram, statusSite: empresa.statusSite,
-            statusInstagram: empresa.statusInstagram, score: empresa.score, observacoes: empresa.observacoes,
+            nome: empresa.nome,
+            segmento: empresa.segmento,
+            areaAtuacao: empresa.areaAtuacao,
+            cidade: empresa.cidade,
+            site: empresa.site,
+            instagram: empresa.instagram,
+            statusSite: empresa.statusSite,
+            statusInstagram: empresa.statusInstagram,
+            score: empresa.score,
+            observacoes: empresa.observacoes,
           },
           pilares,
           agencia: "Locomotiva Comunicação",
@@ -77,15 +92,24 @@ function RelatorioPage() {
         },
       });
       setRes(r);
-      setTermosTxt(r.seo.termos.map((t) => t.termo).join("\n"));
+      const novosTermos = r.seo.termos.map((t) => t.termo).join("\n");
+      setTermosTxt(novosTermos);
       setSementesTxt(r.seo.sementes.join("\n"));
       setConsulta(r.seo.consulta);
+
+      // Salva os termos refinados no cadastro da empresa no banco de dados
+      updateEmpresa(empresa.id, {
+        buscasPartida: r.seo.sementes.join("\n"),
+        termosEncontrados: novosTermos,
+        buscaGoogleMaps: r.seo.consulta,
+      });
+
       addHistorico(empresa.id, {
         data: new Date().toISOString(),
         tipo: "nota",
-        texto: `Relatório de diagnóstico gerado (${pilares.join(", ")}).`,
+        texto: `Relatório de diagnóstico gerado (${pilares.join(", ")}). Termos de busca sincronizados no cadastro.`,
       });
-      toast.success("Relatório gerado");
+      toast.success("Relatório gerado e termos de busca salvos no cadastro da empresa!");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha ao gerar relatório");
     } finally {

@@ -145,7 +145,7 @@ async function pesquisarContextoWeb(empresa: EmpresaCtx): Promise<{ snippets: st
 
   if (serpApiKey && serpApiKey.length > 20 && !serpApiKey.includes(":")) {
     try {
-      const q = `"${empresa.nome}" "${empresa.cidade}" ${empresa.segmento}`;
+      const q = `"${empresa.nome}" "${empresa.cidade}" ${empresa.areaAtuacao || empresa.segmento}`;
       const url = new URL("https://serpapi.com/search.json");
       url.searchParams.set("q", q);
       url.searchParams.set("engine", "google");
@@ -224,17 +224,27 @@ DIRETRIZ CRÍTICA DE TOM DE VOZ (NÃO SEJA PUXA-SACO):
 - Seja estritamente CONSULTIVO, DIRETO, ANALÍTICO, PROFISSIONAL e SEGURO.
 - Aponte os gargalos técnicos e de vendas com clareza, mostre o cálculo do custo da inação e apresente a solução da Locomotiva Comunicação como um investimento lógico de alto retorno financeiro (ROI).`;
 
-    const user = `Analise detalhadamente a empresa abaixo com os dados cadastrais e resultados de pesquisa na internet:
+    const user = `Analise detalhadamente a empresa abaixo com os dados cadastrais, área de atuação, histórico de interações e resultados de pesquisa na internet:
 
 DADOS DA EMPRESA:
-- Nome: ${data.empresa.nome}
+- Nome: ${data.empresa.nome}${data.empresa.razaoSocial ? ` (${data.empresa.razaoSocial})` : ""}
 - Segmento: ${data.empresa.segmento}
+- Área de Atuação / Especialidade: ${data.empresa.areaAtuacao || "Não especificada detalhadamente"}
 - Cidade: ${data.empresa.cidade}${data.empresa.bairro ? ` · ${data.empresa.bairro}` : ""}/RS
 - Site: ${data.empresa.site || "Não possui / desatualizado"} (Status: ${data.empresa.statusSite})
 - Instagram: ${data.empresa.instagram || "Não localizado"} (Status: ${data.empresa.statusInstagram})
 - Telefone/WhatsApp: ${data.empresa.whatsapp || data.empresa.telefone || "Não informado"}
 - Score Digital: ${data.empresa.score}/100
+- Termos de Busca do Negócio: ${data.empresa.buscasPartida ? data.empresa.buscasPartida.replace(/\n/g, ", ") : "Padrão do segmento"}
+- Busca no Google Maps / Google: ${data.empresa.buscaGoogleMaps || "Não definida"}
 - Observações internas: ${data.empresa.observacoes || "Nenhuma"}
+
+HISTÓRICO COMPLETO DE INTERAÇÕES E NOTAS ANTERIORES:
+${data.empresa.historico && data.empresa.historico.length > 0 ? data.empresa.historico.map((h) => `- [${h.data.slice(0, 10)}] ${h.tipo ? `(${h.tipo}) ` : ""}${h.texto}`).join("\n") : "Sem interações anteriores registradas no CRM."}
+
+DIRETRIZ OBRIGATÓRIA DE REFINAMENTO POR ÁREA DE ATUAÇÃO E HISTÓRICO:
+- Utilize a ÁREA DE ATUAÇÃO ESPECÍFICA para construir abordagens e argumentos cirúrgicos sobre os produtos e serviços reais da empresa (evite generalismos vazios).
+- VERIFIQUE TODAS AS INTERAÇÕES ANTERIORES DO HISTÓRICO: se o cliente já recebeu contatos, já levantou objeções ou tem anotações de conversas passadas, adapte o tom e o discurso para dar continuidade inteligente, superando resistências anteriores sem parecer robótico.
 
 DADOS COLETADOS DA PESQUISA WEB EM TEMPO REAL:
 ${webInfo.snippets.length > 0 ? webInfo.snippets.join("\n") : "Sem registros orgânicos adicionais encontrados."}

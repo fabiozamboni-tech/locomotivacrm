@@ -5,7 +5,12 @@ import type { Empresa } from "./mock-data";
 export interface EmpresaCtx {
   id?: string;
   nome: string;
+  razaoSocial?: string;
   segmento: string;
+  areaAtuacao?: string;
+  buscasPartida?: string;
+  termosEncontrados?: string;
+  buscaGoogleMaps?: string;
   cidade: string;
   bairro?: string;
   site?: string;
@@ -17,13 +22,23 @@ export interface EmpresaCtx {
   statusInstagram: string;
   score: number;
   observacoes?: string;
+  historico?: Array<{
+    data: string;
+    tipo?: string;
+    texto: string;
+  }>;
 }
 
 export function toCtx(e: Empresa): EmpresaCtx {
   return {
     id: e.id,
     nome: e.nome,
+    razaoSocial: e.razaoSocial,
     segmento: e.segmento,
+    areaAtuacao: e.areaAtuacao,
+    buscasPartida: e.buscasPartida,
+    termosEncontrados: e.termosEncontrados,
+    buscaGoogleMaps: e.buscaGoogleMaps,
     cidade: e.cidade,
     bairro: e.bairro,
     site: e.site,
@@ -35,13 +50,15 @@ export function toCtx(e: Empresa): EmpresaCtx {
     statusInstagram: e.statusInstagram,
     score: e.score,
     observacoes: e.observacoes,
+    historico: e.historico,
   };
 }
 
 function ctxTxt(e: EmpresaCtx): string {
   return [
-    `Empresa: ${e.nome}`,
+    `Empresa: ${e.nome}${e.razaoSocial ? ` (${e.razaoSocial})` : ""}`,
     `Segmento: ${e.segmento}`,
+    e.areaAtuacao ? `Área de Atuação / Especialidade: ${e.areaAtuacao}` : "",
     `Cidade: ${e.cidade}${e.bairro ? " · " + e.bairro : ""}/RS`,
     e.site ? `Site: ${e.site}` : "Site: (não possui / não localizado)",
     e.instagram ? `Instagram: ${e.instagram}` : "Instagram: (não localizado)",
@@ -50,7 +67,12 @@ function ctxTxt(e: EmpresaCtx): string {
     `Score interno: ${e.score}/100`,
     e.telefone ? `Telefone: ${e.telefone}` : "",
     e.whatsapp ? `WhatsApp: ${e.whatsapp}` : "",
+    e.buscaGoogleMaps ? `Busca Google Maps: ${e.buscaGoogleMaps}` : "",
+    e.buscasPartida ? `Buscas de partida: ${e.buscasPartida.replace(/\n/g, ", ")}` : "",
     e.observacoes ? `Observações internas: ${e.observacoes}` : "",
+    e.historico && e.historico.length > 0
+      ? `Histórico de interações anteriores:\n${e.historico.map((h) => `- [${h.data.slice(0, 10)}] ${h.tipo ? `(${h.tipo}) ` : ""}${h.texto}`).join("\n")}`
+      : "",
   ]
     .filter(Boolean)
     .join("\n");

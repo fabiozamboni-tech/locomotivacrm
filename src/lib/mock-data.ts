@@ -67,6 +67,12 @@ export interface Empresa {
   proximoFollowup?: string;
   naoContatar?: boolean;
   observacoes?: string;
+  // Campos estratégicos e de inteligência de busca
+  razaoSocial?: string;
+  areaAtuacao?: string;
+  buscasPartida?: string;
+  termosEncontrados?: string;
+  buscaGoogleMaps?: string;
   // Diagnóstico
   diagnostico: {
     site: {
