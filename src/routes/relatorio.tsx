@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { gerarRelatorioLead, type Pilar, type Relatorio, type DadosSeo } from "@/lib/relatorio.functions";
-import { waSendUrl } from "@/lib/links";
+import { whatsappUrl } from "@/lib/links";
 import { FileText, Loader2, Printer, Copy, MessageCircle, Mail } from "lucide-react";
 import { toast } from "sonner";
 
@@ -64,8 +64,8 @@ function RelatorioPage() {
       addHistorico(empresa.id, {
         data: new Date().toISOString(),
         tipo: "nota",
-        descricao: `Relatório de diagnóstico gerado (${pilares.join(", ")}).`,
-      } as never);
+        texto: `Relatório de diagnóstico gerado (${pilares.join(", ")}).`,
+      });
       toast.success("Relatório gerado");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha ao gerar relatório");
@@ -122,7 +122,7 @@ function RelatorioPage() {
             <Button variant="outline" onClick={() => copy(res.relatorio.whatsapp)}><Copy className="h-4 w-4" /> Copiar resumo WhatsApp</Button>
             {fone && (
               <Button variant="outline" asChild>
-                <a href={waSendUrl(fone, res.relatorio.whatsapp)} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4" /> Enviar no WhatsApp</a>
+                <a href={`${whatsappUrl(fone)}?text=${encodeURIComponent(res.relatorio.whatsapp)}`} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4" /> Enviar no WhatsApp</a>
               </Button>
             )}
             <Button variant="outline" asChild>
