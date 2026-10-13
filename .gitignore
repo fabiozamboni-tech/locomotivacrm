@@ -18,8 +18,10 @@ dist-ssr
 # Environment variables
 .env
 .env.*
+!.env.example
 .dev.vars
 crm locomotiva 1/
+.data/
 
 # Editor directories and files
 .vscode/*

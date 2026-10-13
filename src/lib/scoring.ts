@@ -41,7 +41,31 @@ export function calcularScore(
   empresa: Empresa,
   weights: ScoreWeights = DEFAULT_WEIGHTS,
 ): { score: number; detalhes: ScoreDetail[] } {
-  const d = empresa.diagnostico;
+  const d = empresa.diagnostico || {
+    site: {
+      responsivo: empresa.statusSite !== "nao_responsivo" && empresa.statusSite !== "sem_site",
+      carregamentoRapido: true,
+      cta: true,
+      formularioFuncional: true,
+      presencaGoogle: true,
+    },
+    instagram: {
+      bioForte: true,
+      linkBio: true,
+      storiesAtivos: true,
+      frequenciaSemanal: 3,
+      consistenciaMarca: 7,
+      diasDesdeUltimoPost: empresa.statusInstagram === "parado" ? 100 : 10,
+    },
+    atendimento: {
+      whatsappVisivel: Boolean(empresa.whatsapp || empresa.telefone),
+      respostaRapida: true,
+      clarezaServicos: true,
+      provaSocial: true,
+      contatoFacil: true,
+      multiplosCanais: true,
+    },
+  };
   const detalhes: ScoreDetail[] = [
     {
       criterio: "Não possui site",

@@ -1,6 +1,22 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useCallback, type ReactNode } from "react";
 import { EMPRESAS_INICIAIS, EMPRESAS_DEMO, type CrmStage, type Empresa } from "./mock-data";
 import { DEFAULT_WEIGHTS, calcularScore, type ScoreWeights } from "./scoring";
+import {
+  getDatabaseState_ServerFn,
+  saveEmpresa_ServerFn,
+  saveAllEmpresas_ServerFn,
+  deleteEmpresa_ServerFn,
+  saveEmpresaExcluida_ServerFn,
+  deleteEmpresaExcluida_ServerFn,
+  clearEmpresasExcluidas_ServerFn,
+  saveInstagramProfiles_ServerFn,
+  deleteInstagramProfile_ServerFn,
+  clearInstagramProfiles_ServerFn,
+  saveWeights_ServerFn,
+  getDatabaseInfo_ServerFn,
+  resetDatabase_ServerFn,
+} from "./database.functions";
+import type { DatabaseInfo } from "./server-db";
 
 export interface EmpresaExcluida {
   id: string;
@@ -34,6 +50,8 @@ export interface InstagramProfile {
   salvoEm: string;
   origemBusca?: string;
 }
+
+export type DbSyncStatus = "idle" | "syncing" | "synced" | "error";
 
 interface StoreValue {
   empresas: Empresa[];
@@ -74,6 +92,11 @@ interface StoreValue {
   carregarDemo: () => void;
   theme: "light" | "dark";
   toggleTheme: () => void;
+  // Sincronização com o Banco de Dados
+  dbSyncStatus: DbSyncStatus;
+  lastSyncTime: Date | null;
+  databaseInfo: DatabaseInfo | null;
+  syncNow: () => Promise<void>;
 }
 
 const StoreCtx = createContext<StoreValue | null>(null);
@@ -128,7 +151,7 @@ function recalcAll(list: Empresa[], w: ScoreWeights): Empresa[] {
   return list.map((e) => ({ ...e, score: calcularScore(e, w).score }));
 }
 
-function loadEmpresas(): Empresa[] {
+function loadEmpresasLocal(): Empresa[] {
   if (typeof window === "undefined") return EMPRESAS_INICIAIS;
   try {
     const raw = window.localStorage.getItem(LS_KEY);
@@ -139,7 +162,7 @@ function loadEmpresas(): Empresa[] {
   }
 }
 
-function loadExcluidos(): EmpresaExcluida[] {
+function loadExcluidosLocal(): EmpresaExcluida[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(LS_EXCLUIDOS);
@@ -150,7 +173,7 @@ function loadExcluidos(): EmpresaExcluida[] {
   }
 }
 
-function loadInstagramDb(): InstagramProfile[] {
+function loadInstagramDbLocal(): InstagramProfile[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(LS_INSTAGRAM_DB);
@@ -161,7 +184,7 @@ function loadInstagramDb(): InstagramProfile[] {
   }
 }
 
-function loadWeights(): ScoreWeights {
+function loadWeightsLocal(): ScoreWeights {
   if (typeof window === "undefined") return DEFAULT_WEIGHTS;
   try {
     const raw = window.localStorage.getItem(LS_WEIGHTS);
@@ -173,26 +196,84 @@ function loadWeights(): ScoreWeights {
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [weights, setWeights] = useState<ScoreWeights>(DEFAULT_WEIGHTS);
+  const [weights, setWeightsState] = useState<ScoreWeights>(DEFAULT_WEIGHTS);
   const [empresas, setEmpresas] = useState<Empresa[]>(EMPRESAS_INICIAIS);
   const [empresasExcluidas, setEmpresasExcluidas] = useState<EmpresaExcluida[]>([]);
   const [instagramProfilesDb, setInstagramProfilesDb] = useState<InstagramProfile[]>([]);
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [hydrated, setHydrated] = useState(false);
+  const [dbSyncStatus, setDbSyncStatus] = useState<DbSyncStatus>("idle");
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const [databaseInfo, setDatabaseInfo] = useState<DatabaseInfo | null>(null);
 
-  // Hidratação client-side (evita mismatch SSR)
-  useEffect(() => {
-    const w = loadWeights();
-    setWeights(w);
-    setEmpresas(recalcAll(loadEmpresas(), w));
-    setEmpresasExcluidas(loadExcluidos());
-    setInstagramProfilesDb(loadInstagramDb());
-    setHydrated(true);
+  // Sincronização centralizada com o banco
+  const syncWithDatabase = useCallback(async () => {
+    try {
+      setDbSyncStatus("syncing");
+      const [dbState, dbInfo] = await Promise.all([
+        getDatabaseState_ServerFn(),
+        getDatabaseInfo_ServerFn().catch(() => null),
+      ]);
+
+      if (dbState) {
+        const localEmpresas = loadEmpresasLocal();
+        const serverEmpresas = dbState.empresas || [];
+
+        // Se o cliente tem mais empresas ou modificações locais que ainda não estão no banco,
+        // sincroniza em lote para o banco sem perder nada
+        const serverIds = new Set(serverEmpresas.map((e) => e.id));
+        const missingOnServer = localEmpresas.filter((e) => !serverIds.has(e.id));
+
+        let finalEmpresas = serverEmpresas;
+        if (missingOnServer.length > 0) {
+          finalEmpresas = await saveAllEmpresas_ServerFn({
+            data: { empresas: [...serverEmpresas, ...missingOnServer], merge: true },
+          });
+        }
+
+        const effectiveWeights = dbState.weights || DEFAULT_WEIGHTS;
+        setWeightsState(effectiveWeights);
+        setEmpresas(recalcAll(finalEmpresas, effectiveWeights));
+        setEmpresasExcluidas(dbState.empresasExcluidas || []);
+        setInstagramProfilesDb(dbState.instagramProfilesDb || []);
+
+        // Atualiza cache offline do localStorage
+        try {
+          window.localStorage.setItem(LS_KEY, JSON.stringify(finalEmpresas));
+          window.localStorage.setItem(LS_WEIGHTS, JSON.stringify(effectiveWeights));
+          window.localStorage.setItem(LS_EXCLUIDOS, JSON.stringify(dbState.empresasExcluidas || []));
+          window.localStorage.setItem(LS_INSTAGRAM_DB, JSON.stringify(dbState.instagramProfilesDb || []));
+        } catch { /* noop */ }
+      }
+
+      if (dbInfo) {
+        setDatabaseInfo(dbInfo);
+      }
+
+      setDbSyncStatus("synced");
+      setLastSyncTime(new Date());
+    } catch (err) {
+      console.warn("Falha na sincronização com banco de dados, usando cache offline:", err);
+      setDbSyncStatus("error");
+    }
   }, []);
 
+  // Hidratação inicial client-side (carrega rápido do localStorage e sincroniza em background com o banco)
+  useEffect(() => {
+    const w = loadWeightsLocal();
+    setWeightsState(w);
+    setEmpresas(recalcAll(loadEmpresasLocal(), w));
+    setEmpresasExcluidas(loadExcluidosLocal());
+    setInstagramProfilesDb(loadInstagramDbLocal());
+    setHydrated(true);
+
+    // Carrega do banco de dados imediatamente
+    syncWithDatabase();
+  }, [syncWithDatabase]);
+
+  // Sincroniza com localStorage para resiliência offline contínua
   useEffect(() => {
     if (!hydrated) return;
-    setEmpresas((prev) => recalcAll(prev, weights));
     try { window.localStorage.setItem(LS_WEIGHTS, JSON.stringify(weights)); } catch { /* noop */ }
   }, [weights, hydrated]);
 
@@ -217,7 +298,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [theme]);
 
-  const isEmpresaExcluida = (item: {
+  const isEmpresaExcluida = useCallback((item: {
     nome?: string;
     razaoSocial?: string;
     cnpj?: string;
@@ -234,15 +315,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const itemCidade = cleanText(item.cidade);
 
     return empresasExcluidas.some((ex) => {
-      // 1. Match por CNPJ
-      if (itemCnpj && ex.cnpj && itemCnpj === cleanDigits(ex.cnpj)) {
-        return true;
-      }
-      // 2. Match por Place ID
-      if (itemPlaceId && ex.placeId && itemPlaceId === ex.placeId.trim()) {
-        return true;
-      }
-      // 3. Match por Domínio do Site (se não for domínio genérico)
+      if (itemCnpj && ex.cnpj && itemCnpj === cleanDigits(ex.cnpj)) return true;
+      if (itemPlaceId && ex.placeId && itemPlaceId === ex.placeId.trim()) return true;
       if (
         itemDomain &&
         ex.site &&
@@ -251,7 +325,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ) {
         return true;
       }
-      // 4. Match por Nome + Cidade (ou Razão Social)
       const exNome = cleanText(ex.nome);
       const exRazao = cleanText(ex.razaoSocial);
       const exCidade = cleanText(ex.cidade);
@@ -261,17 +334,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         (itemRazao && (itemRazao === exNome || (exRazao && itemRazao === exRazao)));
 
       if (matchNome) {
-        if (itemCidade && exCidade) {
-          return itemCidade === exCidade;
-        }
+        if (itemCidade && exCidade) return itemCidade === exCidade;
         return true;
       }
 
       return false;
     });
-  };
+  }, [empresasExcluidas]);
 
-  const excluirEmpresa = (item: {
+  const excluirEmpresa = useCallback((item: {
     nome: string;
     razaoSocial?: string;
     cnpj?: string;
@@ -287,6 +358,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       item.placeId ||
       (item.cnpj ? `cnpj-${cleanDigits(item.cnpj)}` : `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`);
 
+    const novo: EmpresaExcluida = {
+      id,
+      nome: item.nome,
+      razaoSocial: item.razaoSocial,
+      cnpj: item.cnpj,
+      cidade: item.cidade,
+      estado: item.estado,
+      segmento: item.segmento,
+      site: item.site,
+      telefone: item.telefone,
+      placeId: item.placeId,
+      origem: item.origem,
+      excluidoEm: new Date().toISOString(),
+    };
+
     setEmpresasExcluidas((prev) => {
       if (
         prev.some(
@@ -298,42 +384,46 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ) {
         return prev;
       }
-      const novo: EmpresaExcluida = {
-        id,
-        nome: item.nome,
-        razaoSocial: item.razaoSocial,
-        cnpj: item.cnpj,
-        cidade: item.cidade,
-        estado: item.estado,
-        segmento: item.segmento,
-        site: item.site,
-        telefone: item.telefone,
-        placeId: item.placeId,
-        origem: item.origem,
-        excluidoEm: new Date().toISOString(),
-      };
       return [novo, ...prev];
     });
-  };
 
-  const restaurarEmpresaExcluida = (id: string) => {
+    // Despacha gravação assíncrona no banco de dados
+    setDbSyncStatus("syncing");
+    saveEmpresaExcluida_ServerFn({ data: novo })
+      .then(() => {
+        setDbSyncStatus("synced");
+        setLastSyncTime(new Date());
+      })
+      .catch((err) => {
+        console.error("Erro ao salvar exclusao no banco:", err);
+        setDbSyncStatus("error");
+      });
+  }, []);
+
+  const restaurarEmpresaExcluida = useCallback((id: string) => {
     setEmpresasExcluidas((prev) => prev.filter((e) => e.id !== id));
-  };
+    deleteEmpresaExcluida_ServerFn({ data: { id } }).catch((err) =>
+      console.error("Erro ao restaurar excluida no banco:", err),
+    );
+  }, []);
 
-  const limparExcluidos = () => {
+  const limparExcluidos = useCallback(() => {
     setEmpresasExcluidas([]);
     try { window.localStorage.removeItem(LS_EXCLUIDOS); } catch { /* noop */ }
-  };
+    clearEmpresasExcluidas_ServerFn().catch((err) =>
+      console.error("Erro ao limpar excluidos no banco:", err),
+    );
+  }, []);
 
-  const salvarInstagramProfiles = (
+  const salvarInstagramProfiles = useCallback((
     novos: InstagramProfile[],
   ): { adicionados: number; duplicados: number } => {
     let adicionados = 0;
     let duplicados = 0;
+    const uniqueNovos: InstagramProfile[] = [];
 
     setInstagramProfilesDb((prev) => {
       const existingHandles = new Set(prev.map((p) => p.handle.toLowerCase().replace(/^@/, "")));
-      const uniqueNovos: InstagramProfile[] = [];
 
       for (const p of novos) {
         const cleanHandle = p.handle.toLowerCase().replace(/^@/, "");
@@ -341,10 +431,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           duplicados++;
         } else {
           existingHandles.add(cleanHandle);
-          uniqueNovos.push({
+          const item = {
             ...p,
             salvoEm: p.salvoEm || new Date().toISOString(),
-          });
+          };
+          uniqueNovos.push(item);
           adicionados++;
         }
       }
@@ -352,17 +443,182 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return [...uniqueNovos, ...prev];
     });
 
+    if (uniqueNovos.length > 0) {
+      setDbSyncStatus("syncing");
+      saveInstagramProfiles_ServerFn({ data: uniqueNovos })
+        .then(() => {
+          setDbSyncStatus("synced");
+          setLastSyncTime(new Date());
+        })
+        .catch((err) => {
+          console.error("Erro ao salvar perfis Instagram no banco:", err);
+          setDbSyncStatus("error");
+        });
+    }
+
     return { adicionados, duplicados };
-  };
+  }, []);
 
-  const removerInstagramProfile = (id: string) => {
+  const removerInstagramProfile = useCallback((id: string) => {
     setInstagramProfilesDb((prev) => prev.filter((p) => p.id !== id && p.handle !== id));
-  };
+    deleteInstagramProfile_ServerFn({ data: { id } }).catch((err) =>
+      console.error("Erro ao remover perfil Instagram no banco:", err),
+    );
+  }, []);
 
-  const limparInstagramProfilesDb = () => {
+  const limparInstagramProfilesDb = useCallback(() => {
     setInstagramProfilesDb([]);
     try { window.localStorage.removeItem(LS_INSTAGRAM_DB); } catch { /* noop */ }
-  };
+    clearInstagramProfiles_ServerFn().catch((err) =>
+      console.error("Erro ao limpar perfis Instagram no banco:", err),
+    );
+  }, []);
+
+  const updateEmpresa = useCallback((id: string, patch: Partial<Empresa>) => {
+    let updatedEmpresa: Empresa | null = null;
+    setEmpresas((prev) =>
+      prev.map((e) => {
+        if (e.id === id) {
+          const updated = {
+            ...e,
+            ...patch,
+            score: calcularScore({ ...e, ...patch }, weights).score,
+          };
+          updatedEmpresa = updated;
+          return updated;
+        }
+        return e;
+      }),
+    );
+
+    if (updatedEmpresa) {
+      setDbSyncStatus("syncing");
+      saveEmpresa_ServerFn({ data: updatedEmpresa })
+        .then(() => {
+          setDbSyncStatus("synced");
+          setLastSyncTime(new Date());
+        })
+        .catch((err) => {
+          console.error("Erro ao salvar empresa no banco:", err);
+          setDbSyncStatus("error");
+        });
+    }
+  }, [weights]);
+
+  const setStage = useCallback((id: string, stage: CrmStage) => {
+    let updatedEmpresa: Empresa | null = null;
+    setEmpresas((prev) =>
+      prev.map((e) => {
+        if (e.id === id) {
+          const updated = { ...e, crmStage: stage };
+          updatedEmpresa = updated;
+          return updated;
+        }
+        return e;
+      }),
+    );
+
+    if (updatedEmpresa) {
+      setDbSyncStatus("syncing");
+      saveEmpresa_ServerFn({ data: updatedEmpresa })
+        .then(() => {
+          setDbSyncStatus("synced");
+          setLastSyncTime(new Date());
+        })
+        .catch((err) => {
+          console.error("Erro ao atualizar stage no banco:", err);
+          setDbSyncStatus("error");
+        });
+    }
+  }, []);
+
+  const addHistorico = useCallback((id: string, item: Empresa["historico"][number]) => {
+    let updatedEmpresa: Empresa | null = null;
+    setEmpresas((prev) =>
+      prev.map((e) => {
+        if (e.id === id) {
+          const updated = { ...e, historico: [item, ...e.historico] };
+          updatedEmpresa = updated;
+          return updated;
+        }
+        return e;
+      }),
+    );
+
+    if (updatedEmpresa) {
+      setDbSyncStatus("syncing");
+      saveEmpresa_ServerFn({ data: updatedEmpresa })
+        .then(() => {
+          setDbSyncStatus("synced");
+          setLastSyncTime(new Date());
+        })
+        .catch((err) => {
+          console.error("Erro ao registrar historico no banco:", err);
+          setDbSyncStatus("error");
+        });
+    }
+  }, []);
+
+  const addEmpresa = useCallback((e: Empresa) => {
+    const scored = { ...e, score: calcularScore(e, weights).score };
+    setEmpresas((prev) => [scored, ...prev]);
+
+    setDbSyncStatus("syncing");
+    saveEmpresa_ServerFn({ data: scored })
+      .then(() => {
+        setDbSyncStatus("synced");
+        setLastSyncTime(new Date());
+      })
+      .catch((err) => {
+        console.error("Erro ao inserir empresa no banco:", err);
+        setDbSyncStatus("error");
+      });
+  }, [weights]);
+
+  const setWeights = useCallback((w: ScoreWeights) => {
+    setWeightsState(w);
+    setEmpresas((prev) => recalcAll(prev, w));
+    setDbSyncStatus("syncing");
+    saveWeights_ServerFn({ data: w })
+      .then(() => {
+        setDbSyncStatus("synced");
+        setLastSyncTime(new Date());
+      })
+      .catch((err) => {
+        console.error("Erro ao salvar pesos no banco:", err);
+        setDbSyncStatus("error");
+      });
+  }, []);
+
+  const resetPlataforma = useCallback(() => {
+    setEmpresas([]);
+    try { window.localStorage.removeItem(LS_KEY); } catch { /* noop */ }
+    resetDatabase_ServerFn()
+      .then((defState) => {
+        setEmpresas(defState.empresas || []);
+        setWeightsState(defState.weights || DEFAULT_WEIGHTS);
+        setEmpresasExcluidas([]);
+        setInstagramProfilesDb([]);
+        setDbSyncStatus("synced");
+        setLastSyncTime(new Date());
+      })
+      .catch((err) => console.error("Erro ao resetar banco:", err));
+  }, []);
+
+  const carregarDemo = useCallback(() => {
+    const demo = recalcAll(EMPRESAS_DEMO, weights);
+    setEmpresas(demo);
+    setDbSyncStatus("syncing");
+    saveAllEmpresas_ServerFn({ data: { empresas: demo, merge: false } })
+      .then(() => {
+        setDbSyncStatus("synced");
+        setLastSyncTime(new Date());
+      })
+      .catch((err) => {
+        console.error("Erro ao carregar demo no banco:", err);
+        setDbSyncStatus("error");
+      });
+  }, [weights]);
 
   const value = useMemo<StoreValue>(
     () => ({
@@ -373,21 +629,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setWeights,
       theme,
       toggleTheme: () => setTheme((t) => (t === "dark" ? "light" : "dark")),
-      updateEmpresa: (id, patch) =>
-        setEmpresas((prev) =>
-          prev.map((e) => (e.id === id ? { ...e, ...patch } : e)),
-        ),
-      setStage: (id, stage) =>
-        setEmpresas((prev) =>
-          prev.map((e) => (e.id === id ? { ...e, crmStage: stage } : e)),
-        ),
-      addHistorico: (id, item) =>
-        setEmpresas((prev) =>
-          prev.map((e) =>
-            e.id === id ? { ...e, historico: [item, ...e.historico] } : e,
-          ),
-        ),
-      addEmpresa: (e) => setEmpresas((prev) => [{ ...e, score: calcularScore(e, weights).score }, ...prev]),
+      updateEmpresa,
+      setStage,
+      addHistorico,
+      addEmpresa,
       salvarInstagramProfiles,
       removerInstagramProfile,
       limparInstagramProfilesDb,
@@ -395,13 +640,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       restaurarEmpresaExcluida,
       limparExcluidos,
       isEmpresaExcluida,
-      resetPlataforma: () => {
-        setEmpresas([]);
-        try { window.localStorage.removeItem(LS_KEY); } catch { /* noop */ }
-      },
-      carregarDemo: () => setEmpresas(recalcAll(EMPRESAS_DEMO, weights)),
+      resetPlataforma,
+      carregarDemo,
+      dbSyncStatus,
+      lastSyncTime,
+      databaseInfo,
+      syncNow: syncWithDatabase,
     }),
-    [empresas, empresasExcluidas, instagramProfilesDb, weights, theme],
+    [
+      empresas,
+      empresasExcluidas,
+      instagramProfilesDb,
+      weights,
+      theme,
+      dbSyncStatus,
+      lastSyncTime,
+      databaseInfo,
+      syncWithDatabase,
+      updateEmpresa,
+      setStage,
+      addHistorico,
+      addEmpresa,
+      salvarInstagramProfiles,
+      removerInstagramProfile,
+      limparInstagramProfilesDb,
+      excluirEmpresa,
+      restaurarEmpresaExcluida,
+      limparExcluidos,
+      isEmpresaExcluida,
+      resetPlataforma,
+      carregarDemo,
+      setWeights,
+    ],
   );
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;

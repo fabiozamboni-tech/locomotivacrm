@@ -15,6 +15,7 @@ import {
   Sun,
   Search,
   LogOut,
+  Database,
 } from "lucide-react";
 import { lockSite } from "@/lib/gate.functions";
 import { useStore } from "@/lib/store";
@@ -50,7 +51,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const router = useRouter();
   const lock = useServerFn(lockSite);
-  const { theme, toggleTheme, empresas } = useStore();
+  const { theme, toggleTheme, empresas, dbSyncStatus, syncNow, databaseInfo } = useStore();
   const [openSearch, setOpenSearch] = useState(false);
 
   if (pathname === "/login" || pathname === "/unlock") return <>{children}</>;
@@ -111,6 +112,37 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Search className="h-4 w-4" />
             Buscar empresa, cidade, segmento…
             <span className="ml-auto text-[10px] rounded border px-1.5 py-0.5">⌘K</span>
+          </button>
+          <button
+            onClick={() => void syncNow()}
+            title={
+              databaseInfo?.mode === "supabase"
+                ? "Banco de Dados: Supabase PostgreSQL (Ativo e Sincronizado)"
+                : "Banco de Dados: Servidor Persistente (Ativo e Sincronizado). Clique para sincronizar."
+            }
+            className={cn(
+              "hidden sm:inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors",
+              dbSyncStatus === "syncing"
+                ? "border-amber-500/40 bg-amber-500/10 text-amber-400"
+                : dbSyncStatus === "error"
+                  ? "border-destructive/40 bg-destructive/10 text-destructive"
+                  : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20",
+            )}
+          >
+            <Database className={cn("h-3.5 w-3.5", dbSyncStatus === "syncing" && "animate-spin")} />
+            <span className="font-medium">
+              {dbSyncStatus === "syncing" ? "Salvando no Banco..." : "Banco Conectado"}
+            </span>
+            <span
+              className={cn(
+                "h-1.5 w-1.5 rounded-full",
+                dbSyncStatus === "syncing"
+                  ? "bg-amber-400 animate-pulse"
+                  : dbSyncStatus === "error"
+                    ? "bg-destructive"
+                    : "bg-emerald-400",
+              )}
+            />
           </button>
           <Badge variant="outline" className="hidden lg:inline-flex gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useStore } from "@/lib/store";
 import { useServerFn } from "@tanstack/react-start";
+import { cn } from "@/lib/utils";
 import { testApiConnection, type ApiTestResult } from "@/lib/api-status.functions";
 import { getApiSettings, saveApiSetting, type ApiSettingsMap } from "@/lib/api-settings";
 import {
@@ -52,6 +53,10 @@ import {
   Plus,
   Trash2,
   Zap,
+  Download,
+  HardDrive,
+  Cloud,
+  Clock,
 } from "lucide-react";
 
 export const Route = createFileRoute("/configuracoes")({
@@ -74,8 +79,59 @@ const LABELS: Record<keyof ScoreWeights, string> = {
 };
 
 function ConfiguracoesPage() {
-  const { weights, setWeights, resetPlataforma, carregarDemo, empresas } = useStore();
+  const {
+    weights,
+    setWeights,
+    resetPlataforma,
+    carregarDemo,
+    empresas,
+    empresasExcluidas,
+    instagramProfilesDb,
+    dbSyncStatus,
+    lastSyncTime,
+    databaseInfo,
+    syncNow,
+  } = useStore();
   const testConn = useServerFn(testApiConnection);
+
+  const [sincronizandoManual, setSincronizandoManual] = useState(false);
+
+  const handleForcarSincronizacao = async () => {
+    try {
+      setSincronizandoManual(true);
+      await syncNow();
+      toast.success("Banco de Dados sincronizado com sucesso!");
+    } catch {
+      toast.error("Erro ao sincronizar com o banco de dados.");
+    } finally {
+      setSincronizandoManual(false);
+    }
+  };
+
+  const exportarBackupJson = () => {
+    const backup = {
+      versao: 1,
+      exportadoEm: new Date().toISOString(),
+      origem: "Locomotiva CRM - Central de Comunicação 360",
+      totalEmpresas: empresas.length,
+      totalExcluidas: empresasExcluidas.length,
+      totalInstagram: instagramProfilesDb.length,
+      empresas,
+      empresasExcluidas,
+      instagramProfilesDb,
+      pesosScore: weights,
+      configuracoesComunicacao: comunicacao,
+      chavesApi: settings,
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `locomotiva-crm-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Backup completo em JSON exportado com sucesso!");
+  };
 
   // APIs
   const [settings, setSettings] = useState<ApiSettingsMap>(getApiSettings());
@@ -292,7 +348,11 @@ function ConfiguracoesPage() {
           </TabsTrigger>
           <TabsTrigger value="scoring" className="text-xs py-1.5 px-3 flex items-center gap-1.5">
             <Sliders className="h-3.5 w-3.5 text-amber-500" />
-            Critérios de Score & Banco
+            Critérios de Score
+          </TabsTrigger>
+          <TabsTrigger value="database" className="text-xs py-1.5 px-3 flex items-center gap-1.5">
+            <Database className="h-3.5 w-3.5 text-emerald-500" />
+            Banco de Dados & Nuvem
           </TabsTrigger>
         </TabsList>
 
@@ -865,6 +925,118 @@ function ConfiguracoesPage() {
                 >
                   Limpar Todas as Empresas
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------------------------- */}
+        {/* ABA 5: BANCO DE DADOS & NUVEM */}
+        {/* ------------------------------------------------------------------- */}
+        <TabsContent value="database" className="space-y-4 mt-0">
+          <Card className="border-emerald-500/20 bg-gradient-to-br from-card to-emerald-500/5 shadow-sm">
+            <CardHeader className="pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600">
+                    <Database className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-bold">Banco de Dados Centralizado & Persistência</CardTitle>
+                    <CardDescription className="text-xs">
+                      Todos os dados do CRM, funil de vendas, notas e abordagens são persistidos automaticamente no backend.
+                    </CardDescription>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleForcarSincronizacao}
+                    disabled={sincronizandoManual || dbSyncStatus === "syncing"}
+                    className="gap-1.5 text-xs h-9 border-emerald-500/30 hover:bg-emerald-500/10"
+                  >
+                    <RefreshCw className={cn("h-3.5 w-3.5", (sincronizandoManual || dbSyncStatus === "syncing") && "animate-spin")} />
+                    Sincronizar Agora
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={exportarBackupJson}
+                    className="gap-1.5 text-xs h-9 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Exportar Backup JSON
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-4 pt-2">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="p-3 rounded-lg border bg-background/60">
+                  <div className="text-[11px] text-muted-foreground font-medium">Motor de Banco Ativo</div>
+                  <div className="flex items-center gap-1.5 mt-1 font-semibold text-xs text-foreground">
+                    <HardDrive className="h-4 w-4 text-emerald-500" />
+                    {databaseInfo?.mode === "supabase" ? "Supabase PostgreSQL" : "Servidor Persistente"}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">
+                    {databaseInfo?.mode === "supabase" ? "Nuvem Lovable / Supabase" : "Gravação Atômica em Disco"}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg border bg-background/60">
+                  <div className="text-[11px] text-muted-foreground font-medium">Status de Sincronização</div>
+                  <div className="flex items-center gap-1.5 mt-1 font-semibold text-xs text-emerald-500">
+                    <CheckCircle2 className="h-4 w-4" />
+                    {dbSyncStatus === "syncing" ? "Gravando alterações..." : "Conectado & Operacional"}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">
+                    {lastSyncTime ? `Último sync: ${lastSyncTime.toLocaleTimeString()}` : "Sincronizado na inicialização"}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg border bg-background/60">
+                  <div className="text-[11px] text-muted-foreground font-medium">Empresas & Leads</div>
+                  <div className="text-base font-bold text-foreground mt-0.5">
+                    {empresas.length} empresas
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    + {instagramProfilesDb.length} perfis de Instagram
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg border bg-background/60">
+                  <div className="text-[11px] text-muted-foreground font-medium">Blacklist & Exclusões</div>
+                  <div className="text-base font-bold text-foreground mt-0.5">
+                    {empresasExcluidas.length} excluídas
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    Filtro anti-duplicidade ativo
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border/60 bg-muted/30 p-3 space-y-2 text-xs">
+                <div className="flex items-center gap-2 font-medium text-foreground">
+                  <Cloud className="h-4 w-4 text-primary" />
+                  <span>Esquema Relacional PostgreSQL / Supabase</span>
+                </div>
+                <p className="text-muted-foreground leading-relaxed">
+                  O esquema completo do banco de dados relacional está disponível no repositório em{" "}
+                  <code className="bg-muted px-1.5 py-0.5 rounded font-mono text-[11px]">supabase/schema.sql</code>.
+                  Ele define as tabelas <code className="font-mono text-[11px]">empresas</code>,{" "}
+                  <code className="font-mono text-[11px]">empresas_excluidas</code>,{" "}
+                  <code className="font-mono text-[11px]">instagram_profiles</code>,{" "}
+                  <code className="font-mono text-[11px]">comunicacao_settings</code> e{" "}
+                  <code className="font-mono text-[11px]">score_weights</code> com Row Level Security (RLS) habilitado.
+                </p>
+                <div className="text-[11px] text-muted-foreground pt-1 flex items-center gap-2">
+                  <span className="font-semibold text-foreground">Arquivo de armazenamento local:</span>
+                  <code className="bg-background border px-2 py-0.5 rounded font-mono text-[10px] truncate max-w-md">
+                    {databaseInfo?.storagePath || ".data/crm-database.json"}
+                  </code>
+                </div>
               </div>
             </CardContent>
           </Card>
