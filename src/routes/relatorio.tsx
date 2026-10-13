@@ -1,5 +1,5 @@
 import { createFileRoute, useSearch } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 import { useServerFn } from "@tanstack/react-start";
 import { useStore } from "@/lib/store";
@@ -7,7 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { gerarRelatorioLead, type Pilar, type Relatorio, type DadosSeo } from "@/lib/relatorio.functions";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { gerarRelatorioLead, sementesPadrao, type Pilar, type Relatorio, type DadosSeo } from "@/lib/relatorio.functions";
 import { whatsappUrl } from "@/lib/links";
 import { FileText, Loader2, Printer, Copy, MessageCircle, Mail } from "lucide-react";
 import { toast } from "sonner";
@@ -43,6 +45,19 @@ function RelatorioPage() {
   const [res, setRes] = useState<{ relatorio: Relatorio; seo: DadosSeo; geradoEm: string } | null>(null);
   const gerar = useServerFn(gerarRelatorioLead);
   const empresa = empresas.find((e) => e.id === sel);
+  const [sementesTxt, setSementesTxt] = useState("");
+  const [consulta, setConsulta] = useState("");
+  const [termosTxt, setTermosTxt] = useState("");
+
+  useEffect(() => {
+    if (!empresa) return;
+    setSementesTxt(sementesPadrao(empresa.segmento, empresa.cidade).join("\n"));
+    setConsulta(`${empresa.segmento} em ${empresa.cidade}`);
+    setTermosTxt("");
+    setRes(null);
+  }, [empresa?.id]);
+
+  const linhas = (t: string) => t.split("\n").map((x) => x.trim()).filter(Boolean);
 
   async function onGerar() {
     if (!empresa) return;
@@ -58,9 +73,13 @@ function RelatorioPage() {
           },
           pilares,
           agencia: "Locomotiva Comunicação",
+          ajustes: { sementes: linhas(sementesTxt), consulta, termos: linhas(termosTxt) },
         },
       });
       setRes(r);
+      setTermosTxt(r.seo.termos.map((t) => t.termo).join("\n"));
+      setSementesTxt(r.seo.sementes.join("\n"));
+      setConsulta(r.seo.consulta);
       addHistorico(empresa.id, {
         data: new Date().toISOString(),
         tipo: "nota",
@@ -112,6 +131,36 @@ function RelatorioPage() {
           </Button>
         </CardContent>
       </Card>
+
+      {empresa && (
+        <Card className="print:hidden">
+          <CardHeader><CardTitle className="text-base">Termos de pesquisa usados no relatório</CardTitle></CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-3 text-sm">
+            <div className="space-y-1">
+              <label className="font-medium">Buscas de partida (uma por linha)</label>
+              <Textarea rows={6} value={sementesTxt} onChange={(e) => setSementesTxt(e.target.value)} />
+              <p className="text-xs text-muted-foreground">Usadas para descobrir o que as pessoas digitam no Google.</p>
+            </div>
+            <div className="space-y-1">
+              <label className="font-medium">Termos encontrados (uma por linha)</label>
+              <Textarea rows={6} value={termosTxt} onChange={(e) => setTermosTxt(e.target.value)} placeholder="Gere o relatório para preencher, ou digite seus próprios termos." />
+              <p className="text-xs text-muted-foreground">Se preenchido, estes termos são usados no lugar da busca automática. Apague tudo para buscar de novo.</p>
+            </div>
+            <div className="space-y-1">
+              <label className="font-medium">Busca no Google Maps / Google</label>
+              <Input value={consulta} onChange={(e) => setConsulta(e.target.value)} />
+              <p className="text-xs text-muted-foreground">Usada para ver a posição da empresa e os concorrentes.</p>
+              <Button variant="ghost" size="sm" className="mt-2" onClick={() => { setSementesTxt(sementesPadrao(empresa.segmento, empresa.cidade).join("\n")); setConsulta(`${empresa.segmento} em ${empresa.cidade}`); setTermosTxt(""); }}>Restaurar padrão</Button>
+            </div>
+            <div className="md:col-span-3">
+              <Button onClick={onGerar} disabled={!pilares.length || loading}>
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                {res ? "Gerar novamente com ajustes" : "Gerar com estes termos"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {!empresas.length && <p className="text-sm text-muted-foreground">Nenhuma empresa cadastrada ainda. Importe empresas primeiro.</p>}
 
