@@ -111,7 +111,8 @@ const CANAIS: { value: CanalTipo; label: string; icon: typeof Mail }[] = [
 
 function AbordagemPage() {
   const { empresa: empresaId } = useSearch({ from: "/abordagem" });
-  const { empresas } = useStore();
+  const { empresas, updateEmpresa } = useStore();
+  const [cnpjInput, setCnpjInput] = useState("");
   const [selected, setSelected] = useState<string>(empresaId ?? empresas[0]?.id ?? "");
   const [canal, setCanal] = useState<CanalTipo>("whatsapp");
   const [activeTab, setActiveTab] = useState<"dossier" | "demanda" | "sistemas" | "prescricao" | "abordagens">("abordagens");
@@ -131,6 +132,11 @@ function AbordagemPage() {
 
   const empresa = empresas.find((e) => e.id === selected);
 
+  useEffect(() => {
+    setCnpjInput(empresa?.cnpj ?? "");
+    setDecisoresData(null);
+  }, [empresa?.id]);
+
   // Executa a busca de sócios e administradores (QSA)
   const buscarDecisoresQSA = async () => {
     if (!empresa) return;
@@ -138,16 +144,21 @@ function AbordagemPage() {
     try {
       const res = await consultarQsaDecisores({
         data: {
-          cnpj: empresa.cnpj,
+          cnpj: cnpjInput || empresa.cnpj,
           nomeEmpresa: empresa.nome,
           cidade: empresa.cidade,
         },
       });
       setDecisoresData(res);
+      if (res.cnpj) {
+        setCnpjInput(res.cnpj);
+        if (res.real && res.cnpj !== (empresa.cnpj ?? "").replace(/\D/g, "")) updateEmpresa(empresa.id, { cnpj: res.cnpj });
+      }
       if (res.decisorPrincipal?.nome) {
         setNomeDecisorSelecionado(res.decisorPrincipal.nome);
       }
-      toast.success(`Sócios e administradores de ${empresa.nome} identificados!`);
+      if (res.decisores.length) toast.success(`${res.decisores.length} sócio(s) de ${empresa.nome} identificados!`);
+      else toast.warning(res.aviso ?? "Nenhum sócio encontrado.");
     } catch (e) {
       toast.error("Não foi possível obter dados de sócios da Receita Federal.");
     } finally {
@@ -424,19 +435,33 @@ function AbordagemPage() {
                 })}
               </div>
             ) : (
-              <div className="flex items-center justify-between text-xs text-muted-foreground py-1">
-                <span>Nenhum sócio carregado automaticamente ainda.</span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={buscarDecisoresQSA}
-                  disabled={loadingQSA}
-                  className="h-7 text-xs text-indigo-600 hover:text-indigo-700"
-                >
-                  Consultar Sócios via BrasilAPI
-                </Button>
+              <div className="text-xs text-muted-foreground py-1">
+                {decisoresData?.aviso ?? "Nenhum sócio carregado ainda."}
               </div>
             )}
+            {decisoresData?.decisores.length ? (
+              <div className="text-[10px] text-muted-foreground mt-1.5">
+                {decisoresData.razaoSocial} · CNPJ {decisoresData.cnpj} · Fonte: {decisoresData.fonte}
+                {decisoresData.aviso ? ` · ${decisoresData.aviso}` : ""}
+              </div>
+            ) : null}
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                value={cnpjInput}
+                onChange={(e) => setCnpjInput(e.target.value)}
+                placeholder="CNPJ (opcional — melhora a precisão)"
+                className="h-7 flex-1 max-w-xs rounded-md border border-border bg-background px-2 text-xs"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={buscarDecisoresQSA}
+                disabled={loadingQSA}
+                className="h-7 text-xs"
+              >
+                {decisoresData ? "Reconsultar sócios" : "Consultar sócios (Receita Federal)"}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
