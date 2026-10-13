@@ -28,6 +28,19 @@ export interface DadosSeo {
   presenca: PresencaBusca | null;
   organico: { posicao: number | null; top: Array<{ titulo: string; link: string }> } | null;
   avisos: string[];
+  sementes: string[];
+  consulta: string;
+}
+
+export interface AjustesBusca {
+  sementes?: string[];
+  consulta?: string;
+  termos?: string[];
+}
+
+export function sementesPadrao(segmento: string, cidade: string) {
+  const seg = segmento.toLowerCase();
+  return [`${seg} ${cidade}`, `${seg} em ${cidade}`, `melhor ${seg} ${cidade}`, `${seg} perto de mim`];
 }
 
 async function autocomplete(q: string): Promise<string[]> {
@@ -46,11 +59,12 @@ function norm(s: string) {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-async function coletarSeo(e: z.infer<typeof EmpresaInput>): Promise<DadosSeo> {
+async function coletarSeo(e: z.infer<typeof EmpresaInput>, aj: AjustesBusca = {}): Promise<DadosSeo> {
   const avisos: string[] = [];
-  const seg = e.segmento.toLowerCase();
-  const consultas = [`${seg} ${e.cidade}`, `${seg} em ${e.cidade}`, `melhor ${seg} ${e.cidade}`, `${seg} perto de mim`];
-  const listas = await Promise.all(consultas.map(autocomplete));
+  const limpa = (a?: string[]) => (a ?? []).map((x) => x.trim()).filter(Boolean);
+  const sementes = limpa(aj.sementes).length ? limpa(aj.sementes) : sementesPadrao(e.segmento, e.cidade);
+  const manuais = limpa(aj.termos);
+  const listas = manuais.length ? [manuais] : await Promise.all(sementes.map(autocomplete));
   const vistos = new Set<string>();
   const termos: SeoTermo[] = [];
   for (const l of listas) for (const t of l) {
@@ -63,7 +77,7 @@ async function coletarSeo(e: z.infer<typeof EmpresaInput>): Promise<DadosSeo> {
   let presenca: PresencaBusca | null = null;
   const LK = process.env.LOVABLE_API_KEY;
   const GK = process.env.GOOGLE_MAPS_API_KEY;
-  const consulta = `${e.segmento} em ${e.cidade}`;
+  const consulta = aj.consulta?.trim() || `${e.segmento} em ${e.cidade}`;
   if (LK && GK) {
     try {
       const r = await fetch("https://connector-gateway.lovable.dev/google_maps/places/v1/places:searchText", {
@@ -123,7 +137,7 @@ async function coletarSeo(e: z.infer<typeof EmpresaInput>): Promise<DadosSeo> {
     avisos.push("Ranking orgânico do Google indisponível (configure SERPER_API_KEY — plano grátis de 2.500 buscas).");
   }
 
-  return { termos: termos.slice(0, 15), presenca, organico, avisos };
+  return { termos: manuais.length ? termos : termos.slice(0, 15), presenca, organico, avisos, sementes, consulta };
 }
 
 export const PILARES = ["site", "comunicacao", "redes", "branding"] as const;
@@ -188,11 +202,12 @@ const NOMES: Record<Pilar, string> = {
 
 export const gerarRelatorioLead = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
-    z.object({ empresa: EmpresaInput, pilares: z.array(z.enum(PILARES)).min(1), agencia: z.string().default("Locomotiva Comunicação") }).parse(d),
+    z.object({ empresa: EmpresaInput, pilares: z.array(z.enum(PILARES)).min(1), agencia: z.string().default("Locomotiva Comunicação"),
+      ajustes: z.object({ sementes: z.array(z.string()).optional(), consulta: z.string().optional(), termos: z.array(z.string()).optional() }).optional() }).parse(d),
   )
   .handler(async ({ data }) => {
     const { openaiJSON } = await import("./ai-gateway.server");
-    const seo = await coletarSeo(data.empresa);
+    const seo = await coletarSeo(data.empresa, data.ajustes);
     const e = data.empresa;
     const dadosReais = [
       seo.termos.length ? `Buscas reais no Google (Autocomplete): ${seo.termos.map((t) => `"${t.termo}"`).join(", ")}` : "",
