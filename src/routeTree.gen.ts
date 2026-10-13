@@ -19,6 +19,7 @@ import { Route as ImportarRouteImport } from './routes/importar'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as PromptsRouteImport } from './routes/prompts'
+import { Route as RelatorioRouteImport } from './routes/relatorio'
 import { Route as UnlockRouteImport } from './routes/unlock'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
@@ -76,6 +77,11 @@ const PromptsRoute = PromptsRouteImport.update({
   path: '/prompts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RelatorioRoute = RelatorioRouteImport.update({
+  id: '/relatorio',
+  path: '/relatorio',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UnlockRoute = UnlockRouteImport.update({
   id: '/unlock',
   path: '/unlock',
@@ -121,6 +127,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
   '/prompts': typeof PromptsRoute
+  '/relatorio': typeof RelatorioRoute
   '/unlock': typeof UnlockRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -139,6 +146,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
   '/prompts': typeof PromptsRoute
+  '/relatorio': typeof RelatorioRoute
   '/unlock': typeof UnlockRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
   '/prompts': typeof PromptsRoute
+  '/relatorio': typeof RelatorioRoute
   '/unlock': typeof UnlockRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -178,6 +187,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/mcp'
     | '/prompts'
+    | '/relatorio'
     | '/unlock'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
@@ -196,6 +206,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/mcp'
     | '/prompts'
+    | '/relatorio'
     | '/unlock'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
@@ -214,6 +225,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/mcp'
     | '/prompts'
+    | '/relatorio'
     | '/unlock'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
@@ -233,6 +245,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   McpRoute: typeof McpRoute
   PromptsRoute: typeof PromptsRoute
+  RelatorioRoute: typeof RelatorioRoute
   UnlockRoute: typeof UnlockRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -312,6 +325,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PromptsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/relatorio': {
+      id: '/relatorio'
+      path: '/relatorio'
+      fullPath: '/relatorio'
+      preLoaderRoute: typeof RelatorioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/unlock': {
       id: '/unlock'
       path: '/unlock'
@@ -380,6 +400,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   McpRoute: McpRoute,
   PromptsRoute: PromptsRoute,
+  RelatorioRoute: RelatorioRoute,
   UnlockRoute: UnlockRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:

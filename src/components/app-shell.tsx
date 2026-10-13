@@ -1,3 +1,4 @@
+import { FileText } from "lucide-react";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -39,6 +40,7 @@ const NAV: NavItem[] = [
   { to: "/crm", label: "Funil CRM", icon: Kanban },
   { to: "/abordagem", label: "Abordagens", icon: MessageSquareText },
   { to: "/prompts", label: "Prompts IA", icon: Wand2 },
+  { to: "/relatorio", label: "Relatório p/ Lead", icon: FileText },
   { to: "/importar", label: "Importar / Exportar", icon: Upload },
   { to: "/configuracoes", label: "Configurações", icon: Settings },
   { to: "/compliance", label: "Compliance & LGPD", icon: ShieldCheck },
