@@ -27,6 +27,46 @@ export interface AbordagemPsicologicaItem {
   mensagem: string;
 }
 
+export interface PlataformaDemandaItem {
+  plataforma: "Google (Busca & Maps)" | "Instagram" | "Facebook & Grupos" | "TikTok" | "WhatsApp Comercial";
+  chave: "google" | "instagram" | "facebook" | "tiktok" | "whatsapp";
+  volumeEstimadoBusca: string;
+  comportamentoConsumidor: string;
+  impactoEmVendas: string;
+  perdaPorInvisibilidade: string;
+}
+
+export interface MetricaVendaConvincente {
+  indicador: string;
+  estatistica: string;
+  impactoDiretoReceita: string;
+  estrategiaLocomotiva: string;
+}
+
+export interface ProjecaoVendasPresencaDigital {
+  cenarioAtualPerdido: string;
+  potencialCapturaMensal: string;
+  estimativaImpactoFaturamento: string;
+  roiEstimadoComunicacao: string;
+}
+
+export interface ArgumentoMatadorVendas {
+  id: string;
+  titulo: string;
+  gatilhoVendas: string;
+  plataformaAlvo: string;
+  argumentoPronto: string;
+}
+
+export interface InteligenciaPresencaDigital {
+  resumoDemandaLocal: string;
+  porQuePresencaDigitalImporta: string;
+  demandasPorPlataforma: PlataformaDemandaItem[];
+  metricasConvincentesVendas: MetricaVendaConvincente[];
+  projecaoVendas: ProjecaoVendasPresencaDigital;
+  argumentosMatadoresParaAbordagem: ArgumentoMatadorVendas[];
+}
+
 export interface Dossier360Result {
   empresaNome: string;
   segmento: string;
@@ -43,6 +83,7 @@ export interface Dossier360Result {
     frustracoesPassadas: string[];
   };
   abordagensPsicologicas: AbordagemPsicologicaItem[];
+  inteligenciaPresencaDigital: InteligenciaPresencaDigital;
   dimensaoOperacional: {
     gargalosProcesso: string[];
     impactoFinanceiroCustoInacao: string;
@@ -261,6 +302,114 @@ Gere um dossiê JSON estruturado e completo com este formato EXATO:
       "mensagem": "Texto que quebra a desconfiança mostrando que a Locomotiva Comunicação assume todo o peso operacional e técnico."
     }
   ],
+  "inteligenciaPresencaDigital": {
+    "resumoDemandaLocal": "Resumo de 2 frases sobre o volume de clientes buscando ${data.empresa.segmento} em ${data.empresa.cidade}/RS e microrregião",
+    "porQuePresencaDigitalImporta": "Argumento central demonstrando por que presença digital é o principal motor de vendas e credibilidade para a ${data.empresa.nome}",
+    "demandasPorPlataforma": [
+      {
+        "plataforma": "Google (Busca & Maps)",
+        "chave": "google",
+        "volumeEstimadoBusca": "Volume de busca mensal estimado (ex: 800 a 2.500 pesquisas/mês por ${data.empresa.segmento} em ${data.empresa.cidade} e região)",
+        "comportamentoConsumidor": "Como o cliente pesquisa e toma decisão de compra (fundo de funil com alta intenção de contratação)",
+        "impactoEmVendas": "Como estar no topo do Google gera vendas diárias e orçamentos espontâneos sem depender de anúncio pago",
+        "perdaPorInvisibilidade": "Quantas vendas a empresa perde para concorrentes diretos locais por não ter site nem Google Maps otimizado"
+      },
+      {
+        "plataforma": "Instagram",
+        "chave": "instagram",
+        "volumeEstimadoBusca": "Volume de visualizações e pesquisas de validação de marca na região",
+        "comportamentoConsumidor": "Efeito Vitrine: como o cliente avalia autoridade, acabamento e prova social antes de fechar proposta",
+        "impactoEmVendas": "Como design premium e autoridade visual aceleram o fechamento e aumentam o ticket médio",
+        "perdaPorInvisibilidade": "Por que perfil amador ou inativo faz o cliente pedir desconto ou fechar com concorrente mais profissional"
+      },
+      {
+        "plataforma": "Facebook & Grupos",
+        "chave": "facebook",
+        "volumeEstimadoBusca": "Penetração em decisores de 35 a 65 anos e grupos locais de recomendação em ${data.empresa.cidade}",
+        "comportamentoConsumidor": "Decisores de maior ticket buscando recomendações e solidez institucional da empresa",
+        "impactoEmVendas": "Como anúncios hiperlocais geram leads qualificados com menor custo de aquisição",
+        "perdaPorInvisibilidade": "Espaço cedido a marcas concorrentes consolidadas na região"
+      },
+      {
+        "plataforma": "TikTok",
+        "chave": "tiktok",
+        "volumeEstimadoBusca": "Nova ferramenta de busca visual e descoberta local em rápida ascensão no Brasil",
+        "comportamentoConsumidor": "Busca por demonstração prática, processos de fabricação e produto em uso real",
+        "impactoEmVendas": "Vídeos curtos de alto impacto que alcançam milhares de pessoas na cidade sem custo de tráfego",
+        "perdaPorInvisibilidade": "Perda de novos compradores e da percepção de modernidade da marca"
+      },
+      {
+        "plataforma": "WhatsApp Comercial",
+        "chave": "whatsapp",
+        "volumeEstimadoBusca": "Canal onde 95%+ das vendas do segmento são efetivamente convertidas",
+        "comportamentoConsumidor": "Exigência de resposta imediata, catálogo claro e agilidade no envio de proposta",
+        "impactoEmVendas": "Triagem rápida e catálogo interativo aumentam conversão de propostas em até 40%",
+        "perdaPorInvisibilidade": "Demora de mais de 15 minutos faz o cliente fechar com o concorrente no mesmo instante"
+      }
+    ],
+    "metricasConvincentesVendas": [
+      {
+        "indicador": "Validação Pré-Compra (Efeito Vitrine)",
+        "estatistica": "87% dos clientes pesquisam canais digitais antes de aprovar uma compra",
+        "impactoDiretoReceita": "A empresa sem presença digital perde a venda antes mesmo de ter a chance de enviar a proposta comercial",
+        "estrategiaLocomotiva": "Site de alta conversão e identidade 360 que legitimam o padrão de qualidade da empresa em segundos"
+      },
+      {
+        "indicador": "Poder de Preço (Pricing Power & Ticket Médio)",
+        "estatistica": "Empresas com branding premium cobram de 15% a 35% mais caro pelo mesmo produto",
+        "impactoDiretoReceita": "Elimina a guerra de descontos e aumenta o lucro líquido por pedido faturado",
+        "estrategiaLocomotiva": "Design de alto padrão de embalagens, catálogo digital e posicionamento institucional de autoridade"
+      },
+      {
+        "indicador": "Taxa de Conversão de Orçamentos",
+        "estatistica": "Elevação de conversão de 15% para 35% das propostas emitidas",
+        "impactoDiretoReceita": "Mais que dobra o faturamento a partir das mesmas oportunidades que a empresa já recebe",
+        "estrategiaLocomotiva": "Agilidade no WhatsApp comercial, catálogo com carrinho e CRM de acompanhamento ativo"
+      },
+      {
+        "indicador": "Previsibilidade de Vendas & Fim do Boca a Boca Passivo",
+        "estatistica": "Canais ativos criam fluxo contínuo e previsível de novos orçamentos todo mês",
+        "impactoDiretoReceita": "Fim dos meses de baixa e estabilidade no faturamento recorrente",
+        "estrategiaLocomotiva": "Estratégia multicanal integrada gerenciada 100% chave na mão pela Locomotiva Comunicação"
+      }
+    ],
+    "projecaoVendas": {
+      "cenarioAtualPerdido": "Estimativa de 30 a 70 oportunidades de contato perdidas todo mês por falta de canais digitais ativos em ${data.empresa.cidade}",
+      "potencialCapturaMensal": "Captura projetada de 15 a 30 novos orçamentos qualificados por mês",
+      "estimativaImpactoFaturamento": "Projeção de R$ 12.000 a R$ 45.000 em vendas adicionais por mês para a ${data.empresa.nome}",
+      "roiEstimadoComunicacao": "Retorno projetado de 4x a 8x sobre o investimento mensal em Comunicação 360"
+    },
+    "argumentosMatadoresParaAbordagem": [
+      {
+        "id": "arg_google",
+        "titulo": "1. Argumento da Demanda Oculta no Google",
+        "gatilhoVendas": "Vendas Perdidas para Concorrentes Locais",
+        "plataformaAlvo": "Google Busca & Maps",
+        "argumentoPronto": "Texto persuasivo pronto para WhatsApp/e-mail usando dados de busca do Google para convencer o decisor com foco em aumento de vendas."
+      },
+      {
+        "id": "arg_instagram",
+        "titulo": "2. Argumento da Validação Pré-Compra no Instagram",
+        "gatilhoVendas": "Poder de Preço & Não Brigar por Desconto",
+        "plataformaAlvo": "Instagram & Redes Sociais",
+        "argumentoPronto": "Texto persuasivo demonstrando que a falta de vitrine digital faz o cliente exigir desconto ou fugir para a concorrência."
+      },
+      {
+        "id": "arg_roi_vendas",
+        "titulo": "3. Argumento Financeiro de Vendas & ROI Direto",
+        "gatilhoVendas": "Comunicação como Alavanca de Lucro",
+        "plataformaAlvo": "Geral / Reunião de Fechamento",
+        "argumentoPronto": "Texto executivo comprovando que o investimento em comunicação 360 se paga rapidamente no aumento de fechamento de vendas."
+      },
+      {
+        "id": "arg_tiktok",
+        "titulo": "4. Argumento da Descoberta Orgânica (TikTok & Vídeos)",
+        "gatilhoVendas": "Alcance Local Gratuito & Novos Clientes",
+        "plataformaAlvo": "TikTok & Vídeos Curtos",
+        "argumentoPronto": "Texto mostrando como vídeos curtos capturam compradores que hoje nem sabem da existência da empresa."
+      }
+    ]
+  },
   "dimensaoOperacional": {
     "gargalosProcesso": [
       "Gargalo 1 no fluxo de apresentação da marca e captação de clientes",
@@ -452,6 +601,114 @@ function gerarFallbackDossier(
         mensagem: `Olá, [Nome do contato]!\n\nSabemos que muitos empresários de ${cid} já se frustraram com agências que só vendem 'postzinhos' sem retorno, ou ferramentas complexas que ninguém usa.\n\nNa ${agencia}, nosso modelo é 100% focado em retorno financeiro: cuidamos de toda a parte técnica, design e automações para que você só receba os orçamentos prontos.\n\nConseguiu dar uma olhada na micro-auditoria que geramos para a ${nome} (${auditLink})?`,
       },
     ],
+    inteligenciaPresencaDigital: {
+      resumoDemandaLocal: `Mapeamento na região de ${cid}/RS indica forte volume de compradores buscando empresas de ${seg}, com grande concentração de buscas ativas no Google e validação visual de autoridade no Instagram.`,
+      porQuePresencaDigitalImporta: `Hoje, 87% dos clientes pesquisam canais digitais antes de aprovar qualquer orçamento. Se a ${nome} não estiver posicionada com padrão de liderança, o comprador opta pelo concorrente antes mesmo de a sua equipe enviar a proposta comercial.`,
+      demandasPorPlataforma: [
+        {
+          plataforma: "Google (Busca & Maps)",
+          chave: "google",
+          volumeEstimadoBusca: `800 a 2.600 pesquisas/mês por ${seg} em ${cid} e microrregião`,
+          comportamentoConsumidor: `Consumidores e empresas buscam com alta intenção de contratação termos como '${seg} em ${cid}', '${seg} preço' e 'melhor ${seg}', decidindo a compra nos 3 primeiros resultados.`,
+          impactoEmVendas: `Estar no topo do Google Orgânico e no Maps captura até 70% de toda a intenção de compra ativa da cidade, gerando orçamentos espontâneos todos os dias sem custo por clique.`,
+          perdaPorInvisibilidade: `Sem site indexado e perfil otimizado no Google Maps, 100% dessas oportunidades vão diretamente para os concorrentes locais que já investem em presença web.`,
+        },
+        {
+          plataforma: "Instagram",
+          chave: "instagram",
+          volumeEstimadoBusca: `Mais de 12.000 visualizações e pesquisas de validação comercial mensais na região de ${cid}`,
+          comportamentoConsumidor: `Efeito Vitrine: 82% dos clientes que recebem uma proposta ou indicação entram no Instagram para avaliar fotos reais dos trabalhos, acabamento e padrão da marca antes de fechar.`,
+          impactoEmVendas: `Um perfil com identidade visual premium e depoimentos acelera a decisão de compra em até 3x e reduz a objeção de preço, permitindo cobrar um ticket médio até 30% maior.`,
+          perdaPorInvisibilidade: `Perfil amador ou desatualizado transmite sensação de empresa desorganizada, fazendo o cliente pedir desconto ou fechar com um concorrente que aparenta mais solidez.`,
+        },
+        {
+          plataforma: "Facebook & Grupos",
+          chave: "facebook",
+          volumeEstimadoBusca: `Forte penetração em públicos decisores de 35 a 65 anos e grupos locais em ${cid}`,
+          comportamentoConsumidor: `Proprietários e decisores de maior poder aquisitivo ainda utilizam o Facebook para buscar recomendações e validar a solidez institucional da empresa.`,
+          impactoEmVendas: `Campanhas hiperlocais direcionadas geram leads qualificados com menor custo de aquisição e alto índice de fechamento.`,
+          perdaPorInvisibilidade: `Espaço cedido para concorrentes tradicionais que já anunciam e se posicionam ativamente na região.`,
+        },
+        {
+          plataforma: "TikTok",
+          chave: "tiktok",
+          volumeEstimadoBusca: `Nova ferramenta de busca visual e descoberta local em rápida ascensão no Brasil`,
+          comportamentoConsumidor: `Mais de 40% dos novos compradores utilizam o TikTok para ver vídeos reais de produtos em uso, processos de fabricação e diferenciais práticos.`,
+          impactoEmVendas: `Vídeos curtos de demonstração alcançam milhares de visualizações locais sem investimento em anúncios, gerando autoridade instantânea e atração espontânea.`,
+          perdaPorInvisibilidade: `Deixar o canal de lado abre espaço para concorrentes mais jovens dominarem a percepção de inovação no mercado regional.`,
+        },
+        {
+          plataforma: "WhatsApp Comercial",
+          chave: "whatsapp",
+          volumeEstimadoBusca: `Canal onde 95%+ das propostas e vendas de ${seg} em ${cid} são convertidas`,
+          comportamentoConsumidor: `O cliente exige resposta em poucos minutos, catálogo interativo no celular e clareza no processo de atendimento.`,
+          impactoEmVendas: `Triagem imediata e catálogo digital integrado elevam a taxa de conversão dos orçamentos emitidos em até 40%.`,
+          perdaPorInvisibilidade: `Demora de mais de 15 minutos para responder faz o cliente procurar o concorrente no mesmo instante.`,
+        },
+      ],
+      metricasConvincentesVendas: [
+        {
+          indicador: "Validação Pré-Compra (Efeito Vitrine)",
+          estatistica: "87% dos clientes pesquisam canais digitais antes de aprovar uma compra",
+          impactoDiretoReceita: "A empresa sem presença digital profissional perde a venda antes mesmo de ter a chance de apresentar sua proposta comercial.",
+          estrategiaLocomotiva: "Site de alta conversão, portfólio profissional e prova social que legitimam a autoridade da empresa em segundos.",
+        },
+        {
+          indicador: "Poder de Preço (Pricing Power & Ticket Médio)",
+          estatistica: "Empresas com branding premium cobram de 15% a 35% mais caro pelo mesmo produto",
+          impactoDiretoReceita: "O cliente julga a qualidade pelo padrão visual. Marca amadora atrai clientes que pedem desconto; marca premium atrai clientes que pagam pelo valor.",
+          estrategiaLocomotiva: "Identidade visual sofisticada, embalagens personalizadas e materiais institucionais de alto padrão para eliminar a briga por preço.",
+        },
+        {
+          indicador: "Taxa de Conversão de Orçamentos",
+          estatistica: "Elevação de conversão de 15% para 35% das propostas emitidas",
+          impactoDiretoReceita: "Mais que dobra o faturamento a partir das mesmas oportunidades que a empresa já recebe hoje, sem aumentar a equipe.",
+          estrategiaLocomotiva: "Agilidade no WhatsApp comercial, catálogo digital com carrinho e CRM de follow-up que não deixa nenhum lead esfriar.",
+        },
+        {
+          indicador: "Previsibilidade de Vendas & Fim do Boca a Boca Passivo",
+          estatistica: "Canais ativos geram fluxo contínuo e previsível de novos orçamentos todo mês",
+          impactoDiretoReceita: "Fim da oscilação de faturamento e eliminação da dependência exclusiva de indicações passivas que demoram a chegar.",
+          estrategiaLocomotiva: "Estratégia multicanal integrada gerenciada 100% chave na mão pela equipe da Locomotiva Comunicação.",
+        },
+      ],
+      projecaoVendas: {
+        cenarioAtualPerdido: `Perda estimada de 30 a 70 oportunidades de orçamentos por mês por ausência de canais digitais otimizados em ${cid}.`,
+        potencialCapturaMensal: `Captura projetada de 15 a 30 novos orçamentos qualificados por mês.`,
+        estimativaImpactoFaturamento: `Projeção de R$ 12.000 a R$ 45.000 em vendas adicionais por mês para a ${nome}.`,
+        roiEstimadoComunicacao: `Retorno projetado de 4x a 8x sobre o investimento mensal em Comunicação 360 da Locomotiva.`,
+      },
+      argumentosMatadoresParaAbordagem: [
+        {
+          id: "arg_google",
+          titulo: "1. Argumento da Demanda Oculta no Google",
+          gatilhoVendas: "Vendas Perdidas para Concorrentes Locais",
+          plataformaAlvo: "Google Busca & Maps",
+          argumentoPronto: `Olá, [Nome do contato]!\n\nVocê sabia que ocorrem centenas de pesquisas mensais no Google aqui em ${cid} procurando por '${seg}' e quem está capturando 100% desses clientes são seus concorrentes diretos?\n\nHoje a ${nome} não aparece nas primeiras posições de busca e mapa, o que significa que orçamentos prontos estão deixando de entrar todos os dias.\n\nEstruturamos um diagnóstico de 2 minutos sobre como posicionar a ${nome} no topo dessas buscas: ${auditLink}\n\nPodemos conversar 10 minutos para eu te mostrar esses dados da sua região?\n\nAtenciosamente,\n${agencia}`,
+        },
+        {
+          id: "arg_instagram",
+          titulo: "2. Argumento da Validação Pré-Compra no Instagram",
+          gatilhoVendas: "Poder de Preço & Não Brigar por Desconto",
+          plataformaAlvo: "Instagram & Redes Sociais",
+          argumentoPronto: `Olá, [Nome do contato]!\n\nUma pesquisa recente de mercado comprovou que 87% dos clientes pesquisam o Instagram e o site de uma empresa de ${seg} antes de aprovar um orçamento.\n\nQuando um cliente exigente de ${cid} recebe uma proposta da ${nome} e entra nas suas redes hoje, o que ele encontra reforça a autoridade para pagar o preço justo, ou faz ele pedir desconto por achar a comunicação amadora?\n\nNa ${agencia}, reposicionamos marcas para que o cliente pague pelo valor sem questionar preço.\n\nQual o melhor dia para conversarmos sobre esse posicionamento?\n\nUm abraço,\n${agencia}`,
+        },
+        {
+          id: "arg_roi_vendas",
+          titulo: "3. Argumento Financeiro de Vendas & ROI Direto",
+          gatilhoVendas: "Comunicação como Alavanca de Lucro",
+          plataformaAlvo: "Geral / Reunião de Fechamento",
+          argumentoPronto: `Olá, [Nome do contato]!\n\nMuitos empresários veem marketing como custo porque já contrataram agências que só faziam 'posts bonitinhos' sem trazer clientes. Na ${agencia}, trabalhamos com foco estrito em VENDA e LUCRO.\n\nCalculamos que estruturando a presença digital da ${nome} em ${cid} com site de alta conversão, Google otimizado e catálogo digital, é possível capturar de 15 a 30 novos orçamentos por mês, representando uma projeção de R$ 12.000 a R$ 45.000 em vendas adicionais.\n\nO investimento se paga logo nos primeiros novos clientes convertidos.\n\nPodemos agendar 15 minutos para avaliarmos essa projeção na prática?\n\nAtenciosamente,\n${agencia}`,
+        },
+        {
+          id: "arg_tiktok",
+          titulo: "4. Argumento da Descoberta Orgânica (TikTok & Vídeos)",
+          gatilhoVendas: "Alcance Local Gratuito & Novos Clientes",
+          plataformaAlvo: "TikTok & Vídeos Curtos",
+          argumentoPronto: `Olá, [Nome do contato]!\n\nO comportamento de compra mudou: o TikTok se tornou o novo mecanismo de busca de produtos e serviços para uma grande parcela de clientes em ${cid}.\n\nVídeos curtos de 30 segundos mostrando seus produtos e diferenciais de fabricação alcançam milhares de pessoas na região sem gastar 1 real com anúncios.\n\nA ${agencia} produz vídeos estratégicos prontos para atrair compradores que hoje nem sabem que a ${nome} existe.\n\nPodemos bater um papo rápido para te mostrar exemplos do seu segmento?\n\nUm abraço,\n${agencia}`,
+        },
+      ],
+    },
     dimensaoOperacional: {
       gargalosProcesso: [
         "Falta de catálogo digital interativo para fechamento ágil de pedidos.",

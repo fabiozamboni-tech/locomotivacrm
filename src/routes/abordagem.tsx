@@ -19,6 +19,9 @@ import {
   type Dossier360Result,
   type SistemaGestaoItem,
   type TratamentoSintomaItem,
+  type PlataformaDemandaItem,
+  type MetricaVendaConvincente,
+  type ArgumentoMatadorVendas,
 } from "@/lib/dossier-360.functions";
 import { consultarQsaDecisores, type DecisoresResult, type SocioDecisor } from "@/lib/qsa-decisores.functions";
 import { CopilotoObjecoesModal } from "@/components/copiloto-objecoes-modal";
@@ -40,6 +43,8 @@ import {
   AlertCircle,
   ShieldAlert,
   TrendingUp,
+  TrendingDown,
+  Target,
   Gauge,
   Layers,
   Bot,
@@ -72,6 +77,23 @@ function waSendUrl(numero: string | undefined, texto: string): string | undefine
   return `${base}?text=${encodeURIComponent(texto)}`;
 }
 
+function getPlataformaStyle(chave: string) {
+  switch (chave) {
+    case "google":
+      return { icon: Globe, badgeCls: "bg-blue-500/10 text-blue-600 border-blue-500/30", borderCls: "border-blue-500/20" };
+    case "instagram":
+      return { icon: Instagram, badgeCls: "bg-pink-500/10 text-pink-600 border-pink-500/30", borderCls: "border-pink-500/20" };
+    case "facebook":
+      return { icon: Users, badgeCls: "bg-sky-500/10 text-sky-600 border-sky-500/30", borderCls: "border-sky-500/20" };
+    case "tiktok":
+      return { icon: Video, badgeCls: "bg-rose-500/10 text-rose-600 border-rose-500/30", borderCls: "border-rose-500/20" };
+    case "whatsapp":
+      return { icon: MessageCircle, badgeCls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30", borderCls: "border-emerald-500/20" };
+    default:
+      return { icon: Globe, badgeCls: "bg-muted text-muted-foreground", borderCls: "border-border" };
+  }
+}
+
 export const Route = createFileRoute("/abordagem")({
   validateSearch: z.object({ empresa: z.string().optional() }),
   component: AbordagemPage,
@@ -92,7 +114,7 @@ function AbordagemPage() {
   const { empresas } = useStore();
   const [selected, setSelected] = useState<string>(empresaId ?? empresas[0]?.id ?? "");
   const [canal, setCanal] = useState<CanalTipo>("whatsapp");
-  const [activeTab, setActiveTab] = useState<"dossier" | "sistemas" | "prescricao" | "abordagens">("abordagens");
+  const [activeTab, setActiveTab] = useState<"dossier" | "demanda" | "sistemas" | "prescricao" | "abordagens">("abordagens");
   const [dossier, setDossier] = useState<Dossier360Result | null>(null);
   const [loadingIA, setLoadingIA] = useState(false);
   const [nomeAgencia, setNomeAgencia] = useState("Locomotiva Comunicação");
@@ -426,6 +448,10 @@ function AbordagemPage() {
             <Zap className="h-3.5 w-3.5 text-amber-500" />
             Central de Abordagens por Canal
           </TabsTrigger>
+          <TabsTrigger value="demanda" className="text-xs py-1.5 px-3 flex items-center gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <BarChart3 className="h-3.5 w-3.5 text-blue-500" />
+            Demanda de Busca Local & Vendas
+          </TabsTrigger>
           <TabsTrigger value="dossier" className="text-xs py-1.5 px-3 flex items-center gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
             <BrainCircuit className="h-3.5 w-3.5 text-purple-500" />
             Dossiê Psicológico & Abordagens Derivadas
@@ -553,6 +579,54 @@ function AbordagemPage() {
                   className="font-mono text-xs md:text-sm leading-relaxed flex-1 min-h-[280px]"
                 />
 
+                {dossier?.inteligenciaPresencaDigital && (
+                  <div className="flex items-center gap-1.5 flex-wrap pt-2 border-t">
+                    <span className="text-[11px] font-semibold text-muted-foreground">Inserir dados no texto:</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const g = dossier.inteligenciaPresencaDigital.demandasPorPlataforma.find((p) => p.chave === "google");
+                        const txt = `\n\n[Dados de Busca Local - Google]:\n• ${g?.volumeEstimadoBusca || `Demanda ativa em ${empresa?.cidade}`}\n• Impacto em Vendas: ${g?.impactoEmVendas || "Captura de clientes prontos para contratar"}`;
+                        setTextoEditado((prev) => `${prev}${txt}`);
+                        toast.success("Dados do Google inseridos no texto!");
+                      }}
+                      className="h-6 text-[10px] px-2 gap-1 border-blue-500/30 text-blue-600 hover:bg-blue-500/10"
+                    >
+                      <Globe className="h-3 w-3" /> + Busca Google
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const i = dossier.inteligenciaPresencaDigital.demandasPorPlataforma.find((p) => p.chave === "instagram");
+                        const txt = `\n\n[Validação de Marca - Instagram]:\n• ${i?.volumeEstimadoBusca || "Visualizações na região"}\n• Efeito Vitrine: 87% dos clientes pesquisam as redes antes de aprovar proposta.`;
+                        setTextoEditado((prev) => `${prev}${txt}`);
+                        toast.success("Dados do Instagram inseridos no texto!");
+                      }}
+                      className="h-6 text-[10px] px-2 gap-1 border-pink-500/30 text-pink-600 hover:bg-pink-500/10"
+                    >
+                      <Instagram className="h-3 w-3" /> + Vitrine Instagram
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const proj = dossier.inteligenciaPresencaDigital.projecaoVendas;
+                        const txt = `\n\n[Projeção de Vendas & ROI]:\n• ${proj.potencialCapturaMensal}\n• ${proj.estimativaImpactoFaturamento}\n• ${proj.roiEstimadoComunicacao}`;
+                        setTextoEditado((prev) => `${prev}${txt}`);
+                        toast.success("Projeção de Vendas inserida no texto!");
+                      }}
+                      className="h-6 text-[10px] px-2 gap-1 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10"
+                    >
+                      <DollarSign className="h-3 w-3" /> + Projeção de Vendas
+                    </Button>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between text-xs text-muted-foreground flex-wrap gap-2 pt-2 border-t">
                   <div className="flex items-center gap-2">
                     <span>💡 <strong>Tom Consultivo:</strong> Diagnóstico direto e cálculo financeiro do custo da inação, sem bajulação vazia.</span>
@@ -565,11 +639,363 @@ function AbordagemPage() {
         </TabsContent>
 
         {/* ------------------------------------------------------------------- */}
-        {/* ABA 2: DOSSIÊ 3 DIMENSÕES + ABORDAGENS DERIVADAS */}
+        {/* ABA 2: DEMANDA DE BUSCA LOCAL & ARGUMENTOS DE VENDAS */}
+        {/* ------------------------------------------------------------------- */}
+        <TabsContent value="demanda" className="space-y-5 mt-0">
+          {dossier ? (
+            <div className="space-y-5">
+              {/* HEADER DE INTELIGÊNCIA DE PRESENÇA DIGITAL */}
+              <div className="rounded-xl border border-blue-500/30 bg-gradient-to-r from-blue-500/10 via-indigo-500/5 to-card p-5 space-y-3 shadow-sm">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-lg bg-blue-500/15 text-blue-600 dark:text-blue-400">
+                      <BarChart3 className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold text-foreground">
+                        Inteligência de Presença Digital & Demanda de Busca Local
+                      </h2>
+                      <p className="text-xs text-muted-foreground">
+                        {empresa?.segmento} em {empresa?.cidade}/RS · Mapeamento de intenção de compra e dados estratégicos
+                      </p>
+                    </div>
+                  </div>
+
+                  <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+                    Foco Estrito: Aumento de Vendas & ROI
+                  </Badge>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-3 pt-1">
+                  <div className="p-3 rounded-lg border border-border/60 bg-card/70 space-y-1">
+                    <span className="text-[11px] uppercase tracking-wide text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1.5">
+                      <Search className="h-3.5 w-3.5" /> Cenário de Demanda na Região
+                    </span>
+                    <p className="text-xs text-foreground leading-relaxed">
+                      {dossier.inteligenciaPresencaDigital?.resumoDemandaLocal ||
+                        `Forte volume de compradores pesquisando por ${empresa?.segmento} em ${empresa?.cidade} e microrregião.`}
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-lg border border-border/60 bg-card/70 space-y-1">
+                    <span className="text-[11px] uppercase tracking-wide text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1.5">
+                      <Target className="h-3.5 w-3.5" /> Por Que Presença Digital é Crucial
+                    </span>
+                    <p className="text-xs text-foreground leading-relaxed">
+                      {dossier.inteligenciaPresencaDigital?.porQuePresencaDigitalImporta ||
+                        "87% dos clientes pesquisam canais digitais antes de comprar. Sem presença, concorrentes capturam essas vendas."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* DASHBOARD DE PROJEÇÃO DE VENDAS & ROI */}
+              {dossier.inteligenciaPresencaDigital?.projecaoVendas && (
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                  <Card className="border-rose-500/30 bg-rose-500/5 shadow-sm">
+                    <CardHeader className="pb-1.5 pt-3.5 px-4">
+                      <div className="flex items-center justify-between text-rose-600">
+                        <span className="text-xs font-semibold uppercase tracking-wider">Perda no Modelo Atual</span>
+                        <TrendingDown className="h-4 w-4" />
+                      </div>
+                    </CardHeader>
+                    <CardContent className="px-4 pb-3.5">
+                      <p className="text-xs text-foreground font-medium leading-relaxed">
+                        {dossier.inteligenciaPresencaDigital.projecaoVendas.cenarioAtualPerdido}
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-blue-500/30 bg-blue-500/5 shadow-sm">
+                    <CardHeader className="pb-1.5 pt-3.5 px-4">
+                      <div className="flex items-center justify-between text-blue-600">
+                        <span className="text-xs font-semibold uppercase tracking-wider">Novos Orçamentos/Mês</span>
+                        <Target className="h-4 w-4" />
+                      </div>
+                    </CardHeader>
+                    <CardContent className="px-4 pb-3.5">
+                      <p className="text-xs text-foreground font-medium leading-relaxed">
+                        {dossier.inteligenciaPresencaDigital.projecaoVendas.potencialCapturaMensal}
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-emerald-500/30 bg-emerald-500/10 shadow-sm">
+                    <CardHeader className="pb-1.5 pt-3.5 px-4">
+                      <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-400">
+                        <span className="text-xs font-bold uppercase tracking-wider">Vendas Adicionais</span>
+                        <DollarSign className="h-4 w-4" />
+                      </div>
+                    </CardHeader>
+                    <CardContent className="px-4 pb-3.5">
+                      <p className="text-xs text-foreground font-semibold leading-relaxed">
+                        {dossier.inteligenciaPresencaDigital.projecaoVendas.estimativaImpactoFaturamento}
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-purple-500/30 bg-purple-500/5 shadow-sm">
+                    <CardHeader className="pb-1.5 pt-3.5 px-4">
+                      <div className="flex items-center justify-between text-purple-600">
+                        <span className="text-xs font-semibold uppercase tracking-wider">ROI Projetado</span>
+                        <TrendingUp className="h-4 w-4" />
+                      </div>
+                    </CardHeader>
+                    <CardContent className="px-4 pb-3.5">
+                      <p className="text-xs text-foreground font-medium leading-relaxed">
+                        {dossier.inteligenciaPresencaDigital.projecaoVendas.roiEstimadoComunicacao}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              {/* DEMANDA DE BUSCA DETALHADA POR PLATAFORMA (GOOGLE, INSTA, FACE, TIKTOK, WHATSAPP) */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-bold text-foreground">
+                      Dados de Demanda & Comportamento de Busca por Plataforma ({empresa?.cidade})
+                    </h3>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground">
+                    Estimativas de tráfego local e impacto direto nas vendas
+                  </span>
+                </div>
+
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {dossier.inteligenciaPresencaDigital?.demandasPorPlataforma?.map((p, idx) => {
+                    const style = getPlataformaStyle(p.chave);
+                    const IconPlat = style.icon;
+                    return (
+                      <Card key={idx} className={`border ${style.borderCls} shadow-sm flex flex-col justify-between hover:shadow-md transition-all`}>
+                        <CardHeader className="pb-2 pt-3.5 px-4">
+                          <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                            <div className="flex items-center gap-2">
+                              <div className="p-1.5 rounded-md bg-muted">
+                                <IconPlat className="h-4 w-4" />
+                              </div>
+                              <span className="font-bold text-xs text-foreground">{p.plataforma}</span>
+                            </div>
+                            <Badge variant="outline" className={`text-[10px] font-semibold ${style.badgeCls}`}>
+                              {p.volumeEstimadoBusca}
+                            </Badge>
+                          </div>
+                        </CardHeader>
+
+                        <CardContent className="px-4 pb-4 space-y-3 text-xs flex-1 flex flex-col justify-between">
+                          <div className="space-y-2.5">
+                            <div>
+                              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block">
+                                Comportamento do Comprador Local:
+                              </span>
+                              <p className="text-[11px] text-foreground mt-0.5 leading-relaxed">
+                                {p.comportamentoConsumidor}
+                              </p>
+                            </div>
+
+                            <div className="p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                              <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+                                <TrendingUp className="h-3 w-3" /> Impacto Direto em Vendas:
+                              </span>
+                              <p className="text-[11px] text-foreground mt-0.5 leading-relaxed">
+                                {p.impactoEmVendas}
+                              </p>
+                            </div>
+
+                            <div className="p-2.5 rounded-lg bg-rose-500/5 border border-rose-500/20">
+                              <span className="text-[10px] font-semibold text-rose-700 dark:text-rose-400 uppercase tracking-wider flex items-center gap-1">
+                                <AlertCircle className="h-3 w-3" /> Perda por Invisibilidade:
+                              </span>
+                              <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                                {p.perdaPorInvisibilidade}
+                              </p>
+                            </div>
+                          </div>
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const snippet = `\n\n[Mapeamento de Mercado - ${p.plataforma}]:\n• Demanda Local: ${p.volumeEstimadoBusca}\n• Impacto: ${p.impactoEmVendas}`;
+                              setTextoEditado((prev) => `${prev}${snippet}`);
+                              setActiveTab("abordagens");
+                              toast.success(`Dados de ${p.plataforma} inseridos no editor!`);
+                            }}
+                            className="w-full text-xs h-7 mt-2 gap-1 border-border/70"
+                          >
+                            <ArrowRight className="h-3 w-3" /> Inserir no Editor
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* MÉTRICAS PERSUASIVAS PARA QUEBRAR OBJEÇÃO E ACELERAR VENDAS */}
+              {dossier.inteligenciaPresencaDigital?.metricasConvincentesVendas && (
+                <Card className="border-border/60 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-5 w-5 text-emerald-600" />
+                      <div>
+                        <CardTitle className="text-base font-bold text-foreground">
+                          Métricas & Argumentos Irrefutáveis para Aumento de Vendas
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                          Dados de mercado que comprovam que a comunicação 360 se paga rapidamente e gera lucro.
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {dossier.inteligenciaPresencaDigital.metricasConvincentesVendas.map((met, idx) => (
+                      <div key={idx} className="p-3.5 rounded-xl border border-border/70 bg-card space-y-2 flex flex-col justify-between">
+                        <div className="space-y-1.5">
+                          <span className="text-[11px] font-semibold text-foreground block">
+                            {met.indicador}
+                          </span>
+                          <div className="text-xs font-bold text-primary p-1 px-2 rounded bg-primary/10 border border-primary/20 w-fit">
+                            {met.estatistica}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground leading-relaxed pt-1">
+                            {met.impactoDiretoReceita}
+                          </p>
+                        </div>
+
+                        <div className="pt-2 border-t text-[10px] text-emerald-700 dark:text-emerald-400 font-medium">
+                          ✓ {met.estrategiaLocomotiva}
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* ARGUMENTOS MATADORES PRONTOS PARA ABORDAGEM */}
+              {dossier.inteligenciaPresencaDigital?.argumentosMatadoresParaAbordagem && (
+                <Card className="border-primary/30 bg-gradient-to-r from-primary/5 via-card to-primary/5 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-5 w-5 text-amber-500" />
+                      <div>
+                        <CardTitle className="text-base font-bold text-foreground">
+                          Argumentos de Vendas Prontos com Dados Locais (1 Clique)
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                          Textos persuasivos completos baseados nas buscas de {empresa?.cidade} e focados estritamente em aumentar o faturamento do cliente.
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="grid md:grid-cols-2 gap-4">
+                    {dossier.inteligenciaPresencaDigital.argumentosMatadoresParaAbordagem.map((arg) => (
+                      <div
+                        key={arg.id}
+                        className="p-4 rounded-xl border bg-card space-y-3 shadow-sm hover:border-primary/40 transition-all flex flex-col justify-between"
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <span className="font-semibold text-xs text-foreground">{arg.titulo}</span>
+                            <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-600 border-blue-500/30">
+                              {arg.plataformaAlvo}
+                            </Badge>
+                          </div>
+                          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                            🎯 Gatilho: {arg.gatilhoVendas}
+                          </p>
+                          <div className="p-3 bg-muted/30 rounded-lg text-xs font-sans whitespace-pre-line leading-relaxed border">
+                            {arg.argumentoPronto}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-1.5 pt-2 border-t flex-wrap">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              navigator.clipboard.writeText(arg.argumentoPronto);
+                              toast.success("Argumento de vendas copiado!");
+                            }}
+                            className="h-7 text-xs px-2 gap-1"
+                          >
+                            <Copy className="h-3 w-3" /> Copiar
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                              setTextoEditado(arg.argumentoPronto);
+                              setActiveTab("abordagens");
+                              toast.success("Argumento carregado no Editor Principal!");
+                            }}
+                            className="h-7 text-xs px-2 gap-1"
+                          >
+                            <ArrowRight className="h-3 w-3" /> Usar no Editor
+                          </Button>
+                          {waSendUrl(empresa?.whatsapp, arg.argumentoPronto) && (
+                            <Button
+                              asChild
+                              size="sm"
+                              className="h-7 text-xs px-2 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                            >
+                              <a href={waSendUrl(empresa?.whatsapp, arg.argumentoPronto)} target="_blank" rel="noreferrer">
+                                <Send className="h-3 w-3" /> WhatsApp
+                              </a>
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          ) : (
+            <div className="p-8 text-center border rounded-lg bg-muted/20 space-y-2">
+              <Bot className="h-8 w-8 mx-auto text-muted-foreground" />
+              <p className="text-sm font-medium">Nenhum dossiê gerado ainda.</p>
+              <p className="text-xs text-muted-foreground">
+                Clique no botão "🔍 Pesquisar Web & Gerar Dossiê" acima para mapear a demanda de busca local (Google, Insta, Face, TikTok, WhatsApp) e projeções de vendas para {empresa?.nome}.
+              </p>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ------------------------------------------------------------------- */}
+        {/* ABA 3: DOSSIÊ 3 DIMENSÕES + ABORDAGENS DERIVADAS */}
         {/* ------------------------------------------------------------------- */}
         <TabsContent value="dossier" className="space-y-5 mt-0">
           {dossier ? (
             <div className="space-y-5">
+              {/* BANNER DE DESTAQUE: INTELIGÊNCIA DE BUSCA LOCAL & VENDAS */}
+              {dossier.inteligenciaPresencaDigital && (
+                <Card className="border-blue-500/30 bg-gradient-to-r from-blue-500/10 via-card to-indigo-500/10 shadow-sm">
+                  <CardHeader className="py-3 px-4 flex-row items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2.5">
+                      <Globe className="h-5 w-5 text-blue-600 shrink-0" />
+                      <div>
+                        <CardTitle className="text-sm font-bold text-foreground">
+                          Demanda de Busca Local & Oportunidade de Vendas ({empresa?.cidade})
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                          {dossier.inteligenciaPresencaDigital.resumoDemandaLocal}
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => setActiveTab("demanda")}
+                      className="text-xs h-7 gap-1 bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      <BarChart3 className="h-3 w-3" /> Ver Dados Detalhados de Busca & Vendas
+                    </Button>
+                  </CardHeader>
+                </Card>
+              )}
+
               {/* DIMENSÃO 1: FATORES PSICOLÓGICOS E EMOCIONAIS */}
               <Card className="border-purple-500/20 bg-purple-500/5 shadow-sm">
                 <CardHeader className="pb-3">
