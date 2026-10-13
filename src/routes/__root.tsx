@@ -7,6 +7,7 @@ import {
   HeadContent,
   Scripts,
   redirect,
+  type ErrorComponentProps,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
@@ -39,11 +40,11 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error(error);
   const router = useRouter();
   useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
+    reportLovableError(error as Error, { boundary: "tanstack_root_error_component" });
   }, [error]);
 
   return (
@@ -79,12 +80,13 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   beforeLoad: async ({ location }) => {
-    if (location.pathname === "/unlock") return;
+    if (location.pathname === "/unlock") return {};
     const { unlocked } = await isUnlocked();
     if (!unlocked) {
       const next = `${location.pathname}${location.searchStr}${location.hash}`;
       throw redirect({ to: "/unlock", search: { next } });
     }
+    return {};
   },
   head: () => ({
     meta: [
