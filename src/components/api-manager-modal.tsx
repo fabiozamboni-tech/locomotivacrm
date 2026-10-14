@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { testApiConnection, type ApiTestResult } from "@/lib/api-status.functions";
-import { getApiSettings, saveApiSetting, type ApiSettingsMap } from "@/lib/api-settings";
+import { getApiSettings, saveApiSetting, type ApiSettingsMap, type ApiProviderKey } from "@/lib/api-settings";
 import {
   Dialog,
   DialogContent,
@@ -67,7 +67,7 @@ export function ApiManagerModal({ open, onOpenChange }: ApiManagerModalProps) {
     setShowKeys((prev) => ({ ...prev, [provider]: !prev[provider] }));
   };
 
-  const handleKeyChange = (provider: keyof ApiSettingsMap, newKey: string) => {
+  const handleKeyChange = (provider: ApiProviderKey, newKey: string) => {
     setSettings((prev) => ({
       ...prev,
       [provider]: {
@@ -77,11 +77,11 @@ export function ApiManagerModal({ open, onOpenChange }: ApiManagerModalProps) {
     }));
   };
 
-  const handleSaveKey = (provider: keyof ApiSettingsMap) => {
-    const updated = saveApiSetting(provider, { key: settings[provider].key });
+  const handleSaveKey = (provider: ApiProviderKey) => {
+    const updated = saveApiSetting(provider, { key: settings[provider]?.key });
     setSettings(updated);
     toast.success(`Chave da API ${provider.toUpperCase()} salva com sucesso!`);
-    testSingleApi(provider, settings[provider].key);
+    testSingleApi(provider, settings[provider]?.key);
   };
 
   const testSingleApi = async (provider: string, apiKey?: string) => {
@@ -90,7 +90,7 @@ export function ApiManagerModal({ open, onOpenChange }: ApiManagerModalProps) {
       const res = await testConn({
         data: {
           provider,
-          apiKey: apiKey ?? settings[provider as keyof ApiSettingsMap]?.key,
+          apiKey: apiKey ?? settings[provider as ApiProviderKey]?.key,
         },
       });
       setTestResults((prev) => ({ ...prev, [provider]: res }));
@@ -112,9 +112,9 @@ export function ApiManagerModal({ open, onOpenChange }: ApiManagerModalProps) {
   const testAllApis = async () => {
     setTestingAll(true);
     try {
-      const providers = ["serpapi", "apify", "brasilapi", "registrobr", "openstreetmap", "lovable"];
+      const providers = ["serpapi", "groq", "gemini", "openrouter", "apify", "brasilapi", "registrobr", "openstreetmap", "lovable"];
       for (const p of providers) {
-        await testSingleApi(p, settings[p as keyof ApiSettingsMap]?.key);
+        await testSingleApi(p, settings[p as ApiProviderKey]?.key);
       }
       toast.success("Diagnóstico de todas as APIs concluído!");
     } finally {

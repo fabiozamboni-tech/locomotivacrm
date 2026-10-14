@@ -1,7 +1,18 @@
 import { createServerFn } from "@tanstack/react-start";
 
 export interface ApiTestResult {
-  provider: "serpapi" | "apify" | "lovable" | "brasilapi" | "registrobr" | "openstreetmap" | "apollo";
+  provider:
+    | "serpapi"
+    | "apify"
+    | "lovable"
+    | "brasilapi"
+    | "registrobr"
+    | "openstreetmap"
+    | "apollo"
+    | "groq"
+    | "gemini"
+    | "openrouter"
+    | "ollama";
   status: "online" | "unauthorized" | "error" | "unconfigured";
   latencyMs: number;
   message: string;
@@ -14,6 +25,7 @@ export interface ApiTestResult {
     renewalDate?: string;
     isFreeService?: boolean;
     serverInfo?: string;
+    modelUsed?: string;
   };
 }
 
@@ -273,6 +285,137 @@ export const testApiConnection = createServerFn({ method: "POST" })
         message: "Conector Lovable Cloud Gateway configurado.",
         details: { serverInfo: "Lovable Cloud Hosted" },
       };
+    }
+
+    // 7. GROQ (awesome-free-llm-apis: 14.400 req/dia grátis)
+    if (data.provider === "groq") {
+      const key = data.apiKey || process.env.GROQ_API_KEY;
+      if (!key) {
+        return {
+          provider: "groq",
+          status: "unconfigured",
+          latencyMs: 0,
+          message: "Nenhuma chave Groq informada. Obtenha gratuitamente em console.groq.com/keys sem cartão.",
+        };
+      }
+      try {
+        const { testarConexaoLlm } = await import("./llm-provider.server");
+        const res = await testarConexaoLlm("groq", key, "llama-3.3-70b-versatile");
+        return {
+          provider: "groq",
+          status: res.ok ? "online" : "error",
+          latencyMs: res.latencyMs,
+          message: res.message,
+          details: {
+            plan: "Free Tier (30 RPM / 14.400 RPD)",
+            modelUsed: res.modelUsed,
+            isFreeService: true,
+          },
+        };
+      } catch (err: any) {
+        return {
+          provider: "groq",
+          status: "error",
+          latencyMs: Date.now() - startTime,
+          message: err.message || "Erro ao conectar com Groq",
+        };
+      }
+    }
+
+    // 8. GOOGLE GEMINI (awesome-free-llm-apis: 1.500 req/dia grátis)
+    if (data.provider === "gemini") {
+      const key = data.apiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+      if (!key) {
+        return {
+          provider: "gemini",
+          status: "unconfigured",
+          latencyMs: 0,
+          message: "Nenhuma chave Gemini informada. Obtenha gratuitamente no Google AI Studio (aistudio.google.com).",
+        };
+      }
+      try {
+        const { testarConexaoLlm } = await import("./llm-provider.server");
+        const res = await testarConexaoLlm("gemini", key, "gemini-2.0-flash");
+        return {
+          provider: "gemini",
+          status: res.ok ? "online" : "error",
+          latencyMs: res.latencyMs,
+          message: res.message,
+          details: {
+            plan: "Free Tier (15 RPM / 1.500 RPD / 1M Contexto)",
+            modelUsed: res.modelUsed,
+            isFreeService: true,
+          },
+        };
+      } catch (err: any) {
+        return {
+          provider: "gemini",
+          status: "error",
+          latencyMs: Date.now() - startTime,
+          message: err.message || "Erro ao conectar com Google Gemini",
+        };
+      }
+    }
+
+    // 9. OPENROUTER (awesome-free-llm-apis: modelos :free)
+    if (data.provider === "openrouter") {
+      const key = data.apiKey || process.env.OPENROUTER_API_KEY;
+      if (!key) {
+        return {
+          provider: "openrouter",
+          status: "unconfigured",
+          latencyMs: 0,
+          message: "Nenhuma chave OpenRouter informada. Obtenha em openrouter.ai/keys para modelos gratuitos.",
+        };
+      }
+      try {
+        const { testarConexaoLlm } = await import("./llm-provider.server");
+        const res = await testarConexaoLlm("openrouter", key, "meta-llama/llama-3.3-70b-instruct:free");
+        return {
+          provider: "openrouter",
+          status: res.ok ? "online" : "error",
+          latencyMs: res.latencyMs,
+          message: res.message,
+          details: {
+            plan: "Free Tier (:free models)",
+            modelUsed: res.modelUsed,
+            isFreeService: true,
+          },
+        };
+      } catch (err: any) {
+        return {
+          provider: "openrouter",
+          status: "error",
+          latencyMs: Date.now() - startTime,
+          message: err.message || "Erro ao conectar com OpenRouter",
+        };
+      }
+    }
+
+    // 10. OLLAMA LOCAL (awesome-free-llm-apis: 100% gratuito e privado)
+    if (data.provider === "ollama") {
+      try {
+        const { testarConexaoLlm } = await import("./llm-provider.server");
+        const res = await testarConexaoLlm("ollama", "local", "llama3.3", data.apiKey || "http://localhost:11434/v1");
+        return {
+          provider: "ollama",
+          status: res.ok ? "online" : "error",
+          latencyMs: res.latencyMs,
+          message: res.message,
+          details: {
+            plan: "Local / Self-Hosted (Sem limites)",
+            modelUsed: res.modelUsed,
+            isFreeService: true,
+          },
+        };
+      } catch (err: any) {
+        return {
+          provider: "ollama",
+          status: "error",
+          latencyMs: Date.now() - startTime,
+          message: "Servidor Ollama local não está rodando em http://localhost:11434",
+        };
+      }
     }
 
     return {

@@ -4,7 +4,14 @@ import { useStore } from "@/lib/store";
 import { useServerFn } from "@tanstack/react-start";
 import { cn } from "@/lib/utils";
 import { testApiConnection, type ApiTestResult } from "@/lib/api-status.functions";
-import { getApiSettings, saveApiSetting, type ApiSettingsMap } from "@/lib/api-settings";
+import {
+  getApiSettings,
+  saveApiSetting,
+  saveProvedorIaAtivo,
+  type ApiSettingsMap,
+  type ProvedorIaTipo,
+  type ApiProviderKey,
+} from "@/lib/api-settings";
 import {
   getComunicacaoSettings,
   saveComunicacaoSettings,
@@ -57,6 +64,7 @@ import {
   HardDrive,
   Cloud,
   Clock,
+  ExternalLink,
 } from "lucide-react";
 
 export const Route = createFileRoute("/configuracoes")({
@@ -163,7 +171,7 @@ function ConfiguracoesPage() {
     setShowKeys((prev) => ({ ...prev, [provider]: !prev[provider] }));
   };
 
-  const handleKeyChange = (provider: keyof ApiSettingsMap, newKey: string) => {
+  const handleKeyChange = (provider: ApiProviderKey, newKey: string) => {
     setSettings((prev) => ({
       ...prev,
       [provider]: {
@@ -173,11 +181,17 @@ function ConfiguracoesPage() {
     }));
   };
 
-  const handleSaveKey = (provider: keyof ApiSettingsMap) => {
-    const updated = saveApiSetting(provider, { key: settings[provider].key });
+  const handleSaveKey = (provider: ApiProviderKey) => {
+    const updated = saveApiSetting(provider, { key: settings[provider]?.key });
     setSettings(updated);
     toast.success(`Chave da API ${provider.toUpperCase()} salva com sucesso!`);
-    testSingleApi(provider, settings[provider].key);
+    testSingleApi(provider, settings[provider]?.key);
+  };
+
+  const handleSaveProvedorAtivo = (val: ProvedorIaTipo) => {
+    const updated = saveProvedorIaAtivo(val);
+    setSettings(updated);
+    toast.success(`Motor de IA prioritário definido como: ${val.toUpperCase()}`);
   };
 
   const testSingleApi = async (provider: string, apiKey?: string) => {
@@ -186,7 +200,7 @@ function ConfiguracoesPage() {
       const res = await testConn({
         data: {
           provider,
-          apiKey: apiKey ?? settings[provider as keyof ApiSettingsMap]?.key,
+          apiKey: apiKey ?? (settings[provider as ApiProviderKey] as any)?.key,
         },
       });
       setTestResults((prev) => ({ ...prev, [provider]: res }));
@@ -207,9 +221,10 @@ function ConfiguracoesPage() {
 
   const testAllApis = async () => {
     setTestingAll(true);
-    const providers = Object.keys(settings);
+    const providers = ["serpapi", "groq", "gemini", "openrouter", "apify", "brasilapi", "registrobr", "openstreetmap", "lovable"];
     for (const p of providers) {
-      await testSingleApi(p, settings[p as keyof ApiSettingsMap].key);
+      const conf = (settings as any)[p];
+      await testSingleApi(p, typeof conf === "object" ? conf?.key : undefined);
     }
     setTestingAll(false);
     toast.success("Diagnóstico de todas as APIs finalizado!");
@@ -726,17 +741,62 @@ function ConfiguracoesPage() {
         {/* ------------------------------------------------------------------- */}
         {/* ABA 3: APIS DE PESQUISA & ENRIQUECIMENTO */}
         {/* ------------------------------------------------------------------- */}
-        <TabsContent value="apis" className="space-y-4 mt-0">
+        <TabsContent value="apis" className="space-y-5 mt-0">
+          
+          {/* 1. SELETOR DE MOTOR DE IA PRIORITÁRIO */}
+          <Card className="border-border/60 bg-gradient-to-r from-blue-500/5 via-indigo-500/5 to-purple-500/5">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-blue-500" />
+                    Motor de Inteligência Artificial Prioritário
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Roteamento universal com fallback automático — se o provedor preferencial atingir limites ou oscilar, o CRM aciona a próxima rota sem travar.
+                  </CardDescription>
+                </div>
+                <Badge variant="outline" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30 text-xs">
+                  Zero Quedas & Alta Velocidade
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <Select
+                  value={settings.provedorIaAtivo}
+                  onValueChange={(v) => handleSaveProvedorAtivo(v as ProvedorIaTipo)}
+                >
+                  <SelectTrigger className="w-full sm:w-[320px] text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">⚡ Automático (Melhor Rota + Fallback Dinâmico)</SelectItem>
+                    <SelectItem value="groq">Groq (Llama 3.3 70B · 14.400 req/dia grátis)</SelectItem>
+                    <SelectItem value="gemini">Google Gemini (Gemini 2.0 Flash · 1M Contexto)</SelectItem>
+                    <SelectItem value="openrouter">OpenRouter Free (:free models)</SelectItem>
+                    <SelectItem value="lovable">Lovable AI Gateway</SelectItem>
+                    <SelectItem value="ollama">Ollama Local (Offline / Privado)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="text-xs text-muted-foreground">
+                  Provedor atualmente selecionado para geração de sites completos, diagnósticos e abordagens comerciais.
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 2. PROVEDORES DE IA GRATUITOS (awesome-free-llm-apis) */}
           <Card className="border-border/60">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Server className="h-4 w-4 text-primary" />
-                    APIs de Enriquecimento de Dados & IA
+                    <Zap className="h-4 w-4 text-amber-500" />
+                    Provedores de IA Gratuitos (Catálogo awesome-free-llm-apis)
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    Configure e monitore as integrações para prospecção automatizada de empresas.
+                    APIs com camada gratuita permanente sem necessidade de cartão de crédito para geração de sites e texto.
                   </CardDescription>
                 </div>
                 <Button
@@ -752,95 +812,415 @@ function ConfiguracoesPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-3">
-                {Object.entries(settings).map(([provider, conf]) => {
-                  const result = testResults[provider];
-                  const isTesting = testing[provider];
-
-                  return (
-                    <div
-                      key={provider}
-                      className="p-3.5 rounded-lg border border-border/60 bg-card hover:border-border transition-colors space-y-2.5"
-                    >
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-xs uppercase tracking-wider text-foreground">
-                            {conf.label}
-                          </span>
-                          <span className="text-xs text-muted-foreground">({conf.description})</span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          {isTesting ? (
-                            <Badge variant="outline" className="text-xs gap-1 border-blue-500/30 text-blue-500">
-                              <Loader2 className="h-3 w-3 animate-spin" /> Testando...
-                            </Badge>
-                          ) : result ? (
-                            <Badge
-                              variant="outline"
-                              className={`text-xs gap-1 ${
-                                result.status === "online"
-                                  ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
-                                  : result.status === "unconfigured"
-                                    ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
-                                    : "bg-red-500/10 text-red-600 border-red-500/30"
-                              }`}
-                            >
-                              {result.status === "online" ? (
-                                <CheckCircle2 className="h-3 w-3" />
-                              ) : (
-                                <XCircle className="h-3 w-3" />
-                              )}
-                              {result.status === "online" ? "Ativa & Operante" : result.message}
-                            </Badge>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      {conf.requiresKey && (
-                        <div className="flex items-center gap-2">
-                          <div className="relative flex-1">
-                            <Input
-                              type={showKeys[provider] ? "text" : "password"}
-                              value={conf.key || ""}
-                              onChange={(e) => handleKeyChange(provider as any, e.target.value)}
-                              placeholder={`Chave da API ${conf.label}`}
-                              className="text-xs font-mono pr-8"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => toggleShowKey(provider)}
-                              className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
-                            >
-                              {showKeys[provider] ? (
-                                <EyeOff className="h-3.5 w-3.5" />
-                              ) : (
-                                <Eye className="h-3.5 w-3.5" />
-                              )}
-                            </button>
-                          </div>
-                          <Button
-                            size="sm"
-                            onClick={() => handleSaveKey(provider as any)}
-                            className="text-xs h-9 px-3"
-                          >
-                            Salvar
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => testSingleApi(provider, conf.key)}
-                            disabled={isTesting}
-                            className="text-xs h-9 px-3"
-                          >
-                            Testar
-                          </Button>
-                        </div>
-                      )}
+              <div className="grid gap-3.5">
+                
+                {/* GROQ */}
+                <div className="p-3.5 rounded-lg border border-border/60 bg-card hover:border-border transition-colors space-y-2.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs uppercase tracking-wider text-foreground">Groq Cloud</span>
+                      <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+                        30 RPM · 14.400 req/dia Grátis (Sem Cartão)
+                      </Badge>
+                      <a
+                        href="https://console.groq.com/keys"
+                        target="_blank"
+                        rel="noopener"
+                        className="text-[11px] text-blue-500 hover:underline flex items-center gap-0.5 ml-1"
+                      >
+                        Obter Chave Grátis <ExternalLink className="size-3" />
+                      </a>
                     </div>
-                  );
-                })}
+                    {testing["groq"] ? (
+                      <Badge variant="outline" className="text-xs gap-1 border-blue-500/30 text-blue-500">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Testando...
+                      </Badge>
+                    ) : testResults["groq"] ? (
+                      <Badge
+                        variant="outline"
+                        className={`text-xs gap-1 ${
+                          testResults["groq"].status === "online"
+                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                            : "bg-red-500/10 text-red-600 border-red-500/30"
+                        }`}
+                      >
+                        {testResults["groq"].status === "online" ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                        {testResults["groq"].status === "online" ? `Ativa (${testResults["groq"].latencyMs}ms)` : testResults["groq"].message}
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type={showKeys["groq"] ? "text" : "password"}
+                        value={settings.groq.key || ""}
+                        onChange={(e) => handleKeyChange("groq", e.target.value)}
+                        placeholder="gsk_... (Chave gratuita do Groq Console)"
+                        className="text-xs font-mono pr-8"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleShowKey("groq")}
+                        className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                      >
+                        {showKeys["groq"] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                    <Button size="sm" onClick={() => handleSaveKey("groq")} className="text-xs h-9 px-3">
+                      Salvar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => testSingleApi("groq", settings.groq.key)}
+                      disabled={testing["groq"]}
+                      className="text-xs h-9 px-3"
+                    >
+                      Testar
+                    </Button>
+                  </div>
+                </div>
+
+                {/* GOOGLE GEMINI */}
+                <div className="p-3.5 rounded-lg border border-border/60 bg-card hover:border-border transition-colors space-y-2.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs uppercase tracking-wider text-foreground">Google Gemini</span>
+                      <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-600 border-blue-500/30">
+                        15 RPM · 1.500 req/dia · 1M Contexto (Sem Cartão)
+                      </Badge>
+                      <a
+                        href="https://aistudio.google.com/app/apikey"
+                        target="_blank"
+                        rel="noopener"
+                        className="text-[11px] text-blue-500 hover:underline flex items-center gap-0.5 ml-1"
+                      >
+                        Obter Chave Grátis <ExternalLink className="size-3" />
+                      </a>
+                    </div>
+                    {testing["gemini"] ? (
+                      <Badge variant="outline" className="text-xs gap-1 border-blue-500/30 text-blue-500">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Testando...
+                      </Badge>
+                    ) : testResults["gemini"] ? (
+                      <Badge
+                        variant="outline"
+                        className={`text-xs gap-1 ${
+                          testResults["gemini"].status === "online"
+                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                            : "bg-red-500/10 text-red-600 border-red-500/30"
+                        }`}
+                      >
+                        {testResults["gemini"].status === "online" ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                        {testResults["gemini"].status === "online" ? `Ativa (${testResults["gemini"].latencyMs}ms)` : testResults["gemini"].message}
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type={showKeys["gemini"] ? "text" : "password"}
+                        value={settings.gemini.key || ""}
+                        onChange={(e) => handleKeyChange("gemini", e.target.value)}
+                        placeholder="AIzaSy... (Chave gratuita do Google AI Studio)"
+                        className="text-xs font-mono pr-8"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleShowKey("gemini")}
+                        className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                      >
+                        {showKeys["gemini"] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                    <Button size="sm" onClick={() => handleSaveKey("gemini")} className="text-xs h-9 px-3">
+                      Salvar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => testSingleApi("gemini", settings.gemini.key)}
+                      disabled={testing["gemini"]}
+                      className="text-xs h-9 px-3"
+                    >
+                      Testar
+                    </Button>
+                  </div>
+                </div>
+
+                {/* OPENROUTER FREE */}
+                <div className="p-3.5 rounded-lg border border-border/60 bg-card hover:border-border transition-colors space-y-2.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs uppercase tracking-wider text-foreground">OpenRouter</span>
+                      <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-600 border-purple-500/30">
+                        Modelos :free Gratuitos (Nemotron, Llama 3.3)
+                      </Badge>
+                      <a
+                        href="https://openrouter.ai/keys"
+                        target="_blank"
+                        rel="noopener"
+                        className="text-[11px] text-blue-500 hover:underline flex items-center gap-0.5 ml-1"
+                      >
+                        Obter Chave <ExternalLink className="size-3" />
+                      </a>
+                    </div>
+                    {testing["openrouter"] ? (
+                      <Badge variant="outline" className="text-xs gap-1 border-blue-500/30 text-blue-500">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Testando...
+                      </Badge>
+                    ) : testResults["openrouter"] ? (
+                      <Badge
+                        variant="outline"
+                        className={`text-xs gap-1 ${
+                          testResults["openrouter"].status === "online"
+                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                            : "bg-red-500/10 text-red-600 border-red-500/30"
+                        }`}
+                      >
+                        {testResults["openrouter"].status === "online" ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                        {testResults["openrouter"].status === "online" ? `Ativa (${testResults["openrouter"].latencyMs}ms)` : testResults["openrouter"].message}
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type={showKeys["openrouter"] ? "text" : "password"}
+                        value={settings.openrouter.key || ""}
+                        onChange={(e) => handleKeyChange("openrouter", e.target.value)}
+                        placeholder="sk-or-v1-... (Chave OpenRouter)"
+                        className="text-xs font-mono pr-8"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleShowKey("openrouter")}
+                        className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                      >
+                        {showKeys["openrouter"] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                    <Button size="sm" onClick={() => handleSaveKey("openrouter")} className="text-xs h-9 px-3">
+                      Salvar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => testSingleApi("openrouter", settings.openrouter.key)}
+                      disabled={testing["openrouter"]}
+                      className="text-xs h-9 px-3"
+                    >
+                      Testar
+                    </Button>
+                  </div>
+                </div>
+
+                {/* OLLAMA LOCAL */}
+                <div className="p-3.5 rounded-lg border border-border/60 bg-card hover:border-border transition-colors space-y-2.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs uppercase tracking-wider text-foreground">Ollama Local</span>
+                      <Badge variant="outline" className="text-[10px] bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/30">
+                        100% Offline · Privado · Ilimitado
+                      </Badge>
+                    </div>
+                    {testing["ollama"] ? (
+                      <Badge variant="outline" className="text-xs gap-1 border-blue-500/30 text-blue-500">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Testando...
+                      </Badge>
+                    ) : testResults["ollama"] ? (
+                      <Badge
+                        variant="outline"
+                        className={`text-xs gap-1 ${
+                          testResults["ollama"].status === "online"
+                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                            : "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                        }`}
+                      >
+                        {testResults["ollama"].status === "online" ? <CheckCircle2 className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
+                        {testResults["ollama"].status === "online" ? "Servidor Local Ativo" : "Offline"}
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="text"
+                      value={settings.ollama.baseUrl || "http://localhost:11434/v1"}
+                      onChange={(e) =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          ollama: { ...prev.ollama, baseUrl: e.target.value },
+                        }))
+                      }
+                      placeholder="http://localhost:11434/v1"
+                      className="text-xs font-mono"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        saveApiSetting("ollama", { baseUrl: settings.ollama.baseUrl });
+                        toast.success("URL do Ollama salva!");
+                      }}
+                      className="text-xs h-9 px-3"
+                    >
+                      Salvar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => testSingleApi("ollama", settings.ollama.baseUrl)}
+                      disabled={testing["ollama"]}
+                      className="text-xs h-9 px-3"
+                    >
+                      Testar
+                    </Button>
+                  </div>
+                </div>
+
               </div>
+            </CardContent>
+          </Card>
+
+          {/* 3. APIS DE BUSCA E PROSPECÇÃO */}
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Globe className="h-4 w-4 text-primary" />
+                APIs de Pesquisa Web & Prospecção Externa
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Motores de busca no Google, Maps, redes sociais e validação cadastral de CNPJ.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              
+              {/* SERPAPI */}
+              <div className="p-3.5 rounded-lg border border-border/60 bg-card space-y-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-xs uppercase tracking-wider text-foreground">SerpApi</span>
+                    <span className="text-xs text-muted-foreground">(Google Search & Maps em tempo real)</span>
+                  </div>
+                  {testResults["serpapi"] && (
+                    <Badge
+                      variant="outline"
+                      className={`text-xs gap-1 ${
+                        testResults["serpapi"].status === "online"
+                          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                          : "bg-red-500/10 text-red-600 border-red-500/30"
+                      }`}
+                    >
+                      {testResults["serpapi"].status === "online" ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                      {testResults["serpapi"].status === "online" ? "Ativa & Operante" : testResults["serpapi"].message}
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      type={showKeys["serpapi"] ? "text" : "password"}
+                      value={settings.serpapi.key || ""}
+                      onChange={(e) => handleKeyChange("serpapi", e.target.value)}
+                      placeholder="Chave SerpApi"
+                      className="text-xs font-mono pr-8"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => toggleShowKey("serpapi")}
+                      className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                    >
+                      {showKeys["serpapi"] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                  <Button size="sm" onClick={() => handleSaveKey("serpapi")} className="text-xs h-9 px-3">
+                    Salvar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => testSingleApi("serpapi", settings.serpapi.key)}
+                    disabled={testing["serpapi"]}
+                    className="text-xs h-9 px-3"
+                  >
+                    Testar
+                  </Button>
+                </div>
+              </div>
+
+              {/* APIFY */}
+              <div className="p-3.5 rounded-lg border border-border/60 bg-card space-y-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-xs uppercase tracking-wider text-foreground">Apify</span>
+                    <span className="text-xs text-muted-foreground">(Minerador de Instagram e perfis digitais)</span>
+                  </div>
+                  {testResults["apify"] && (
+                    <Badge
+                      variant="outline"
+                      className={`text-xs gap-1 ${
+                        testResults["apify"].status === "online"
+                          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                          : "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                      }`}
+                    >
+                      {testResults["apify"].status === "online" ? <CheckCircle2 className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
+                      {testResults["apify"].status === "online" ? "Ativa" : "Não configurada"}
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      type={showKeys["apify"] ? "text" : "password"}
+                      value={settings.apify.key || ""}
+                      onChange={(e) => handleKeyChange("apify", e.target.value)}
+                      placeholder="Chave Apify (opcional)"
+                      className="text-xs font-mono pr-8"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => toggleShowKey("apify")}
+                      className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                    >
+                      {showKeys["apify"] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                  <Button size="sm" onClick={() => handleSaveKey("apify")} className="text-xs h-9 px-3">
+                    Salvar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => testSingleApi("apify", settings.apify.key)}
+                    disabled={testing["apify"]}
+                    className="text-xs h-9 px-3"
+                  >
+                    Testar
+                  </Button>
+                </div>
+              </div>
+
+              {/* SERVIÇOS PÚBLICOS E ABERTOS */}
+              <div className="p-3.5 rounded-lg border border-border/40 bg-muted/20 space-y-2">
+                <span className="font-bold text-xs uppercase tracking-wider text-foreground block">
+                  Serviços Públicos Integrados (Sem Necessidade de Chave)
+                </span>
+                <div className="grid sm:grid-cols-3 gap-2 text-xs">
+                  <div className="p-2 rounded bg-card border flex items-center justify-between">
+                    <span>BrasilAPI (CNPJ)</span>
+                    <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/30">Operante</Badge>
+                  </div>
+                  <div className="p-2 rounded bg-card border flex items-center justify-between">
+                    <span>Registro.br (Domínios)</span>
+                    <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/30">Operante</Badge>
+                  </div>
+                  <div className="p-2 rounded bg-card border flex items-center justify-between">
+                    <span>OpenStreetMap (GPS)</span>
+                    <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/30">Operante</Badge>
+                  </div>
+                </div>
+              </div>
+
             </CardContent>
           </Card>
         </TabsContent>

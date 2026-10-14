@@ -73,6 +73,9 @@ export interface Empresa {
   buscasPartida?: string;
   termosEncontrados?: string;
   buscaGoogleMaps?: string;
+  // Site gerado com IA e pesquisa web (padrão 21st.dev)
+  siteGeradoHtml?: string;
+  siteGeradoData?: string;
   // Diagnóstico
   diagnostico: {
     site: {

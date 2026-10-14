@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS public.empresas (
     buscas_partida TEXT,
     termos_encontrados TEXT,
     busca_google_maps TEXT,
+    site_gerado_html TEXT,
+    site_gerado_data TEXT,
     observacoes TEXT,
     historico JSONB DEFAULT '[]'::jsonb,
     detalhes_analise JSONB,

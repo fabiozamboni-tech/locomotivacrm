@@ -13,6 +13,7 @@ export interface EmpresaCtx {
   buscaGoogleMaps?: string;
   cidade: string;
   bairro?: string;
+  endereco?: string;
   site?: string;
   instagram?: string;
   telefone?: string;
@@ -41,6 +42,7 @@ export function toCtx(e: Empresa): EmpresaCtx {
     buscaGoogleMaps: e.buscaGoogleMaps,
     cidade: e.cidade,
     bairro: e.bairro,
+    endereco: e.endereco,
     site: e.site,
     instagram: e.instagram,
     telefone: e.telefone,
