@@ -342,9 +342,9 @@ function EmpresasPage() {
                         className="h-7 text-xs px-2.5 gap-1 bg-gradient-to-r from-emerald-600 to-primary text-white"
                         title="Abrir Central de Abordagens e Dossiê 360"
                       >
-                        <Link to="/abordagem" search={{ empresa: e.id }}>
+                        <Link to="/analise-cliente" search={{ empresa: e.id, tab: "dossier" }}>
                           <Zap className="h-3 w-3" />
-                          Abordar
+                          Analisar
                         </Link>
                       </Button>
                     </div>

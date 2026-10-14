@@ -142,3 +142,19 @@
     color: var(--color-foreground);
   }
 }
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 0;
+  }
+  body {
+    background-color: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  header, aside, nav, .print\:hidden {
+    display: none !important;
+  }
+}

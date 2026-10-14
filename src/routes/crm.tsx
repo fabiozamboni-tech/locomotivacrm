@@ -679,7 +679,7 @@ function EmpresaModal({
               size="sm"
               className="h-7 text-xs gap-1 bg-gradient-to-r from-emerald-600 to-primary text-white"
             >
-              <Link to="/abordagem" search={{ empresa: empresa.id }} onClick={() => onOpenChange(false)}>
+              <Link to="/analise-cliente" search={{ empresa: empresa.id, tab: "dossier" }} onClick={() => onOpenChange(false)}>
                 <Zap className="h-3 w-3" />
                 Dossiê & Abordagem 360
               </Link>
@@ -728,11 +728,12 @@ function EmpresaModal({
               </Button>
               <div className="flex-1" />
               <Link
-                to="/abordagem"
+                to="/analise-cliente"
+                search={{ empresa: empresa.id, tab: "dossier" }}
                 onClick={() => onOpenChange(false)}
                 className="text-xs text-muted-foreground hover:text-primary inline-flex items-center gap-1"
               >
-                Abrir gerador completo <ExternalLink className="size-3" />
+                Abrir na Análise do cliente <ExternalLink className="size-3" />
               </Link>
             </div>
 

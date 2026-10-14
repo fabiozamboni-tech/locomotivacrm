@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AbordagemRouteImport } from './routes/abordagem'
+import { Route as AnaliseClienteRouteImport } from './routes/analise-cliente'
 import { Route as ComplianceRouteImport } from './routes/compliance'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as CrmRouteImport } from './routes/crm'
@@ -35,6 +36,11 @@ const IndexRoute = IndexRouteImport.update({
 const AbordagemRoute = AbordagemRouteImport.update({
   id: '/abordagem',
   path: '/abordagem',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AnaliseClienteRoute = AnaliseClienteRouteImport.update({
+  id: '/analise-cliente',
+  path: '/analise-cliente',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ComplianceRoute = ComplianceRouteImport.update({
@@ -119,6 +125,7 @@ const Char91DotmcpChar93InvokeToolToolRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/abordagem': typeof AbordagemRoute
+  '/analise-cliente': typeof AnaliseClienteRoute
   '/compliance': typeof ComplianceRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/crm': typeof CrmRoute
@@ -138,6 +145,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/abordagem': typeof AbordagemRoute
+  '/analise-cliente': typeof AnaliseClienteRoute
   '/compliance': typeof ComplianceRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/crm': typeof CrmRoute
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/abordagem': typeof AbordagemRoute
+  '/analise-cliente': typeof AnaliseClienteRoute
   '/compliance': typeof ComplianceRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/crm': typeof CrmRoute
@@ -179,6 +188,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/abordagem'
+    | '/analise-cliente'
     | '/compliance'
     | '/configuracoes'
     | '/crm'
@@ -198,6 +208,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/abordagem'
+    | '/analise-cliente'
     | '/compliance'
     | '/configuracoes'
     | '/crm'
@@ -217,6 +228,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/abordagem'
+    | '/analise-cliente'
     | '/compliance'
     | '/configuracoes'
     | '/crm'
@@ -237,6 +249,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AbordagemRoute: typeof AbordagemRoute
+  AnaliseClienteRoute: typeof AnaliseClienteRoute
   ComplianceRoute: typeof ComplianceRoute
   ConfiguracoesRoute: typeof ConfiguracoesRoute
   CrmRoute: typeof CrmRoute
@@ -267,6 +280,13 @@ declare module '@tanstack/react-router' {
       path: '/abordagem'
       fullPath: '/abordagem'
       preLoaderRoute: typeof AbordagemRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/analise-cliente': {
+      id: '/analise-cliente'
+      path: '/analise-cliente'
+      fullPath: '/analise-cliente'
+      preLoaderRoute: typeof AnaliseClienteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/compliance': {
@@ -392,6 +412,7 @@ const EmpresasRouteWithChildren = EmpresasRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AbordagemRoute: AbordagemRoute,
+  AnaliseClienteRoute: AnaliseClienteRoute,
   ComplianceRoute: ComplianceRoute,
   ConfiguracoesRoute: ConfiguracoesRoute,
   CrmRoute: CrmRoute,

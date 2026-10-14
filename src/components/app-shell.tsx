@@ -16,6 +16,7 @@ import {
   Search,
   LogOut,
   Database,
+  Sparkles,
 } from "lucide-react";
 import { lockSite } from "@/lib/gate.functions";
 import { useStore } from "@/lib/store";
@@ -39,9 +40,7 @@ const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/empresas", label: "Empresas", icon: Building2 },
   { to: "/crm", label: "Funil CRM", icon: Kanban },
-  { to: "/abordagem", label: "Abordagens", icon: MessageSquareText },
-  { to: "/prompts", label: "Prompts IA", icon: Wand2 },
-  { to: "/relatorio", label: "Relatório p/ Lead", icon: FileText },
+  { to: "/analise-cliente", label: "Análise do cliente", icon: Sparkles },
   { to: "/importar", label: "Importar / Exportar", icon: Upload },
   { to: "/configuracoes", label: "Configurações", icon: Settings },
   { to: "/compliance", label: "Compliance & LGPD", icon: ShieldCheck },

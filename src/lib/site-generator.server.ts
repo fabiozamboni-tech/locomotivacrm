@@ -136,7 +136,73 @@ export async function pesquisarContextoParaSite(empresa: EmpresaCtx): Promise<Pe
 }
 
 /**
- * Gera um site completo no estilo 21st.dev com Tailwind e micro-animações,
+ * Retorna imagens fotográficas reais de alta qualidade (Unsplash) mapeadas pelo segmento da empresa
+ */
+export function getImagensPorSegmento(segmento?: string) {
+  const s = (segmento || "").toLowerCase();
+  if (s.includes("vin") || s.includes("enot") || s.includes("uva")) {
+    return {
+      hero: "https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?auto=format&fit=crop&w=1600&q=80",
+      servicos: [
+        "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1474722883778-792e7990302f?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1528823872057-9c018a7a7553?auto=format&fit=crop&w=800&q=80",
+      ],
+    };
+  }
+  if (s.includes("móvel") || s.includes("movel") || s.includes("decor") || s.includes("planej") || s.includes("marcen")) {
+    return {
+      hero: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1600&q=80",
+      servicos: [
+        "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=800&q=80",
+      ],
+    };
+  }
+  if (s.includes("rest") || s.includes("gastro") || s.includes("café") || s.includes("pizz") || s.includes("bar")) {
+    return {
+      hero: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1600&q=80",
+      servicos: [
+        "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=800&q=80",
+      ],
+    };
+  }
+  if (s.includes("saúde") || s.includes("saude") || s.includes("clínic") || s.includes("clinic") || s.includes("médic") || s.includes("medic") || s.includes("odonto")) {
+    return {
+      hero: "https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=1600&q=80",
+      servicos: [
+        "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=800&q=80",
+      ],
+    };
+  }
+  if (s.includes("hotel") || s.includes("pousad") || s.includes("turism") || s.includes("chalé")) {
+    return {
+      hero: "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1600&q=80",
+      servicos: [
+        "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80",
+      ],
+    };
+  }
+  // Padrão Premium Corporativo / Serviços
+  return {
+    hero: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1600&q=80",
+    servicos: [
+      "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=800&q=80",
+    ],
+  };
+}
+
+/**
+ * Gera um site completo no estilo 21st.dev com Tailwind, animações GSAP e fotografias reais,
  * usando template determinístico de altíssima qualidade como fallback e base.
  */
 export function construirSiteModerno21stDev(empresa: EmpresaCtx, pesquisa: PesquisaWebSiteResult): string {
@@ -149,6 +215,7 @@ export function construirSiteModerno21stDev(empresa: EmpresaCtx, pesquisa: Pesqu
   const segmento = empresa.segmento || "Serviços Especializados";
   const area = empresa.areaAtuacao || segmento;
   const snippetsText = pesquisa.snippets.length > 0 ? pesquisa.snippets.join(" · ") : "";
+  const imagens = getImagensPorSegmento(empresa.segmento);
 
   return `<!DOCTYPE html>
 <html lang="pt-BR" class="scroll-smooth">
@@ -165,6 +232,9 @@ export function construirSiteModerno21stDev(empresa: EmpresaCtx, pesquisa: Pesqu
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- GSAP & ScrollTrigger for high-performance fluid animations -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -250,26 +320,26 @@ export function construirSiteModerno21stDev(empresa: EmpresaCtx, pesquisa: Pesqu
     </div>
   </header>
 
-  <!-- HERO SECTION WITH AMBIENT GLOW (21st.dev style) -->
+  <!-- HERO SECTION WITH AMBIENT GLOW (21st.dev style + GSAP) -->
   <section class="relative pt-20 pb-28 ambient-glow overflow-hidden">
     <div class="absolute inset-0 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:24px_24px] opacity-10"></div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
       
-      <!-- BADGE -->
-      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400 text-xs font-medium mb-8">
+      <!-- BADGE (hero-anim) -->
+      <div class="hero-anim inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400 text-xs font-medium mb-8">
         <span class="size-2 rounded-full bg-blue-500 animate-ping"></span>
         <span>Referência em ${area} em ${city} e Região</span>
       </div>
 
-      <h1 class="font-heading font-extrabold text-4xl sm:text-6xl lg:text-7xl tracking-tight text-white max-w-4xl mx-auto leading-tight">
+      <h1 class="hero-anim font-heading font-extrabold text-4xl sm:text-6xl lg:text-7xl tracking-tight text-white max-w-4xl mx-auto leading-tight">
         Elevando o padrão de <span class="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400">${segmento}</span> com agilidade e confiança.
       </h1>
 
-      <p class="mt-6 text-lg sm:text-xl text-slate-300 max-w-2xl mx-auto font-light leading-relaxed">
+      <p class="hero-anim mt-6 text-lg sm:text-xl text-slate-300 max-w-2xl mx-auto font-light leading-relaxed">
         Soluções sob medida para clientes que exigem pontualidade, atendimento consultivo e a mais alta qualidade em <strong>${city}</strong>.
       </p>
 
-      <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+      <div class="hero-anim mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
         <a href="${whatsappLink}" target="_blank" rel="noopener" class="w-full sm:w-auto px-8 py-4 rounded-xl text-base font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-xl shadow-blue-500/25 hover:shadow-blue-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2">
           <i data-lucide="zap" class="size-5"></i>
           <span>Solicitar Orçamento Rápido</span>
@@ -280,8 +350,25 @@ export function construirSiteModerno21stDev(empresa: EmpresaCtx, pesquisa: Pesqu
         </a>
       </div>
 
+      <!-- HERO VISUAL SHOWCASE COM IMAGEM EM ALTA RESOLUÇÃO (hero-anim) -->
+      <div class="hero-anim mt-14 max-w-5xl mx-auto rounded-3xl overflow-hidden border border-slate-700/60 shadow-2xl shadow-blue-500/10 relative group">
+        <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/25 to-transparent z-10"></div>
+        <img src="${imagens.hero}" alt="${empresa.nome} ${city}" class="w-full h-72 sm:h-[420px] object-cover group-hover:scale-105 transition-transform duration-700">
+        <div class="absolute bottom-6 left-6 right-6 z-20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left">
+          <div>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-600/90 text-white backdrop-blur mb-1.5">
+              <i data-lucide="check" class="size-3.5"></i> Excelência Comprovada em ${city}
+            </span>
+            <h4 class="text-xl sm:text-2xl font-bold text-white">${area}</h4>
+          </div>
+          <a href="${whatsappLink}" target="_blank" rel="noopener" class="px-5 py-2.5 rounded-xl bg-white text-slate-950 hover:bg-slate-100 font-bold text-xs shadow-lg flex items-center gap-2 self-start sm:self-auto transition-transform hover:scale-105">
+            <i data-lucide="message-circle" class="size-4 text-emerald-600"></i> Falar com Especialista
+          </a>
+        </div>
+      </div>
+
       <!-- PROOF NUMBERS (21st.dev stats pill) -->
-      <div class="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
+      <div class="hero-anim mt-12 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
         <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 text-center">
           <div class="font-heading font-bold text-3xl text-white">100%</div>
           <div class="text-xs text-slate-400 mt-1">Foco no Cliente</div>
@@ -322,7 +409,7 @@ export function construirSiteModerno21stDev(empresa: EmpresaCtx, pesquisa: Pesqu
     </div>
   </div>
 
-  <!-- BENTO GRID (21st.dev asymmetric layout) -->
+  <!-- BENTO GRID (21st.dev asymmetric layout + GSAP ScrollTrigger) -->
   <section id="solucoes" class="py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="text-center max-w-3xl mx-auto mb-16">
       <h2 class="text-xs uppercase tracking-widest font-bold text-blue-400 mb-2">Nossos Serviços</h2>
@@ -331,9 +418,12 @@ export function construirSiteModerno21stDev(empresa: EmpresaCtx, pesquisa: Pesqu
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       
-      <!-- Bento Card 1 (Large 2-col) -->
-      <div class="md:col-span-2 spotlight-card bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-8 sm:p-10 relative group hover:border-blue-500/50 transition-all">
-        <div class="size-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mb-6">
+      <!-- Bento Card 1 (Large 2-col com Imagem Ilustrativa) -->
+      <div class="reveal-card md:col-span-2 spotlight-card bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-8 sm:p-10 relative group hover:border-blue-500/50 transition-all">
+        <div class="rounded-2xl overflow-hidden mb-6 h-56 border border-slate-800">
+          <img src="${imagens.servicos[0]}" alt="${area}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+        </div>
+        <div class="size-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mb-4">
           <i data-lucide="award" class="size-7"></i>
         </div>
         <span class="text-xs font-semibold text-blue-400 tracking-wider uppercase">Destaque Principal</span>
@@ -349,16 +439,25 @@ export function construirSiteModerno21stDev(empresa: EmpresaCtx, pesquisa: Pesqu
       </div>
 
       <!-- Bento Card 2 -->
-      <div class="spotlight-card bg-slate-900 border border-slate-800 rounded-3xl p-8 relative hover:border-indigo-500/50 transition-all flex flex-col justify-between">
+      <div class="reveal-card spotlight-card bg-slate-900 border border-slate-800 rounded-3xl p-8 relative hover:border-indigo-500/50 transition-all flex flex-col justify-between group">
         <div>
-          <div class="size-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mb-6">
-            <i data-lucide="phone-call" class="size-6"></i>
+          <div class="rounded-2xl overflow-hidden mb-4 h-36 border border-slate-800">
+            <img src="${imagens.servicos[1]}" alt="Atendimento" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+          </div>
+          <div class="size-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mb-3">
+            <i data-lucide="phone-call" class="size-5"></i>
           </div>
           <h3 class="font-heading text-xl font-bold text-white">Atendimento Rápido</h3>
           <p class="mt-2 text-slate-400 text-sm leading-relaxed">
             Sem filas ou respostas automáticas demoradas. Você fala direto com quem resolve e agenda no melhor horário.
           </p>
         </div>
+        <div class="mt-6 pt-4 border-t border-slate-800/80">
+          <a href="${whatsappLink}" class="text-sm font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+            Chamar agora <i data-lucide="arrow-right" class="size-4"></i>
+          </a>
+        </div>
+      </div>
         <div class="mt-6 pt-6 border-t border-slate-800/80">
           <a href="${whatsappLink}" class="text-sm font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
             Chamar agora <i data-lucide="arrow-right" class="size-4"></i>
@@ -498,9 +597,41 @@ export function construirSiteModerno21stDev(empresa: EmpresaCtx, pesquisa: Pesqu
     </a>
   </div>
 
-  <!-- Lucide icons activator & spotlight card effect -->
+  <!-- Lucide icons activator & GSAP animations & spotlight card effect -->
   <script>
     lucide.createIcons();
+
+    // GSAP Core & ScrollTrigger animations
+    if (typeof gsap !== 'undefined') {
+      if (typeof ScrollTrigger !== 'undefined') {
+        gsap.registerPlugin(ScrollTrigger);
+      }
+
+      // Animação de entrada dos elementos da Hero
+      gsap.from(".hero-anim", {
+        opacity: 0,
+        y: 35,
+        duration: 0.9,
+        stagger: 0.12,
+        ease: "power3.out"
+      });
+
+      // Animação de revelação dos cards e seções com ScrollTrigger
+      gsap.utils.toArray('.reveal-card').forEach((el) => {
+        gsap.from(el, {
+          scrollTrigger: {
+            trigger: el,
+            start: "top 85%",
+            toggleActions: "play none none none"
+          },
+          opacity: 0,
+          y: 45,
+          duration: 0.8,
+          ease: "power2.out"
+        });
+      });
+    }
+
     document.querySelectorAll('.spotlight-card').forEach(card => {
       card.addEventListener('mousemove', e => {
         const rect = card.getBoundingClientRect();
@@ -527,21 +658,31 @@ export const gerarSiteCompletoIA_ServerFn = createServerFn({ method: "POST" })
     let providerUsed = "template_21st_dev";
     let modelUsed = "bespoke_engine";
 
-    const promptSystem = `Você é um Design Engineer sênior e Diretor de Arte Web premiado, especialista em landing pages de altíssima conversão e design systems modernos no estilo 21st.dev (Tailwind CSS, micro-interações, Bento Grid, Spotlight glow, tipografia de impacto).
+    const promptSystem = `Você é um Design Engineer sênior e Diretor de Arte Web premiado, especialista em landing pages de altíssima conversão e design systems modernos no estilo 21st.dev (Tailwind CSS, animações GSAP fluidas, fotografias ricas, Bento Grid, Spotlight glow, tipografia de impacto).
 
-REGRAS CRÍTICAS DE DESIGN:
-1. NUNCA gere sites com "cara genérica de IA" (evite clichês como "Inovação para o seu negócio", "Soluções inteligentes", cards iguais 3x3 azuis).
-2. O site DEVE ser em HTML5 completo (<!DOCTYPE html> até </html>), totalmente funcional e responsivo.
-3. Use Tailwind CSS via CDN (<script src="https://cdn.tailwindcss.com"></script>) e fontes do Google Fonts (Plus Jakarta Sans para corpo, Outfit para títulos).
-4. Use Lucide Icons (<script src="https://unpkg.com/lucide@latest"></script> e <i data-lucide="..."></i>).
-5. Incorpore componentes do 21st.dev:
+REGRAS CRÍTICAS DE DESIGN E ANIMAÇÃO:
+1. NUNCA gere sites com "cara genérica de IA" (evite clichês como "Inovação para o seu negócio", "Soluções inteligentes", cards iguais 3x3 azuis e vazios de imagens).
+2. OBRIGATÓRIO - ANIMAÇÕES GSAP (GreenSock):
+   - Inclua no <head> as bibliotecas GSAP e ScrollTrigger via CDN:
+     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+   - No final do <body>, inicialize o ScrollTrigger (gsap.registerPlugin(ScrollTrigger)) e adicione animações de entrada elegantes na Hero (stagger com ease: 'power3.out') e revelação dos cards de serviços ao rolar a página.
+3. OBRIGATÓRIO - APELO VISUAL COM FOTOGRAFIAS REAIS:
+   - O site DEVE ser extremamente visual. NUNCA use apenas ícones e blocos de texto.
+   - Use fotografias reais em alta resolução do Unsplash (https://images.unsplash.com/photo-...) com tags temáticas diretamente ligadas ao segmento (${data.empresa.segmento} · ${data.empresa.areaAtuacao || ""}).
+   - Coloque uma imagem principal marcante na Hero (composição editorial com card ou grid com overlay sofisticado).
+   - Ilustre as seções de serviços e diferenciais com imagens reais dos produtos, procedimentos ou ambientes.
+4. O site DEVE ser em HTML5 completo (<!DOCTYPE html> até </html>), totalmente funcional e responsivo.
+5. Use Tailwind CSS via CDN (<script src="https://cdn.tailwindcss.com"></script>) e fontes do Google Fonts (Plus Jakarta Sans para corpo, Outfit para títulos).
+6. Use Lucide Icons (<script src="https://unpkg.com/lucide@latest"></script> e <i data-lucide="..."></i>).
+7. Incorpore componentes do 21st.dev:
    - Spotlight Cards com efeito de iluminação no cursor do mouse.
    - Infinite Logo / Feature Marquee animado com Tailwind keyframes.
    - Bento Grid assimétrico com hierarquia clara e cards interativos.
    - Ambient Glow Hero com gradientes radiais sofisticados.
    - Botão Flutuante de WhatsApp pulsante com link direto para wa.me/55...
-6. Use os dados reais da empresa e da pesquisa web coletada. Seja ultra-específico quanto à cidade (${data.empresa.cidade}/RS) e segmento (${data.empresa.segmento} · ${data.empresa.areaAtuacao || ""}).
-7. Retorne APENAS o código HTML puro, sem explicações antes ou depois.`;
+8. Use os dados reais da empresa e da pesquisa web coletada. Seja ultra-específico quanto à cidade (${data.empresa.cidade}/RS) e segmento (${data.empresa.segmento} · ${data.empresa.areaAtuacao || ""}).
+9. Retorne APENAS o código HTML puro, sem explicações antes ou depois.`;
 
     const promptUser = `Crie a landing page premium completa para a empresa abaixo:
 

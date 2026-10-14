@@ -43,6 +43,28 @@ export type OrigemDado =
   | "csv"
   | "enriquecimento";
 
+export interface SlideItem {
+  id: string;
+  tipo: "capa" | "mercado" | "diagnostico" | "responsabilidades_agencia" | "responsabilidades_cliente" | "plano_acao" | "personalizado";
+  titulo: string;
+  subtitulo?: string;
+  pontos: string[];
+  destaque?: string;
+  autor?: string;
+  tags?: string[];
+  oculto?: boolean;
+}
+
+export interface ApresentacaoSlidesData {
+  titulo: string;
+  subtitulo: string;
+  empresaNome: string;
+  cidade: string;
+  agencia: string;
+  slides: SlideItem[];
+  atualizadoEm: string;
+}
+
 export interface Empresa {
   id: string;
   nome: string;
@@ -74,9 +96,16 @@ export interface Empresa {
   buscasPartida?: string;
   termosEncontrados?: string;
   buscaGoogleMaps?: string;
-  // Site gerado com IA e pesquisa web (padrão 21st.dev)
+  // Site gerado com IA e pesquisa web (padrão 21st.dev + GSAP)
   siteGeradoHtml?: string;
   siteGeradoData?: string;
+  // Análise Unificada do Cliente (Persistida no banco de dados)
+  dossier360?: any;
+  relatorioLead?: any;
+  relatorioSeo?: any;
+  relatorioGeradoEm?: string;
+  apresentacaoSlides?: ApresentacaoSlidesData;
+  analiseAtualizadaEm?: string;
   // Diagnóstico
   diagnostico: {
     site: {

@@ -612,7 +612,7 @@ export function EmpresaCadastroModal({
               size="sm"
               className="text-xs h-8 gap-1"
             >
-              <Link to="/abordagem" search={{ empresa: empresa.id }}>
+              <Link to="/analise-cliente" search={{ empresa: empresa.id, tab: "dossier" }}>
                 <MessageSquareText className="h-3.5 w-3.5 text-primary" />
                 Dossiê 360
               </Link>
@@ -623,7 +623,7 @@ export function EmpresaCadastroModal({
               size="sm"
               className="text-xs h-8 gap-1"
             >
-              <Link to="/relatorio" search={{ empresa: empresa.id }}>
+              <Link to="/analise-cliente" search={{ empresa: empresa.id, tab: "relatorio" }}>
                 <FileText className="h-3.5 w-3.5 text-blue-500" />
                 Relatório p/ Lead
               </Link>

@@ -197,7 +197,7 @@ export function TimingRadarCard({
                       size="sm"
                       className="gap-1 text-xs h-7 px-2"
                     >
-                      <Link to="/abordagem" search={{ empresa: sinal.empresaId }}>
+                      <Link to="/analise-cliente" search={{ empresa: sinal.empresaId, tab: "dossier" }}>
                         Abordar
                         <ArrowUpRight className="h-3.5 w-3.5" />
                       </Link>

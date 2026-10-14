@@ -171,9 +171,9 @@ function EmpresaDetalhe() {
             size="sm"
             className="h-9 gap-1.5 bg-gradient-to-r from-emerald-600 to-primary text-white font-medium text-xs shadow-sm"
           >
-            <Link to="/abordagem" search={{ empresa: empresa.id }}>
+            <Link to="/analise-cliente" search={{ empresa: empresa.id, tab: "dossier" }}>
               <Sparkles className="h-4 w-4" />
-              🎯 Dossiê & Abordagens 360
+              🎯 Análise do Cliente 360
             </Link>
           </Button>
 
@@ -313,18 +313,18 @@ function EmpresaDetalhe() {
               )}
               <Separator />
               <Link
-                to={"/abordagem" as never}
-                search={{ empresa: empresa.id } as never}
+                to={"/analise-cliente" as never}
+                search={{ empresa: empresa.id, tab: "dossier" } as never}
                 className="block w-full"
               >
-                <Button className="w-full" size="sm">Gerar abordagem comercial</Button>
+                <Button className="w-full" size="sm">Análise e Abordagem 360</Button>
               </Link>
               <Link
-                to={"/prompts" as never}
-                search={{ empresa: empresa.id } as never}
+                to={"/analise-cliente" as never}
+                search={{ empresa: empresa.id, tab: "site" } as never}
                 className="block w-full"
               >
-                <Button className="w-full" size="sm" variant="outline">Gerar prompts de produção</Button>
+                <Button className="w-full" size="sm" variant="outline">Estúdio de Sites & Prompts</Button>
               </Link>
               <Separator />
               <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Análise real com IA</div>
