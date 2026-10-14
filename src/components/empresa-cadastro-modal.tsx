@@ -4,7 +4,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { useStore } from "@/lib/store";
 import type { Empresa, CrmStage } from "@/lib/mock-data";
 import { CRM_STAGES_ORDER, CRM_STAGE_LABEL } from "@/components/badges";
-import { gerarDadosCadastroIA_ServerFn } from "@/lib/cadastro-ia.functions";
+import {
+  gerarDadosCadastroIA_ServerFn,
+  sugerirPublicoAlvoIA_ServerFn,
+} from "@/lib/cadastro-ia.functions";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +45,7 @@ import {
   Save,
   MessageSquareText,
   Share2,
+  Users,
 } from "lucide-react";
 
 interface EmpresaCadastroModalProps {
@@ -75,12 +79,14 @@ export function EmpresaCadastroModal({
 }: EmpresaCadastroModalProps) {
   const { updateEmpresa } = useStore();
   const gerarDadosIA = useServerFn(gerarDadosCadastroIA_ServerFn);
+  const sugerirPublicoAlvoIA = useServerFn(sugerirPublicoAlvoIA_ServerFn);
 
   const [nome, setNome] = useState("");
   const [razaoSocial, setRazaoSocial] = useState("");
   const [cnpj, setCnpj] = useState("");
   const [segmento, setSegmento] = useState("");
   const [areaAtuacao, setAreaAtuacao] = useState("");
+  const [publicoAlvo, setPublicoAlvo] = useState("");
   const [cidade, setCidade] = useState("");
   const [bairro, setBairro] = useState("");
   const [endereco, setEndereco] = useState("");
@@ -96,6 +102,7 @@ export function EmpresaCadastroModal({
   const [buscaGoogleMaps, setBuscaGoogleMaps] = useState("");
 
   const [gerandoIA, setGerandoIA] = useState(false);
+  const [gerandoPublicoAlvo, setGerandoPublicoAlvo] = useState(false);
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
@@ -105,6 +112,7 @@ export function EmpresaCadastroModal({
     setCnpj(empresa.cnpj || "");
     setSegmento(empresa.segmento || "");
     setAreaAtuacao(empresa.areaAtuacao || "");
+    setPublicoAlvo(empresa.publicoAlvo || "");
     setCidade(empresa.cidade || "");
     setBairro(empresa.bairro || "");
     setEndereco(empresa.endereco || "");
@@ -136,11 +144,13 @@ export function EmpresaCadastroModal({
           instagram,
           observacoes,
           areaAtuacaoAtual: areaAtuacao,
+          publicoAlvoAtual: publicoAlvo,
         },
       });
 
       if (res) {
         if (res.areaAtuacao) setAreaAtuacao(res.areaAtuacao);
+        if (res.publicoAlvo) setPublicoAlvo(res.publicoAlvo);
         if (res.buscasPartida) setBuscasPartida(res.buscasPartida);
         if (res.termosEncontrados) setTermosEncontrados(res.termosEncontrados);
         if (res.buscaGoogleMaps) setBuscaGoogleMaps(res.buscaGoogleMaps);
@@ -159,6 +169,30 @@ export function EmpresaCadastroModal({
     }
   };
 
+  const handleSugerirPublicoAlvo = async () => {
+    setGerandoPublicoAlvo(true);
+    try {
+      const res = await sugerirPublicoAlvoIA({
+        data: {
+          nome,
+          segmento,
+          cidade,
+          areaAtuacao,
+          observacoes,
+        },
+      });
+
+      if (res?.publicoAlvo) {
+        setPublicoAlvo(res.publicoAlvo);
+        toast.success("Público-alvo sugerido com inteligência!");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao sugerir público-alvo.");
+    } finally {
+      setGerandoPublicoAlvo(false);
+    }
+  };
+
   const handleSalvar = () => {
     setSalvando(true);
     try {
@@ -168,6 +202,7 @@ export function EmpresaCadastroModal({
         cnpj: cnpj || undefined,
         segmento,
         areaAtuacao: areaAtuacao || undefined,
+        publicoAlvo: publicoAlvo || undefined,
         cidade,
         bairro: bairro || undefined,
         endereco,
@@ -338,6 +373,41 @@ export function EmpresaCadastroModal({
               />
               <p className="text-[11px] text-muted-foreground">
                 Esta área de atuação orientará a IA a criar abordagens com gancho específico nos serviços reais da empresa, evitando propostas genéricas.
+              </p>
+            </div>
+
+            {/* PÚBLICO-ALVO DOS CLIENTES (SOLICITADO PELO USUÁRIO) */}
+            <div className="space-y-1.5 p-3 rounded-lg border border-indigo-200 dark:border-indigo-900/40 bg-indigo-50/50 dark:bg-indigo-950/20">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5" />
+                  Público-Alvo dos Clientes (Quem busca e compra desta empresa)
+                </Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={gerandoPublicoAlvo}
+                  onClick={handleSugerirPublicoAlvo}
+                  className="h-6 px-2 text-[11px] gap-1 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40"
+                >
+                  {gerandoPublicoAlvo ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3 w-3" />
+                  )}
+                  Sugerir com IA
+                </Button>
+              </div>
+              <Textarea
+                rows={3}
+                value={publicoAlvo}
+                onChange={(e) => setPublicoAlvo(e.target.value)}
+                placeholder="Quem são os potenciais compradores/clientes que buscam o serviço desta empresa? Ex: Proprietários de imóveis de médio e alto padrão na Serra Gaúcha, arquitetos parceiros, noivas, famílias exigentes..."
+                className="text-xs leading-relaxed bg-background"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Esta informação calibra o Relatório para o Lead, direcionando os hábitos de pesquisa, dores de compra e impacto em vendas para atrair esse perfil exato.
               </p>
             </div>
           </TabsContent>

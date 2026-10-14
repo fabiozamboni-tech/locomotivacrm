@@ -5,6 +5,7 @@ const EmpresaInput = z.object({
   nome: z.string(),
   segmento: z.string(),
   areaAtuacao: z.string().optional(),
+  publicoAlvo: z.string().optional(),
   cidade: z.string(),
   site: z.string().optional(),
   instagram: z.string().optional(),
@@ -31,12 +32,14 @@ export interface DadosSeo {
   avisos: string[];
   sementes: string[];
   consulta: string;
+  publicoAlvo?: string;
 }
 
 export interface AjustesBusca {
   sementes?: string[];
   consulta?: string;
   termos?: string[];
+  publicoAlvo?: string;
 }
 
 export function sementesPadrao(segmento: string, cidade: string, areaAtuacao?: string) {
@@ -145,7 +148,15 @@ async function coletarSeo(e: z.infer<typeof EmpresaInput>, aj: AjustesBusca = {}
     avisos.push("Ranking orgânico do Google indisponível (configure SERPER_API_KEY — plano grátis de 2.500 buscas).");
   }
 
-  return { termos: manuais.length ? termos : termos.slice(0, 15), presenca, organico, avisos, sementes, consulta };
+  return {
+    termos: manuais.length ? termos : termos.slice(0, 15),
+    presenca,
+    organico,
+    avisos,
+    sementes,
+    consulta,
+    publicoAlvo: aj.publicoAlvo ?? e.publicoAlvo,
+  };
 }
 
 export const PILARES = ["site", "comunicacao", "redes", "branding"] as const;
@@ -158,10 +169,19 @@ export interface SecaoRelatorio {
   solucao: string[];
   impactoVendas: string;
 }
+
+export interface AnalisePublicoAlvo {
+  perfilComprador: string;
+  comoBuscaNaInternet: string;
+  principaisDoresEInteresses: string[];
+  criteriosDeDecisao: string[];
+}
+
 export interface Relatorio {
   titulo: string;
   resumoExecutivo: string;
   contextoMercado: string;
+  analisePublicoAlvo: AnalisePublicoAlvo;
   secoes: SecaoRelatorio[];
   planoAcao: string[];
   proximoPasso: string;
@@ -173,11 +193,52 @@ export interface Relatorio {
 const SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["titulo", "resumoExecutivo", "contextoMercado", "secoes", "planoAcao", "proximoPasso", "whatsapp", "emailAssunto", "emailCorpo"],
+  required: [
+    "titulo",
+    "resumoExecutivo",
+    "contextoMercado",
+    "analisePublicoAlvo",
+    "secoes",
+    "planoAcao",
+    "proximoPasso",
+    "whatsapp",
+    "emailAssunto",
+    "emailCorpo",
+  ],
   properties: {
     titulo: { type: "string" },
     resumoExecutivo: { type: "string" },
     contextoMercado: { type: "string" },
+    analisePublicoAlvo: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "perfilComprador",
+        "comoBuscaNaInternet",
+        "principaisDoresEInteresses",
+        "criteriosDeDecisao",
+      ],
+      properties: {
+        perfilComprador: {
+          type: "string",
+          description: "Perfil demográfico, sócio-econômico e comportamental de quem busca o serviço da empresa na região.",
+        },
+        comoBuscaNaInternet: {
+          type: "string",
+          description: "Como esse comprador busca no Google, Maps e redes sociais antes de comprar ou contratar.",
+        },
+        principaisDoresEInteresses: {
+          type: "array",
+          items: { type: "string" },
+          description: "3 a 5 dores, urgências ou desejos que motivam a busca.",
+        },
+        criteriosDeDecisao: {
+          type: "array",
+          items: { type: "string" },
+          description: "3 a 5 fatores decisivos que fazem esse comprador fechar negócio.",
+        },
+      },
+    },
     secoes: {
       type: "array",
       items: {
@@ -210,13 +271,31 @@ const NOMES: Record<Pilar, string> = {
 
 export const gerarRelatorioLead = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
-    z.object({ empresa: EmpresaInput, pilares: z.array(z.enum(PILARES)).min(1), agencia: z.string().default("Locomotiva Comunicação"),
-      ajustes: z.object({ sementes: z.array(z.string()).optional(), consulta: z.string().optional(), termos: z.array(z.string()).optional() }).optional() }).parse(d),
+    z
+      .object({
+        empresa: EmpresaInput,
+        pilares: z.array(z.enum(PILARES)).min(1),
+        agencia: z.string().default("Locomotiva Comunicação"),
+        ajustes: z
+          .object({
+            sementes: z.array(z.string()).optional(),
+            consulta: z.string().optional(),
+            termos: z.array(z.string()).optional(),
+            publicoAlvo: z.string().optional(),
+          })
+          .optional(),
+      })
+      .parse(d),
   )
   .handler(async ({ data }) => {
     const { openaiJSON } = await import("./ai-gateway.server");
     const seo = await coletarSeo(data.empresa, data.ajustes);
     const e = data.empresa;
+    const publicoAlvoEfetivo =
+      data.ajustes?.publicoAlvo?.trim() ||
+      e.publicoAlvo?.trim() ||
+      "";
+
     const dadosReais = [
       seo.termos.length ? `Buscas reais no Google (Autocomplete): ${seo.termos.map((t) => `"${t.termo}"`).join(", ")}` : "",
       seo.presenca
@@ -237,13 +316,16 @@ export const gerarRelatorioLead = createServerFn({ method: "POST" })
           content:
             `Você é estrategista sênior da agência ${data.agencia}. Escreva em português do Brasil um diagnóstico consultivo, claro e elegante, para ENVIAR AO EMPRESÁRIO (lead). ` +
             "Use apenas os dados fornecidos como fatos; números de mercado gerais devem ser citados como referência de mercado, nunca inventados como dados da empresa. " +
+            "CRÍTICO - PÚBLICO-ALVO: Leve OBRIGATORIAMENTE em consideração o perfil do Público-Alvo dos clientes que costumam buscar este serviço. Preencha o bloco 'analisePublicoAlvo' e adapte cada pilar (dores, soluções e impacto em vendas) para demonstrar claramente ao lead como a presença digital atual dele perde esses compradores para os concorrentes e como a agência vai captar esse público exato. " +
             "Para cada pilar solicitado gere uma seção com dores concretas (3-5), solução proposta (3-5) e como isso converte em aumento de vendas. " +
             "Tom: respeitoso, sem jargão técnico, focado em faturamento e reputação. 'whatsapp' deve ser um resumo executivo curto com *negritos* e marcadores, pronto para enviar. 'emailCorpo' em texto simples.",
         },
         {
           role: "user",
           content:
-            `Empresa: ${e.nome}\nSegmento: ${e.segmento}\nCidade: ${e.cidade}\nSite: ${e.site ?? "não possui"} (status: ${e.statusSite})\nInstagram: ${e.instagram ?? "não localizado"} (status: ${e.statusInstagram})\nScore de oportunidade: ${e.score}/100\n${e.observacoes ? "Observações: " + e.observacoes + "\n" : ""}` +
+            `Empresa: ${e.nome}\nSegmento: ${e.segmento}${e.areaAtuacao ? `\nÁrea de Atuação: ${e.areaAtuacao}` : ""}\nCidade: ${e.cidade}/RS\n` +
+            `Público-Alvo dos clientes que buscam o serviço:\n${publicoAlvoEfetivo || "(Deduza com profundidade com base no segmento comercial e na cidade/região)"}\n\n` +
+            `Site: ${e.site ?? "não possui"} (status: ${e.statusSite})\nInstagram: ${e.instagram ?? "não localizado"} (status: ${e.statusInstagram})\nScore de oportunidade: ${e.score}/100\n${e.observacoes ? "Observações: " + e.observacoes + "\n" : ""}` +
             `\nDADOS REAIS COLETADOS:\n${dadosReais || "(nenhum)"}\n\nPilares a incluir (nesta ordem): ${data.pilares.map((p) => NOMES[p]).join(", ")}.`,
         },
       ],

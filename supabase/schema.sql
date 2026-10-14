@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS public.empresas (
     score INTEGER DEFAULT 0,
     crm_stage TEXT DEFAULT 'prospeccao',
     area_atuacao TEXT,
+    publico_alvo TEXT,
     buscas_partida TEXT,
     termos_encontrados TEXT,
     busca_google_maps TEXT,

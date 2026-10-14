@@ -9,9 +9,27 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { gerarRelatorioLead, sementesPadrao, type Pilar, type Relatorio, type DadosSeo } from "@/lib/relatorio.functions";
+import {
+  gerarRelatorioLead,
+  sementesPadrao,
+  type Pilar,
+  type Relatorio,
+  type DadosSeo,
+  type AnalisePublicoAlvo,
+} from "@/lib/relatorio.functions";
+import { sugerirPublicoAlvoIA_ServerFn } from "@/lib/cadastro-ia.functions";
 import { whatsappUrl } from "@/lib/links";
-import { FileText, Loader2, Printer, Copy, MessageCircle, Mail } from "lucide-react";
+import {
+  FileText,
+  Loader2,
+  Printer,
+  Copy,
+  MessageCircle,
+  Mail,
+  Users,
+  Sparkles,
+  Save,
+} from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/relatorio")({
@@ -44,10 +62,15 @@ function RelatorioPage() {
   const [loading, setLoading] = useState(false);
   const [res, setRes] = useState<{ relatorio: Relatorio; seo: DadosSeo; geradoEm: string } | null>(null);
   const gerar = useServerFn(gerarRelatorioLead);
+  const sugerirPublicoAlvoIA = useServerFn(sugerirPublicoAlvoIA_ServerFn);
   const empresa = empresas.find((e) => e.id === sel);
+
   const [sementesTxt, setSementesTxt] = useState("");
   const [consulta, setConsulta] = useState("");
   const [termosTxt, setTermosTxt] = useState("");
+  const [publicoAlvoTxt, setPublicoAlvoTxt] = useState("");
+  const [gerandoPublicoAlvo, setGerandoPublicoAlvo] = useState(false);
+  const [salvandoPublicoAlvo, setSalvandoPublicoAlvo] = useState(false);
 
   useEffect(() => {
     if (!empresa) return;
@@ -62,10 +85,48 @@ function RelatorioPage() {
         : `${empresa.segmento} em ${empresa.cidade}`)
     );
     setTermosTxt(empresa.termosEncontrados?.trim() || "");
+    setPublicoAlvoTxt(empresa.publicoAlvo?.trim() || "");
     setRes(null);
   }, [empresa?.id]);
 
   const linhas = (t: string) => t.split("\n").map((x) => x.trim()).filter(Boolean);
+
+  async function onSugerirPublicoAlvo() {
+    if (!empresa) return;
+    setGerandoPublicoAlvo(true);
+    try {
+      const r = await sugerirPublicoAlvoIA({
+        data: {
+          nome: empresa.nome,
+          segmento: empresa.segmento,
+          cidade: empresa.cidade,
+          areaAtuacao: empresa.areaAtuacao,
+          observacoes: empresa.observacoes,
+        },
+      });
+      if (r?.publicoAlvo) {
+        setPublicoAlvoTxt(r.publicoAlvo);
+        toast.success("Público-alvo sugerido pela IA com sucesso!");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao sugerir público-alvo.");
+    } finally {
+      setGerandoPublicoAlvo(false);
+    }
+  }
+
+  function onSalvarPublicoAlvoNoCadastro() {
+    if (!empresa) return;
+    setSalvandoPublicoAlvo(true);
+    try {
+      updateEmpresa(empresa.id, { publicoAlvo: publicoAlvoTxt || undefined });
+      toast.success("Público-alvo salvo no cadastro da empresa!");
+    } catch {
+      toast.error("Erro ao salvar no cadastro.");
+    } finally {
+      setSalvandoPublicoAlvo(false);
+    }
+  }
 
   async function onGerar() {
     if (!empresa) return;
@@ -78,6 +139,7 @@ function RelatorioPage() {
             nome: empresa.nome,
             segmento: empresa.segmento,
             areaAtuacao: empresa.areaAtuacao,
+            publicoAlvo: publicoAlvoTxt || empresa.publicoAlvo,
             cidade: empresa.cidade,
             site: empresa.site,
             instagram: empresa.instagram,
@@ -88,7 +150,12 @@ function RelatorioPage() {
           },
           pilares,
           agencia: "Locomotiva Comunicação",
-          ajustes: { sementes: linhas(sementesTxt), consulta, termos: linhas(termosTxt) },
+          ajustes: {
+            sementes: linhas(sementesTxt),
+            consulta,
+            termos: linhas(termosTxt),
+            publicoAlvo: publicoAlvoTxt || empresa.publicoAlvo,
+          },
         },
       });
       setRes(r);
@@ -97,19 +164,20 @@ function RelatorioPage() {
       setSementesTxt(r.seo.sementes.join("\n"));
       setConsulta(r.seo.consulta);
 
-      // Salva os termos refinados no cadastro da empresa no banco de dados
+      // Salva os termos refinados e público-alvo no cadastro da empresa no banco de dados
       updateEmpresa(empresa.id, {
         buscasPartida: r.seo.sementes.join("\n"),
         termosEncontrados: novosTermos,
         buscaGoogleMaps: r.seo.consulta,
+        publicoAlvo: publicoAlvoTxt || undefined,
       });
 
       addHistorico(empresa.id, {
         data: new Date().toISOString(),
         tipo: "nota",
-        texto: `Relatório de diagnóstico gerado (${pilares.join(", ")}). Termos de busca sincronizados no cadastro.`,
+        texto: `Relatório de diagnóstico gerado (${pilares.join(", ")}). Público-alvo e termos sincronizados no cadastro.`,
       });
-      toast.success("Relatório gerado e termos de busca salvos no cadastro da empresa!");
+      toast.success("Relatório gerado e parâmetros salvos no cadastro da empresa!");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha ao gerar relatório");
     } finally {
@@ -158,28 +226,105 @@ function RelatorioPage() {
 
       {empresa && (
         <Card className="print:hidden">
-          <CardHeader><CardTitle className="text-base">Termos de pesquisa usados no relatório</CardTitle></CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-3 text-sm">
-            <div className="space-y-1">
-              <label className="font-medium">Buscas de partida (uma por linha)</label>
-              <Textarea rows={6} value={sementesTxt} onChange={(e) => setSementesTxt(e.target.value)} />
-              <p className="text-xs text-muted-foreground">Usadas para descobrir o que as pessoas digitam no Google.</p>
+          <CardHeader>
+            <CardTitle className="text-base flex flex-wrap items-center justify-between gap-2">
+              <span>Parâmetros de busca e público-alvo para o relatório</span>
+              {empresa.areaAtuacao && (
+                <span className="text-xs font-normal text-muted-foreground">
+                  Foco: {empresa.areaAtuacao}
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            {/* PÚBLICO-ALVO EDITÁVEL */}
+            <div className="space-y-2 p-3.5 rounded-lg border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/40 dark:bg-indigo-950/20">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <label className="text-sm font-semibold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
+                    <Users className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                    Público-Alvo dos Clientes que Buscam este Serviço
+                  </label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Identifica quem compra do lead, motivações de pesquisa e dores para calibrar os argumentos do relatório.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onSugerirPublicoAlvo}
+                    disabled={gerandoPublicoAlvo}
+                    className="h-7 text-xs gap-1 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/50"
+                  >
+                    {gerandoPublicoAlvo ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3 w-3 text-indigo-500" />
+                    )}
+                    Sugerir com IA
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={onSalvarPublicoAlvoNoCadastro}
+                    disabled={salvandoPublicoAlvo}
+                    className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                  >
+                    <Save className="h-3 w-3" />
+                    Salvar no cadastro
+                  </Button>
+                </div>
+              </div>
+              <Textarea
+                rows={3}
+                value={publicoAlvoTxt}
+                onChange={(e) => setPublicoAlvoTxt(e.target.value)}
+                placeholder="Ex: Proprietários de residências e novos apartamentos em Caxias do Sul buscando móveis sob medida de alta durabilidade, arquitetos e designers de interiores parceiros..."
+                className="text-xs leading-relaxed bg-background"
+              />
             </div>
-            <div className="space-y-1">
-              <label className="font-medium">Termos encontrados (uma por linha)</label>
-              <Textarea rows={6} value={termosTxt} onChange={(e) => setTermosTxt(e.target.value)} placeholder="Gere o relatório para preencher, ou digite seus próprios termos." />
-              <p className="text-xs text-muted-foreground">Se preenchido, estes termos são usados no lugar da busca automática. Apague tudo para buscar de novo.</p>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-1">
+                <label className="font-medium">Buscas de partida (uma por linha)</label>
+                <Textarea rows={6} value={sementesTxt} onChange={(e) => setSementesTxt(e.target.value)} />
+                <p className="text-xs text-muted-foreground">Usadas para descobrir o que as pessoas digitam no Google.</p>
+              </div>
+              <div className="space-y-1">
+                <label className="font-medium">Termos encontrados (uma por linha)</label>
+                <Textarea rows={6} value={termosTxt} onChange={(e) => setTermosTxt(e.target.value)} placeholder="Gere o relatório para preencher, ou digite seus próprios termos." />
+                <p className="text-xs text-muted-foreground">Se preenchido, estes termos são usados no lugar da busca automática. Apague tudo para buscar de novo.</p>
+              </div>
+              <div className="space-y-1">
+                <label className="font-medium">Busca no Google Maps / Google</label>
+                <Input value={consulta} onChange={(e) => setConsulta(e.target.value)} />
+                <p className="text-xs text-muted-foreground">Usada para ver a posição da empresa e os concorrentes.</p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => {
+                    setSementesTxt(sementesPadrao(empresa.segmento, empresa.cidade, empresa.areaAtuacao).join("\n"));
+                    setConsulta(
+                      empresa.areaAtuacao
+                        ? `${empresa.areaAtuacao.split(/[,\-–\.]/)[0].trim()} em ${empresa.cidade}`
+                        : `${empresa.segmento} em ${empresa.cidade}`
+                    );
+                    setTermosTxt("");
+                  }}
+                >
+                  Restaurar padrão
+                </Button>
+              </div>
             </div>
-            <div className="space-y-1">
-              <label className="font-medium">Busca no Google Maps / Google</label>
-              <Input value={consulta} onChange={(e) => setConsulta(e.target.value)} />
-              <p className="text-xs text-muted-foreground">Usada para ver a posição da empresa e os concorrentes.</p>
-              <Button variant="ghost" size="sm" className="mt-2" onClick={() => { setSementesTxt(sementesPadrao(empresa.segmento, empresa.cidade).join("\n")); setConsulta(`${empresa.segmento} em ${empresa.cidade}`); setTermosTxt(""); }}>Restaurar padrão</Button>
-            </div>
-            <div className="md:col-span-3">
+
+            <div>
               <Button onClick={onGerar} disabled={!pilares.length || loading}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-                {res ? "Gerar novamente com ajustes" : "Gerar com estes termos"}
+                {res ? "Gerar novamente com ajustes" : "Gerar com estes parâmetros"}
               </Button>
             </div>
           </CardContent>
@@ -214,6 +359,10 @@ function RelatorioPage() {
 
             <section><h3 className="font-semibold mb-1">Resumo executivo</h3><p className="text-sm leading-relaxed">{res.relatorio.resumoExecutivo}</p></section>
             <section><h3 className="font-semibold mb-1">O seu mercado hoje</h3><p className="text-sm leading-relaxed">{res.relatorio.contextoMercado}</p></section>
+
+            {res.relatorio.analisePublicoAlvo && (
+              <PublicoAlvoBloco analise={res.relatorio.analisePublicoAlvo} />
+            )}
 
             <SeoBloco seo={res.seo} />
 
@@ -270,3 +419,57 @@ function SeoBloco({ seo }: { seo: DadosSeo }) {
     </Card>
   );
 }
+
+function PublicoAlvoBloco({ analise }: { analise: AnalisePublicoAlvo }) {
+  if (!analise) return null;
+  return (
+    <Card className="break-inside-avoid border-indigo-200 dark:border-indigo-900/50 bg-gradient-to-br from-indigo-50/50 via-background to-muted/20">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2 text-indigo-950 dark:text-indigo-200">
+          <Users className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+          Perfil do Público-Alvo & Comportamento de Busca
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4 text-sm">
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">
+              Quem são os compradores do segmento
+            </p>
+            <p className="leading-relaxed">{analise.perfilComprador}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">
+              Como procuram na Internet (Google & Redes)
+            </p>
+            <p className="leading-relaxed">{analise.comoBuscaNaInternet}</p>
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4 pt-2 border-t">
+          <div>
+            <p className="text-xs font-semibold text-destructive mb-1.5">
+              Principais Dores & O que o Cliente Valoriza
+            </p>
+            <ul className="list-disc pl-5 text-xs space-y-1 text-muted-foreground">
+              {analise.principaisDoresEInteresses?.map((item, i) => (
+                <li key={i}><span className="text-foreground">{item}</span></li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-primary mb-1.5">
+              Critérios que Definem a Escolha / Compra
+            </p>
+            <ul className="list-disc pl-5 text-xs space-y-1 text-muted-foreground">
+              {analise.criteriosDeDecisao?.map((item, i) => (
+                <li key={i}><span className="text-foreground">{item}</span></li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+

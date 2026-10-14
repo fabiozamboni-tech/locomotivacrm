@@ -8,6 +8,7 @@ export interface EmpresaCtx {
   razaoSocial?: string;
   segmento: string;
   areaAtuacao?: string;
+  publicoAlvo?: string;
   buscasPartida?: string;
   termosEncontrados?: string;
   buscaGoogleMaps?: string;
@@ -37,6 +38,7 @@ export function toCtx(e: Empresa): EmpresaCtx {
     razaoSocial: e.razaoSocial,
     segmento: e.segmento,
     areaAtuacao: e.areaAtuacao,
+    publicoAlvo: e.publicoAlvo,
     buscasPartida: e.buscasPartida,
     termosEncontrados: e.termosEncontrados,
     buscaGoogleMaps: e.buscaGoogleMaps,
@@ -61,6 +63,7 @@ function ctxTxt(e: EmpresaCtx): string {
     `Empresa: ${e.nome}${e.razaoSocial ? ` (${e.razaoSocial})` : ""}`,
     `Segmento: ${e.segmento}`,
     e.areaAtuacao ? `Área de Atuação / Especialidade: ${e.areaAtuacao}` : "",
+    e.publicoAlvo ? `Público-Alvo dos Clientes: ${e.publicoAlvo}` : "",
     `Cidade: ${e.cidade}${e.bairro ? " · " + e.bairro : ""}/RS`,
     e.site ? `Site: ${e.site}` : "Site: (não possui / não localizado)",
     e.instagram ? `Instagram: ${e.instagram}` : "Instagram: (não localizado)",

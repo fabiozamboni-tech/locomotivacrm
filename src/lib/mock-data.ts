@@ -70,6 +70,7 @@ export interface Empresa {
   // Campos estratégicos e de inteligência de busca
   razaoSocial?: string;
   areaAtuacao?: string;
+  publicoAlvo?: string;
   buscasPartida?: string;
   termosEncontrados?: string;
   buscaGoogleMaps?: string;
