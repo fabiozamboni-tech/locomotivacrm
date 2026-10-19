@@ -123,6 +123,24 @@ export function gerarApresentacaoPadrao(
         "Previsão de retorno direto através do aumento na taxa de conversão e captação de clientes de maior ticket médio.",
       tags: ["Cronograma", "Próximos Passos", "ROI"],
     },
+
+    // SLIDE 7: FIM / ENCERRAMENTO & CONTATOS OFICIAIS
+    {
+      id: "slide_fim",
+      tipo: "fim",
+      titulo: "Locomotiva Comunicação",
+      subtitulo: "Tecnologia, Posicionamento e Estratégia de Captação Contínua",
+      pontos: [
+        "Telefone / WhatsApp: (54) 9703-9116",
+        "E-mail: fabi@locomotiva.live",
+        "Website: www.locomotiva.live",
+        "Instagram: @locomotivacom",
+        "Facebook: /locomotivacom",
+      ],
+      destaque: "Transforme a presença digital da sua marca em clientes recorrentes e escala de faturamento.",
+      autor: "Locomotiva Comunicação",
+      tags: ["Encerramento", "Contatos", "Locomotiva"],
+    },
   ];
 
   return {
