@@ -80,7 +80,12 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   beforeLoad: async ({ location }) => {
-    if (location.pathname === "/unlock") return {};
+    if (
+      location.pathname === "/unlock" ||
+      location.pathname === "/login" ||
+      location.pathname.startsWith("/.lovable/oauth/")
+    )
+      return {};
     const { unlocked } = await isUnlocked();
     if (!unlocked) {
       const next = `${location.pathname}${location.searchStr}${location.hash}`;

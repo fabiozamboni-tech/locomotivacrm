@@ -3,13 +3,17 @@
   "sdk_version": "0.26.2",
   "path": "/mcp",
   "auth": {
-    "type": "none"
+    "type": "oauth",
+    "issuer": "https://ygptalxumuawdtcpwcry.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
   },
   "mcp": {
     "server": {
-      "name": "locomotivacrm",
+      "name": "crm-locomotiva",
       "version": "0.1.0",
-      "title": "Locomotivacrm"
+      "title": "CRM Locomotiva"
     },
     "tools": [
       {
