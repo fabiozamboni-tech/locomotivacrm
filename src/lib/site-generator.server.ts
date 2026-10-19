@@ -25,7 +25,7 @@ export interface GerarSiteInput {
     lovable?: string;
     ollamaBaseUrl?: string;
   };
-  provedorPreferencial?: "auto" | "groq" | "gemini" | "openrouter" | "lovable" | "ollama";
+  provedorPreferencial?: "auto" | "groq" | "gemini" | "openrouter" | "cerebras" | "lovable" | "ollama";
   estiloVisual?: "moderno_dark" | "clean_minimalista" | "vibrante_corporativo" | "premium_editorial";
 }
 

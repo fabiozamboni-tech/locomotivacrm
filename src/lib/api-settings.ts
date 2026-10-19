@@ -5,7 +5,7 @@ export interface ApiConfig {
   baseUrl?: string;
 }
 
-export type ProvedorIaTipo = "auto" | "groq" | "gemini" | "openrouter" | "lovable" | "ollama";
+export type ProvedorIaTipo = "auto" | "groq" | "gemini" | "openrouter" | "cerebras" | "lovable" | "ollama";
 
 export type ApiProviderKey =
   | "serpapi"
@@ -15,6 +15,7 @@ export type ApiProviderKey =
   | "groq"
   | "gemini"
   | "openrouter"
+  | "cerebras"
   | "ollama";
 
 export interface ApiSettingsMap {
@@ -26,6 +27,7 @@ export interface ApiSettingsMap {
   groq: ApiConfig;
   gemini: ApiConfig;
   openrouter: ApiConfig;
+  cerebras: ApiConfig;
   ollama: ApiConfig;
   provedorIaAtivo: ProvedorIaTipo;
 }
@@ -66,6 +68,11 @@ const DEFAULT_SETTINGS: ApiSettingsMap = {
     enabled: true,
     model: "meta-llama/llama-3.3-70b-instruct:free",
   },
+  cerebras: {
+    key: "",
+    enabled: true,
+    model: "llama-3.3-70b",
+  },
   ollama: {
     key: "",
     enabled: false,
@@ -100,6 +107,10 @@ export function getApiSettings(): ApiSettingsMap {
       openrouter: {
         ...DEFAULT_SETTINGS.openrouter,
         ...(parsed.openrouter || {}),
+      },
+      cerebras: {
+        ...DEFAULT_SETTINGS.cerebras,
+        ...(parsed.cerebras || {}),
       },
       ollama: {
         ...DEFAULT_SETTINGS.ollama,

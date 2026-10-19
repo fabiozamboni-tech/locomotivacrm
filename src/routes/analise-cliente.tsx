@@ -34,6 +34,14 @@ import { consultarQsaDecisores, type DecisoresResult } from "@/lib/qsa-decisores
 import { gerarSiteCompletoIA_ServerFn, type PesquisaWebSiteResult } from "@/lib/site-generator.server";
 import { gerarPrompt, type TipoPrompt } from "@/lib/generators";
 import { getApiSettings, type ProvedorIaTipo } from "@/lib/api-settings";
+import {
+  TONS_ABORDAGEM,
+  gerarTextoProntoPorTom,
+  obterDicaAbordagem,
+  formatarTextoAbordagem,
+  type TomAbordagemId,
+} from "@/lib/abordagem-tons";
+import { gerarAbordagemAmigavelIA_ServerFn } from "@/lib/abordagem-ia.functions";
 import { MatrizResponsabilidades } from "@/components/analise-cliente/matriz-responsabilidades";
 import { SlideDeckBuilder } from "@/components/analise-cliente/slide-deck-builder";
 import { CopilotoObjecoesModal } from "@/components/copiloto-objecoes-modal";
@@ -73,6 +81,15 @@ import {
   Loader2,
   ChevronRight,
   Target,
+  Instagram,
+  Smile,
+  HeartHandshake,
+  Coffee,
+  Award,
+  RotateCcw,
+  SlidersHorizontal,
+  HelpCircle,
+  Send,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Empresa, ApresentacaoSlidesData } from "@/lib/mock-data";
@@ -96,10 +113,19 @@ type CanalTipo = "whatsapp" | "email" | "instagram" | "ligacaoReuniao" | "propos
 
 const CANAIS: { value: CanalTipo; label: string; icon: typeof Mail }[] = [
   { value: "whatsapp", label: "WhatsApp Estratégico", icon: MessageCircle },
+  { value: "instagram", label: "Direct Instagram", icon: Instagram },
   { value: "email", label: "E-mail Executivo", icon: Mail },
-  { value: "instagram", label: "Direct Instagram", icon: Globe },
-  { value: "ligacaoReuniao", label: "Roteiro de Reunião", icon: Phone },
+  { value: "ligacaoReuniao", label: "Roteiro de Reunião / Áudio", icon: Phone },
   { value: "propostaValor360", label: "Pitch de Proposta 360", icon: FileText },
+];
+
+const PROVEDORES_IA_ABORDAGEM: { value: ProvedorIaTipo; label: string; badge: string; desc: string }[] = [
+  { value: "auto", label: "Automático (Melhor Disponível)", badge: "Recomendado", desc: "Prioriza Groq/Cerebras Llama 3.3 e faz fallback inteligente" },
+  { value: "groq", label: "Groq (Llama 3.3 70B)", badge: "Ultra Rápido", desc: "Respostas em milissegundos com modelo aberto topo de linha" },
+  { value: "cerebras", label: "Cerebras (Llama 3.3 70B)", badge: "Velocidade Máxima", desc: "Hardware wafer-scale de altíssima taxa de tokens/s" },
+  { value: "gemini", label: "Google Gemini 2.0 Flash", badge: "Alta Criatividade", desc: "Excelente raciocínio e redação persuasiva contextualizada" },
+  { value: "openrouter", label: "OpenRouter (Modelos Free)", badge: "Livre", desc: "Acesso a catálogo variado de modelos gratuitos" },
+  { value: "ollama", label: "Ollama (Local / Offline)", badge: "Privado", desc: "Executa modelos em seu servidor local sem enviar dados" },
 ];
 
 const PILARES_OPCOES: { value: Pilar; label: string }[] = [
@@ -148,9 +174,7 @@ function AnaliseClientePage() {
     });
   };
 
-  // ---------------------------------------------------------------------------
-  // ESTADOS E CARREGAMENTO DO DOSSIÊ 360 & ABORDAGENS (PERSISTIDO)
-  // ---------------------------------------------------------------------------
+  // Estados e Carregamento do Dossiê 360 & Abordagens (Persistido)
   const [dossier, setDossier] = useState<Dossier360Result | null>(empresa?.dossier360 ?? null);
   const [loadingDossier, setLoadingDossier] = useState(false);
   const [canal, setCanal] = useState<CanalTipo>("whatsapp");
@@ -159,6 +183,14 @@ function AnaliseClientePage() {
   const [decisoresData, setDecisoresData] = useState<DecisoresResult | null>(null);
   const [loadingQSA, setLoadingQSA] = useState(false);
   const [cnpjInput, setCnpjInput] = useState(empresa?.cnpj ?? "");
+
+  // Estados de Tons de Abordagem Amigáveis & IA (awesome-free-llm-apis)
+  const gerarAbordagemIAFn = useServerFn(gerarAbordagemAmigavelIA_ServerFn);
+  const [tomAbordagem, setTomAbordagem] = useState<TomAbordagemId>("amigavel_elogio");
+  const [provedorIaAbordagem, setProvedorIaAbordagem] = useState<ProvedorIaTipo>("auto");
+  const [instrucaoIaAbordagem, setInstrucaoIaAbordagem] = useState("");
+  const [gerandoAbordagemIA, setGerandoAbordagemIA] = useState(false);
+  const [metaAbordagem, setMetaAbordagem] = useState<{ provedor: string; modelo: string; fallback?: boolean } | null>(null);
 
   // Modais de apoio
   const [openCopilotoObjecoes, setOpenCopilotoObjecoes] = useState(false);
@@ -245,24 +277,38 @@ function AnaliseClientePage() {
     setPesquisaSite(null);
   }, [empresa?.id]);
 
-  // Atualiza texto da abordagem quando altera canal ou dossiê
+  // Atualiza texto da abordagem quando altera canal, dossiê ou empresa
   useEffect(() => {
-    if (!dossier?.abordagensPorCanal) return;
-    const item = dossier.abordagensPorCanal[canal];
-    if (!item) return;
+    if (!empresa) return;
 
-    if ("texto" in item) {
-      setTextoAbordagemEditado(
-        canal === "email" && "assunto" in item ? `Assunto: ${item.assunto}\n\n${item.texto}` : item.texto,
-      );
-    } else if ("textoCompleto" in item) {
-      setTextoAbordagemEditado(item.textoCompleto);
-    } else if ("falaAbertura" in item) {
-      setTextoAbordagemEditado(
-        `Fala de Abertura:\n${item.falaAbertura}\n\nPergunta-Chave de Diagnóstico:\n${item.perguntaChaveDiagnostico}\n\nPassos da Reunião:\n${item.roteiroPassos.join("\n")}`,
-      );
+    if (dossier?.abordagensPorCanal) {
+      const item = dossier.abordagensPorCanal[canal];
+      if (item) {
+        if ("texto" in item && item.texto) {
+          setTextoAbordagemEditado(
+            canal === "email" && "assunto" in item ? `Assunto: ${item.assunto}\n\n${item.texto}` : item.texto,
+          );
+          setMetaAbordagem({ provedor: "Dossiê 360", modelo: "Salvo no Banco", fallback: false });
+          return;
+        } else if ("textoCompleto" in item && item.textoCompleto) {
+          setTextoAbordagemEditado(item.textoCompleto);
+          setMetaAbordagem({ provedor: "Dossiê 360", modelo: "Salvo no Banco", fallback: false });
+          return;
+        } else if ("falaAbertura" in item && item.falaAbertura) {
+          setTextoAbordagemEditado(
+            `Fala de Abertura:\n${item.falaAbertura}\n\nPergunta-Chave de Diagnóstico:\n${item.perguntaChaveDiagnostico}\n\nPassos da Reunião:\n${item.roteiroPassos.join("\n")}`,
+          );
+          setMetaAbordagem({ provedor: "Dossiê 360", modelo: "Salvo no Banco", fallback: false });
+          return;
+        }
+      }
     }
-  }, [canal, dossier]);
+
+    // Se ainda não tiver texto no dossiê, preenche com texto pronto humanizado do tom selecionado
+    const pronto = gerarTextoProntoPorTom(toCtx(empresa), canal, tomAbordagem, "Locomotiva Comunicação");
+    setTextoAbordagemEditado(formatarTextoAbordagem(canal, pronto));
+    setMetaAbordagem({ provedor: "Estratégia Pronta", modelo: "Texto Humanizado de Alta Conversão", fallback: false });
+  }, [canal, dossier, empresa?.id]);
 
   // ---------------------------------------------------------------------------
   // HANDLERS DE EXECUÇÃO E GRAVAÇÃO
@@ -301,6 +347,183 @@ function AnaliseClientePage() {
     } finally {
       setLoadingDossier(false);
     }
+  };
+
+  // 1.1 Seleciona Tom de Abordagem e Aplica Texto Pronto
+  const handleSelecionarTom = (novoTom: TomAbordagemId) => {
+    setTomAbordagem(novoTom);
+    if (!empresa) return;
+    const pronto = gerarTextoProntoPorTom(toCtx(empresa), canal, novoTom, "Locomotiva Comunicação");
+    setTextoAbordagemEditado(formatarTextoAbordagem(canal, pronto));
+    setMetaAbordagem({
+      provedor: "Estratégia Pronta",
+      modelo: "Texto Humanizado de Alta Conversão",
+      fallback: false,
+    });
+    const tomInfo = TONS_ABORDAGEM.find((t) => t.id === novoTom);
+    toast.info(`Tom "${tomInfo?.nome}" aplicado ao canal ativo!`);
+  };
+
+  // 1.2 Restaura o Texto Pronto do Tom Ativo
+  const handleRestaurarTextoPronto = () => {
+    if (!empresa) return;
+    const pronto = gerarTextoProntoPorTom(toCtx(empresa), canal, tomAbordagem, "Locomotiva Comunicação");
+    setTextoAbordagemEditado(formatarTextoAbordagem(canal, pronto));
+    setMetaAbordagem({
+      provedor: "Estratégia Pronta",
+      modelo: "Texto Humanizado de Alta Conversão",
+      fallback: false,
+    });
+    toast.success("Texto pronto do tom restaurado com sucesso!");
+  };
+
+  // 1.3 Gera Novo Texto de Abordagem com IA (awesome-free-llm-apis)
+  const handleGerarAbordagemComIA = async () => {
+    if (!empresa) return;
+    setGerandoAbordagemIA(true);
+    try {
+      const res = await gerarAbordagemIAFn({
+        data: {
+          empresa: toCtx(empresa),
+          canal,
+          tom: tomAbordagem,
+          provedor: provedorIaAbordagem,
+          instrucaoCustomizada: instrucaoIaAbordagem,
+        },
+      });
+
+      setTextoAbordagemEditado(formatarTextoAbordagem(canal, res));
+      const ehFallback = res.provedorUtilizado.toLowerCase().includes("pronto");
+      setMetaAbordagem({
+        provedor: res.provedorUtilizado,
+        modelo: res.modeloUtilizado,
+        fallback: ehFallback,
+      });
+
+      if (ehFallback) {
+        toast.info("Texto pronto estratégico aplicado (nenhuma chave de IA configurada ou ativa).");
+      } else {
+        toast.success(`Nova abordagem amigável gerada via ${res.provedorUtilizado} (${res.modeloUtilizado})!`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao conectar com a IA. Restaurando texto pronto.");
+      const pronto = gerarTextoProntoPorTom(toCtx(empresa), canal, tomAbordagem, "Locomotiva Comunicação");
+      setTextoAbordagemEditado(formatarTextoAbordagem(canal, pronto));
+    } finally {
+      setGerandoAbordagemIA(false);
+    }
+  };
+
+  // 1.4 Salva a Abordagem Ativa no Dossiê 360 e no Banco de Dados
+  const handleSalvarAbordagemNoDossier = () => {
+    if (!empresa) return;
+    const textoLimpo = textoAbordagemEditado.trim();
+    if (!textoLimpo) {
+      toast.error("O texto da abordagem está vazio.");
+      return;
+    }
+
+    const tomAtualObj = TONS_ABORDAGEM.find((t) => t.id === tomAbordagem);
+    const canalAtualObj = CANAIS.find((c) => c.value === canal);
+
+    const dossierAtual: Dossier360Result = dossier ?? {
+      empresaNome: empresa.nome,
+      segmento: empresa.segmento,
+      cidade: empresa.cidade,
+      pesquisaWebRealizada: {
+        termoBuscado: `${empresa.nome} ${empresa.cidade}`,
+        fontesEncontradas: [],
+        resumoMercadoLocal: `Segmento de ${empresa.segmento} em ${empresa.cidade}.`,
+      },
+      dimensaoPsicologica: {
+        doresAtuais: ["Falta de previsibilidade na captação"],
+        medosERiscos: ["Dependência excessiva de indicações"],
+        desejosEAmbicoes: ["Ser referência de qualidade regional"],
+        frustracoesPassadas: ["Agências que não entenderam o negócio"],
+      },
+      abordagensPsicologicas: [],
+      inteligenciaPresencaDigital: {
+        resumoDemandaLocal: "Potencial alto para atração de clientes qualificados.",
+        porQuePresencaDigitalImporta: "Gera autoridade e quebra objeção de preço.",
+        demandasPorPlataforma: [],
+        metricasConvincentesVendas: [],
+        projecaoVendas: {
+          cenarioAtualPerdido: "Leads que buscam e não encontram",
+          potencialCapturaMensal: "15 a 30 contatos qualificados",
+          estimativaImpactoFaturamento: "Crescimento sustentável",
+          roiEstimadoComunicacao: "Multiplicador de 3x a 5x",
+        },
+        argumentosMatadoresParaAbordagem: [],
+      },
+      dimensaoOperacional: {
+        gargalosProcesso: ["Tempo gasto em atendimento manual"],
+        impactoFinanceiroCustoInacao: "Perda de oportunidades diárias",
+        nivelMaturidade: "intermediaria",
+        justificativaMaturidade: "Possui operação consolidada e bom atendimento.",
+        sistemasGestaoRecomendados: [],
+      },
+      dimensaoEstrategica: {
+        metasCrescimento: ["Expandir carteira com clientes de alto padrão"],
+        culturaOrganizacional: "Foco em excelência e confiança",
+        tomRecomendadoAbordagem: tomAtualObj?.nome || "Amigável & Elogio Genuíno",
+      },
+      prescricaoTratamentoLucro: {
+        itensTratamento: [],
+        resumoFinanceiroLucratividade: "Aumento de margem ao atrair clientes que valorizam a qualidade.",
+      },
+      abordagensPorCanal: {
+        whatsapp: { titulo: "WhatsApp Estratégico", texto: "", ganchoAbertura: "", focoPrincipal: "" },
+        email: { titulo: "E-mail Executivo", assunto: `Parceria & Oportunidade - ${empresa.nome}`, texto: "", focoPrincipal: "" },
+        instagram: { titulo: "Direct Instagram", texto: "", ganchoAbertura: "" },
+        ligacaoReuniao: { titulo: "Roteiro de Reunião", falaAbertura: "", perguntaChaveDiagnostico: "", roteiroPassos: [] },
+        propostaValor360: { titulo: "Pitch de Proposta 360", resumoExecutivo: "", textoCompleto: "" },
+      },
+    };
+
+    const novoDossier: Dossier360Result = {
+      ...dossierAtual,
+      dimensaoEstrategica: {
+        ...dossierAtual.dimensaoEstrategica,
+        tomRecomendadoAbordagem: tomAtualObj?.nome || dossierAtual.dimensaoEstrategica.tomRecomendadoAbordagem,
+      },
+      abordagensPorCanal: {
+        ...dossierAtual.abordagensPorCanal,
+        [canal]:
+          canal === "email"
+            ? {
+                ...dossierAtual.abordagensPorCanal.email,
+                texto: textoLimpo,
+              }
+            : canal === "ligacaoReuniao"
+            ? {
+                ...dossierAtual.abordagensPorCanal.ligacaoReuniao,
+                falaAbertura: textoLimpo,
+              }
+            : canal === "propostaValor360"
+            ? {
+                ...dossierAtual.abordagensPorCanal.propostaValor360,
+                textoCompleto: textoLimpo,
+              }
+            : {
+                ...dossierAtual.abordagensPorCanal[canal as "whatsapp" | "instagram"],
+                texto: textoLimpo,
+              },
+      },
+    };
+
+    setDossier(novoDossier);
+    updateEmpresa(empresa.id, {
+      dossier360: novoDossier,
+      analiseAtualizadaEm: new Date().toISOString(),
+    });
+
+    addHistorico(empresa.id, {
+      data: new Date().toISOString(),
+      tipo: "nota",
+      texto: `Roteiro de abordagem para ${canalAtualObj?.label} salvo no dossiê (${tomAtualObj?.nome}).`,
+    });
+
+    toast.success(`Abordagem para ${canalAtualObj?.label} salva no Dossiê com sucesso!`);
   };
 
   // 2. Gera Relatório SEO e Salva no Banco de Dados
@@ -857,11 +1080,11 @@ function AnaliseClientePage() {
           </TabsContent>
 
           {/* =====================================================================
-              ABA 3: DOSSIÊ 360 & ABORDAGENS COMERCIAIS (COM PERSISTÊNCIA)
+              ABA 3: DOSSIÊ 360 & ABORDAGENS COMERCIAIS AMIGÁVEIS (COM PERSISTÊNCIA)
              ===================================================================== */}
           <TabsContent value="dossier" className="space-y-6 mt-0">
             <Card>
-              <CardHeader className="pb-3 border-b">
+              <CardHeader className="pb-4 border-b">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <CardTitle className="text-base font-bold flex items-center gap-2">
@@ -869,7 +1092,7 @@ function AnaliseClientePage() {
                       <span>Dossiê 360 & Roteiros de Abordagem Multicanal</span>
                     </CardTitle>
                     <CardDescription className="text-xs">
-                      Perfil psicológico do decisor, sistemas recomendados e mensagens prontas para envio.
+                      Textos amigáveis e não-frios para primeiro contato, enriquecidos com modelos abertos do repositório de LLMs gratuitas.
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
@@ -877,114 +1100,312 @@ function AnaliseClientePage() {
                       onClick={handleGerarDossier}
                       disabled={loadingDossier}
                       size="sm"
+                      variant="outline"
                       className="text-xs gap-1.5"
                     >
                       {loadingDossier ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                      {dossier ? "Atualizar Dossiê" : "Gerar Dossiê com IA"}
+                      {dossier ? "Atualizar Diagnóstico 360" : "Gerar Diagnóstico 360"}
                     </Button>
                   </div>
                 </div>
               </CardHeader>
 
               <CardContent className="p-5 space-y-6">
-                {dossier ? (
-                  <div className="space-y-6">
-                    {/* SELETOR DE CANAIS DE ABORDAGEM */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-semibold uppercase text-muted-foreground">Canal de Abordagem</label>
-                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                        {CANAIS.map((c) => {
-                          const Icon = c.icon;
-                          const ativo = canal === c.value;
-                          return (
-                            <button
-                              key={c.value}
-                              type="button"
-                              onClick={() => setCanal(c.value)}
-                              className={`p-2.5 rounded-lg border text-left flex items-center gap-2 text-xs font-semibold transition-all ${
-                                ativo
-                                  ? "border-primary bg-primary/10 text-primary shadow-xs"
-                                  : "border-border hover:bg-muted/50 text-muted-foreground"
+                {/* 1. SELETOR DE TOM DE ABORDAGEM (ANTI-FRIEZA & HUMANIZADO) */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <Smile className="h-4 w-4 text-emerald-600" />
+                      Escolha o Tom da Abordagem (1º Contato Amigável)
+                    </label>
+                    <span className="text-[11px] text-muted-foreground">
+                      Evite abordagens frias apontando defeitos; crie conexão genuína.
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+                    {TONS_ABORDAGEM.map((t) => {
+                      const ativo = tomAbordagem === t.id;
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => handleSelecionarTom(t.id)}
+                          className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between gap-1.5 ${
+                            ativo
+                              ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40"
+                              : "border-border/80 hover:bg-muted/40 hover:border-border"
+                          }`}
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-xs font-bold leading-tight flex items-center gap-1.5">
+                                {t.id === "amigavel_elogio" && <HeartHandshake className="h-3.5 w-3.5 text-rose-500" />}
+                                {t.id === "consultivo_parceiro" && <Users className="h-3.5 w-3.5 text-blue-500" />}
+                                {t.id === "descontraido_curioso" && <Coffee className="h-3.5 w-3.5 text-amber-500" />}
+                                {t.id === "valorizacao_marca" && <Award className="h-3.5 w-3.5 text-purple-500" />}
+                                {t.id === "direto_gentil" && <Zap className="h-3.5 w-3.5 text-emerald-500" />}
+                                {t.nome}
+                              </span>
+                            </div>
+                            <Badge
+                              variant="secondary"
+                              className={`text-[10px] font-semibold px-1.5 py-0 ${
+                                ativo ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
                               }`}
                             >
-                              <Icon className="h-4 w-4 shrink-0" />
-                              <span className="truncate">{c.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
+                              {t.tagline}
+                            </Badge>
+                            <p className="text-[11px] text-muted-foreground line-clamp-2 leading-snug">
+                              {t.descricao}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. SELETOR DE CANAIS DE ABORDAGEM */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Canal de Envio</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    {CANAIS.map((c) => {
+                      const Icon = c.icon;
+                      const ativo = canal === c.value;
+                      return (
+                        <button
+                          key={c.value}
+                          type="button"
+                          onClick={() => setCanal(c.value)}
+                          className={`p-2.5 rounded-lg border text-left flex items-center gap-2 text-xs font-semibold transition-all ${
+                            ativo
+                              ? "border-primary bg-primary/10 text-primary shadow-xs"
+                              : "border-border hover:bg-muted/50 text-muted-foreground"
+                          }`}
+                        >
+                          <Icon className="h-4 w-4 shrink-0" />
+                          <span className="truncate">{c.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 3. BARRA DE IA (awesome-free-llm-apis) & CONTROLES DE REGENERAÇÃO */}
+                <div className="p-3.5 rounded-xl border border-border/80 bg-muted/20 space-y-3">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <Bot className="h-4 w-4 text-primary" />
+                      <span className="text-xs font-bold">Motor de Redação IA (Awesome Free LLMs):</span>
+                      <Select
+                        value={provedorIaAbordagem}
+                        onValueChange={(v) => setProvedorIaAbordagem(v as ProvedorIaTipo)}
+                      >
+                        <SelectTrigger className="h-8 text-xs w-[240px]">
+                          <SelectValue placeholder="Selecione o provedor de IA" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PROVEDORES_IA_ABORDAGEM.map((p) => (
+                            <SelectItem key={p.value} value={p.value} className="text-xs">
+                              <div className="flex items-center justify-between gap-2 w-full">
+                                <span>{p.label}</span>
+                                <Badge variant="outline" className="text-[9px] px-1 py-0">{p.badge}</Badge>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
 
-                    {/* EDITOR DE MENSAGEM DO CANAL ATIVO */}
-                    <Card className="border-border/80">
-                      <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                        <CardTitle className="text-xs font-bold uppercase">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRestaurarTextoPronto}
+                        className="h-8 text-xs gap-1.5"
+                        title="Recupera o texto pronto estratégico para este canal e tom"
+                      >
+                        <RotateCcw className="h-3 w-3" /> Restaurar Texto Pronto
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleGerarAbordagemComIA}
+                        disabled={gerandoAbordagemIA}
+                        className="h-8 text-xs gap-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:opacity-90 shadow-xs"
+                      >
+                        {gerandoAbordagemIA ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3.5 w-3.5" />
+                        )}
+                        {gerandoAbordagemIA ? "Criando Variação..." : "Gerar Variação com IA"}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Input de instrução extra opcional */}
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Instrução opcional para a IA (ex: citar post recente no Instagram, citar indicação de um amigo, etc.)..."
+                      value={instrucaoIaAbordagem}
+                      onChange={(e) => setInstrucaoIaAbordagem(e.target.value)}
+                      className="h-8 text-xs bg-background"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !gerandoAbordagemIA) {
+                          handleGerarAbordagemComIA();
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* 4. EDITOR DE MENSAGEM DO CANAL ATIVO COM AÇÕES E METADADOS */}
+                <Card className="border-border/80 shadow-xs">
+                  <CardHeader className="pb-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b bg-muted/10">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="text-xs font-bold uppercase tracking-wider">
                           Script Pronto para {CANAIS.find((c) => c.value === canal)?.label}
                         </CardTitle>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => copy(textoAbordagemEditado)}
-                            className="h-7 text-xs gap-1"
-                          >
-                            <Copy className="h-3 w-3" /> Copiar
-                          </Button>
-                          {canal === "whatsapp" && fone && (
-                            <Button
-                              size="sm"
-                              onClick={() => setOpenWhatsModal(true)}
-                              className="h-7 text-xs gap-1 bg-emerald-600 hover:bg-emerald-500 text-white"
-                            >
-                              <MessageCircle className="h-3 w-3" /> Disparar WhatsApp
-                            </Button>
-                          )}
-                          {canal === "email" && empresa.email && (
-                            <Button
-                              size="sm"
-                              onClick={() => setOpenEmailModal(true)}
-                              className="h-7 text-xs gap-1"
-                            >
-                              <Mail className="h-3 w-3" /> Enviar E-mail
-                            </Button>
-                          )}
-                        </div>
-                      </CardHeader>
-                      <CardContent className="p-4 pt-1">
-                        <Textarea
-                          rows={8}
-                          value={textoAbordagemEditado}
-                          onChange={(e) => setTextoAbordagemEditado(e.target.value)}
-                          className="text-xs font-mono leading-relaxed"
-                        />
-                      </CardContent>
-                    </Card>
-
-                    {/* SINTOMAS OPERACIONAIS E SISTEMAS RECOMENDADOS */}
-                    {dossier.prescricaoTratamentoLucro?.itensTratamento && dossier.prescricaoTratamentoLucro.itensTratamento.length > 0 && (
-                      <div className="space-y-2">
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                          Sintomas Operacionais & O que Geraria Mais Lucro
-                        </h4>
-                        <div className="grid sm:grid-cols-2 gap-3">
-                          {dossier.prescricaoTratamentoLucro.itensTratamento.map((s, idx) => (
-                            <div key={idx} className="p-3 rounded-lg border border-border/80 bg-muted/20 space-y-1 text-xs">
-                              <p className="font-bold text-destructive">⚠️ {s.sintomaIdentificado}</p>
-                              <p className="text-muted-foreground">{s.comoTratar}</p>
-                              <p className="text-primary font-medium text-[11px]">💡 Lucro: {s.comoGeraMaisLucro}</p>
-                            </div>
-                          ))}
-                        </div>
+                        <Badge variant="outline" className="text-[10px] bg-background">
+                          Tom: {TONS_ABORDAGEM.find((t) => t.id === tomAbordagem)?.nome}
+                        </Badge>
+                        {metaAbordagem && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            {metaAbordagem.provedor} ({metaAbordagem.modelo})
+                          </Badge>
+                        )}
                       </div>
-                    )}
+                      <p className="text-[11px] text-muted-foreground">
+                        Edite livremente as informações antes do disparo ou salve o roteiro no dossiê oficial.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={handleSalvarAbordagemNoDossier}
+                        className="h-7 text-xs gap-1 bg-indigo-600 hover:bg-indigo-500 text-white"
+                      >
+                        <Save className="h-3 w-3" /> Salvar no Dossiê
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copy(textoAbordagemEditado)}
+                        className="h-7 text-xs gap-1"
+                      >
+                        <Copy className="h-3 w-3" /> Copiar
+                      </Button>
+
+                      {canal === "whatsapp" && (
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            if (fone) {
+                              setOpenWhatsModal(true);
+                            } else {
+                              toast.info("A empresa não possui telefone/WhatsApp cadastrado.");
+                            }
+                          }}
+                          className="h-7 text-xs gap-1 bg-emerald-600 hover:bg-emerald-500 text-white"
+                        >
+                          <MessageCircle className="h-3 w-3" /> Disparar WhatsApp
+                        </Button>
+                      )}
+
+                      {canal === "email" && empresa.email && (
+                        <Button
+                          size="sm"
+                          onClick={() => setOpenEmailModal(true)}
+                          className="h-7 text-xs gap-1"
+                        >
+                          <Mail className="h-3 w-3" /> Enviar E-mail
+                        </Button>
+                      )}
+
+                      {canal === "instagram" && empresa.instagram && (
+                        <a
+                          href={empresa.instagram.startsWith("http") ? empresa.instagram : `https://instagram.com/${empresa.instagram.replace(/^@/, "")}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border border-border hover:bg-muted"
+                        >
+                          <Instagram className="h-3 w-3 text-pink-500" /> Abrir Perfil
+                        </a>
+                      )}
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="p-4 space-y-3">
+                    <Textarea
+                      rows={10}
+                      value={textoAbordagemEditado}
+                      onChange={(e) => setTextoAbordagemEditado(e.target.value)}
+                      className="text-xs font-mono leading-relaxed resize-y bg-background"
+                      placeholder="O texto do roteiro de abordagem aparecerá aqui..."
+                    />
+
+                    {/* Dica de Ouro Contextual para o Primeiro Contato */}
+                    <div className="flex items-start gap-2.5 p-3 rounded-lg border border-amber-500/20 bg-amber-500/5 text-xs text-amber-900 dark:text-amber-200">
+                      <HelpCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                      <div className="space-y-0.5">
+                        <strong className="font-semibold">Dica Estratégica para este Canal e Tom:</strong>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                          {obterDicaAbordagem(canal, tomAbordagem)}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* 5. DIAGNÓSTICO 360 & SINTOMAS OPERACIONAIS (SE DISPONÍVEL) */}
+                {dossier?.prescricaoTratamentoLucro?.itensTratamento && dossier.prescricaoTratamentoLucro.itensTratamento.length > 0 ? (
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                        <TrendingUp className="h-4 w-4 text-primary" />
+                        Sintomas Operacionais & O que Geraria Mais Lucro (Diagnóstico 360)
+                      </h4>
+                      <Badge variant="outline" className="text-[10px]">
+                        Diagnóstico Persistido no Banco
+                      </Badge>
+                    </div>
+
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {dossier.prescricaoTratamentoLucro.itensTratamento.map((s, idx) => (
+                        <div key={idx} className="p-3.5 rounded-xl border border-border/80 bg-card space-y-1.5 text-xs shadow-xs">
+                          <p className="font-bold text-destructive flex items-center gap-1.5">
+                            <span>⚠️</span> {s.sintomaIdentificado}
+                          </p>
+                          <p className="text-muted-foreground text-[11px] leading-relaxed">
+                            <strong>Tratamento:</strong> {s.comoTratar}
+                          </p>
+                          <div className="p-2 rounded-md bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 font-medium text-[11px] flex items-center gap-1.5">
+                            <span>💡</span>
+                            <span><strong>Lucro:</strong> {s.comoGeraMaisLucro}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ) : (
-                  <div className="p-8 text-center space-y-3">
-                    <MessageSquareText className="h-10 w-10 text-muted-foreground mx-auto" />
-                    <p className="text-sm font-semibold">Dossiê 360 ainda não foi gerado para esta empresa.</p>
-                    <Button onClick={handleGerarDossier} disabled={loadingDossier} size="sm">
-                      {loadingDossier ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />}
-                      Gerar Dossiê & Abordagens com IA
+                  <div className="p-4 rounded-xl border border-dashed border-border bg-muted/10 text-center space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      Deseja mapear também os sintomas operacionais profundos e sistemas de gestão recomendados para a empresa?
+                    </p>
+                    <Button
+                      onClick={handleGerarDossier}
+                      disabled={loadingDossier}
+                      size="sm"
+                      variant="outline"
+                      className="text-xs gap-1.5"
+                    >
+                      {loadingDossier ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                      Gerar Diagnóstico Psicológico & Operacional 360 com IA
                     </Button>
                   </div>
                 )}

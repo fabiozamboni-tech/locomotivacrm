@@ -10,7 +10,7 @@ export interface ChatMessage {
   content: string;
 }
 
-export type ProvedorNome = "groq" | "gemini" | "openrouter" | "lovable" | "ollama";
+export type ProvedorNome = "groq" | "gemini" | "openrouter" | "cerebras" | "lovable" | "ollama";
 
 export interface LlmCallOptions {
   provedorPreferencial?: ProvedorNome | "auto";
@@ -21,6 +21,7 @@ export interface LlmCallOptions {
     groq?: string;
     gemini?: string;
     openrouter?: string;
+    cerebras?: string;
     lovable?: string;
     ollamaBaseUrl?: string;
   };
@@ -81,6 +82,22 @@ export const PROVIDERS_CONFIG: Record<ProvedorNome, ProviderEndpointConfig> = {
     }),
     formatBody: (messages, model, temperature = 0.7, maxTokens = 4096) => ({
       model: model || "meta-llama/llama-3.3-70b-instruct:free",
+      messages,
+      temperature,
+      max_tokens: maxTokens,
+    }),
+  },
+  cerebras: {
+    nome: "cerebras",
+    url: "https://api.cerebras.ai/v1/chat/completions",
+    defaultModel: "llama-3.3-70b",
+    getKey: (custom) => custom?.cerebras || process.env.CEREBRAS_API_KEY,
+    getHeaders: (key) => ({
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+    }),
+    formatBody: (messages, model, temperature = 0.7, maxTokens = 4096) => ({
+      model: model || "llama-3.3-70b",
       messages,
       temperature,
       max_tokens: maxTokens,
@@ -183,7 +200,7 @@ export async function chamarLlmUniversal(
   }
 
   // Adiciona os demais em ordem de custo/eficiência para o fallback
-  const candidates: ProvedorNome[] = ["groq", "gemini", "lovable", "openrouter", "ollama"];
+  const candidates: ProvedorNome[] = ["groq", "gemini", "cerebras", "lovable", "openrouter", "ollama"];
   for (const c of candidates) {
     if (!order.includes(c)) {
       order.push(c);
