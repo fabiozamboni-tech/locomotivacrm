@@ -56,17 +56,17 @@ const DEFAULT_SETTINGS: ApiSettingsMap = {
   groq: {
     key: "",
     enabled: true,
-    model: "llama-3.3-70b-versatile",
+    model: "llama-3.1-8b-instant",
   },
   gemini: {
     key: "",
     enabled: true,
-    model: "gemini-2.0-flash",
+    model: "gemini-3.8-flash",
   },
   openrouter: {
     key: "",
     enabled: true,
-    model: "meta-llama/llama-3.3-70b-instruct:free",
+    model: "openrouter/free",
   },
   cerebras: {
     key: "",
@@ -88,6 +88,23 @@ export function getApiSettings(): ApiSettingsMap {
     const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!raw) return DEFAULT_SETTINGS;
     const parsed = JSON.parse(raw);
+
+    // Migração de modelos depreciados para versões ativas
+    const groqModel =
+      parsed.groq?.model === "llama-3.3-70b-versatile"
+        ? "llama-3.1-8b-instant"
+        : (parsed.groq?.model || DEFAULT_SETTINGS.groq.model);
+
+    const geminiModel =
+      parsed.gemini?.model === "gemini-2.0-flash"
+        ? "gemini-3.8-flash"
+        : (parsed.gemini?.model || DEFAULT_SETTINGS.gemini.model);
+
+    const openrouterModel =
+      parsed.openrouter?.model === "meta-llama/llama-3.3-70b-instruct:free"
+        ? "openrouter/free"
+        : (parsed.openrouter?.model || DEFAULT_SETTINGS.openrouter.model);
+
     return {
       ...DEFAULT_SETTINGS,
       ...parsed,
@@ -99,14 +116,17 @@ export function getApiSettings(): ApiSettingsMap {
       groq: {
         ...DEFAULT_SETTINGS.groq,
         ...(parsed.groq || {}),
+        model: groqModel,
       },
       gemini: {
         ...DEFAULT_SETTINGS.gemini,
         ...(parsed.gemini || {}),
+        model: geminiModel,
       },
       openrouter: {
         ...DEFAULT_SETTINGS.openrouter,
         ...(parsed.openrouter || {}),
+        model: openrouterModel,
       },
       cerebras: {
         ...DEFAULT_SETTINGS.cerebras,

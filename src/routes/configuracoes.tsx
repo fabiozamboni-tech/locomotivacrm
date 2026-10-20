@@ -221,7 +221,7 @@ function ConfiguracoesPage() {
 
   const testAllApis = async () => {
     setTestingAll(true);
-    const providers = ["serpapi", "groq", "gemini", "openrouter", "apify", "brasilapi", "registrobr", "openstreetmap", "lovable"];
+    const providers = ["serpapi", "groq", "gemini", "cerebras", "openrouter", "apify", "brasilapi", "registrobr", "openstreetmap", "lovable"];
     for (const p of providers) {
       const conf = (settings as any)[p];
       await testSingleApi(p, typeof conf === "object" ? conf?.key : undefined);
@@ -820,7 +820,7 @@ function ConfiguracoesPage() {
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-xs uppercase tracking-wider text-foreground">Groq Cloud</span>
                       <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
-                        30 RPM · 14.400 req/dia Grátis (Sem Cartão)
+                        Llama 3.1 8B Instant · 30 RPM · 14.400 req/dia Grátis (Sem Cartão)
                       </Badge>
                       <a
                         href="https://console.groq.com/keys"
@@ -887,7 +887,7 @@ function ConfiguracoesPage() {
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-xs uppercase tracking-wider text-foreground">Google Gemini</span>
                       <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-600 border-blue-500/30">
-                        15 RPM · 1.500 req/dia · 1M Contexto (Sem Cartão)
+                        Gemini 3.8 Flash · 15 RPM · 1.500 req/dia (Sem Cartão)
                       </Badge>
                       <a
                         href="https://aistudio.google.com/app/apikey"
@@ -954,7 +954,7 @@ function ConfiguracoesPage() {
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-xs uppercase tracking-wider text-foreground">OpenRouter</span>
                       <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-600 border-purple-500/30">
-                        Modelos :free Gratuitos (Nemotron, Llama 3.3)
+                        openrouter/free · Modelos Gratuitos (Zero Custo)
                       </Badge>
                       <a
                         href="https://openrouter.ai/keys"
@@ -1008,6 +1008,73 @@ function ConfiguracoesPage() {
                       size="sm"
                       onClick={() => testSingleApi("openrouter", settings.openrouter.key)}
                       disabled={testing["openrouter"]}
+                      className="text-xs h-9 px-3"
+                    >
+                      Testar
+                    </Button>
+                  </div>
+                </div>
+
+                {/* CEREBRAS (awesome-free-llm-apis: Ultra Veloz Wafer-Scale) */}
+                <div className="p-3.5 rounded-lg border border-border/60 bg-card hover:border-border transition-colors space-y-2.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs uppercase tracking-wider text-foreground">Cerebras AI</span>
+                      <Badge variant="outline" className="text-[10px] bg-rose-500/10 text-rose-600 border-rose-500/30">
+                        Llama 3.3 70B · Wafer-Scale Ultra Veloz
+                      </Badge>
+                      <a
+                        href="https://cloud.cerebras.ai"
+                        target="_blank"
+                        rel="noopener"
+                        className="text-[11px] text-blue-500 hover:underline flex items-center gap-0.5 ml-1"
+                      >
+                        Obter Chave Grátis <ExternalLink className="size-3" />
+                      </a>
+                    </div>
+                    {testing["cerebras"] ? (
+                      <Badge variant="outline" className="text-xs gap-1 border-blue-500/30 text-blue-500">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Testando...
+                      </Badge>
+                    ) : testResults["cerebras"] ? (
+                      <Badge
+                        variant="outline"
+                        className={`text-xs gap-1 ${
+                          testResults["cerebras"].status === "online"
+                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                            : "bg-red-500/10 text-red-600 border-red-500/30"
+                        }`}
+                      >
+                        {testResults["cerebras"].status === "online" ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                        {testResults["cerebras"].status === "online" ? `Ativa (${testResults["cerebras"].latencyMs}ms)` : testResults["cerebras"].message}
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type={showKeys["cerebras"] ? "text" : "password"}
+                        value={settings.cerebras?.key || ""}
+                        onChange={(e) => handleKeyChange("cerebras", e.target.value)}
+                        placeholder="csk-... (Chave Cerebras Cloud)"
+                        className="text-xs font-mono pr-8"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleShowKey("cerebras")}
+                        className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                      >
+                        {showKeys["cerebras"] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                    <Button size="sm" onClick={() => handleSaveKey("cerebras")} className="text-xs h-9 px-3">
+                      Salvar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => testSingleApi("cerebras", settings.cerebras?.key)}
+                      disabled={testing["cerebras"]}
                       className="text-xs h-9 px-3"
                     >
                       Testar

@@ -120,11 +120,11 @@ const CANAIS: { value: CanalTipo; label: string; icon: typeof Mail }[] = [
 ];
 
 const PROVEDORES_IA_ABORDAGEM: { value: ProvedorIaTipo; label: string; badge: string; desc: string }[] = [
-  { value: "auto", label: "Automático (Melhor Disponível)", badge: "Recomendado", desc: "Prioriza Groq/Cerebras Llama 3.3 e faz fallback inteligente" },
-  { value: "groq", label: "Groq (Llama 3.3 70B)", badge: "Ultra Rápido", desc: "Respostas em milissegundos com modelo aberto topo de linha" },
-  { value: "cerebras", label: "Cerebras (Llama 3.3 70B)", badge: "Velocidade Máxima", desc: "Hardware wafer-scale de altíssima taxa de tokens/s" },
-  { value: "gemini", label: "Google Gemini 2.0 Flash", badge: "Alta Criatividade", desc: "Excelente raciocínio e redação persuasiva contextualizada" },
-  { value: "openrouter", label: "OpenRouter (Modelos Free)", badge: "Livre", desc: "Acesso a catálogo variado de modelos gratuitos" },
+  { value: "auto", label: "Automático (Melhor Disponível)", badge: "Recomendado", desc: "Prioriza Cerebras/Groq/Gemini com auto-recuperação de modelo" },
+  { value: "cerebras", label: "Cerebras (Llama 3.3 70B)", badge: "Ultra Veloz", desc: "Hardware wafer-scale de altíssima taxa de tokens/s" },
+  { value: "groq", label: "Groq (Llama 3.1 8B Instant)", badge: "Milissegundos", desc: "Respostas em milissegundos com modelo aberto oficial" },
+  { value: "gemini", label: "Google Gemini 3.8 Flash", badge: "Alta Inteligência", desc: "Excelente raciocínio e redação persuasiva contextualizada" },
+  { value: "openrouter", label: "OpenRouter (openrouter/free)", badge: "Livre", desc: "Roteamento inteligente para catálogo de modelos 100% gratuitos" },
   { value: "ollama", label: "Ollama (Local / Offline)", badge: "Privado", desc: "Executa modelos em seu servidor local sem enviar dados" },
 ];
 

@@ -40,14 +40,14 @@ export const PROVIDERS_CONFIG: Record<ProvedorNome, ProviderEndpointConfig> = {
   groq: {
     nome: "groq",
     url: "https://api.groq.com/openai/v1/chat/completions",
-    defaultModel: "llama-3.3-70b-versatile",
+    defaultModel: "llama-3.1-8b-instant",
     getKey: (custom) => custom?.groq || process.env.GROQ_API_KEY,
     getHeaders: (key) => ({
       "Content-Type": "application/json",
       Authorization: `Bearer ${key}`,
     }),
     formatBody: (messages, model, temperature = 0.7, maxTokens = 4096) => ({
-      model: model || "llama-3.3-70b-versatile",
+      model: model || "llama-3.1-8b-instant",
       messages,
       temperature,
       max_tokens: maxTokens,
@@ -56,14 +56,14 @@ export const PROVIDERS_CONFIG: Record<ProvedorNome, ProviderEndpointConfig> = {
   gemini: {
     nome: "gemini",
     url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-    defaultModel: "gemini-2.0-flash",
+    defaultModel: "gemini-3.8-flash",
     getKey: (custom) => custom?.gemini || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY,
     getHeaders: (key) => ({
       "Content-Type": "application/json",
       Authorization: `Bearer ${key}`,
     }),
     formatBody: (messages, model, temperature = 0.7, maxTokens = 4096) => ({
-      model: model || "gemini-2.0-flash",
+      model: model || "gemini-3.8-flash",
       messages,
       temperature,
       max_tokens: maxTokens,
@@ -72,7 +72,7 @@ export const PROVIDERS_CONFIG: Record<ProvedorNome, ProviderEndpointConfig> = {
   openrouter: {
     nome: "openrouter",
     url: "https://openrouter.ai/api/v1/chat/completions",
-    defaultModel: "meta-llama/llama-3.3-70b-instruct:free",
+    defaultModel: "openrouter/free",
     getKey: (custom) => custom?.openrouter || process.env.OPENROUTER_API_KEY,
     getHeaders: (key) => ({
       "Content-Type": "application/json",
@@ -81,7 +81,7 @@ export const PROVIDERS_CONFIG: Record<ProvedorNome, ProviderEndpointConfig> = {
       "X-Title": "Locomotiva CRM",
     }),
     formatBody: (messages, model, temperature = 0.7, maxTokens = 4096) => ({
-      model: model || "meta-llama/llama-3.3-70b-instruct:free",
+      model: model || "openrouter/free",
       messages,
       temperature,
       max_tokens: maxTokens,
@@ -137,7 +137,19 @@ export const PROVIDERS_CONFIG: Record<ProvedorNome, ProviderEndpointConfig> = {
 };
 
 /**
- * Executa uma chamada para um provedor específico.
+ * Modelos de contingência para cada provedor (caso o modelo solicitado retorne 404/descontinuado/indisponível).
+ */
+export const PROVIDER_FALLBACK_MODELS: Record<ProvedorNome, string[]> = {
+  groq: ["llama-3.1-8b-instant", "llama3-8b-8192", "mixtral-8x7b-32768", "gemma2-9b-it"],
+  gemini: ["gemini-3.8-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-pro"],
+  openrouter: ["openrouter/free", "meta-llama/llama-3.2-3b-instruct:free", "meta-llama/llama-3.1-8b-instruct:free", "mistralai/mistral-7b-instruct:free"],
+  cerebras: ["llama-3.3-70b", "llama3.1-8b"],
+  lovable: ["google/gemini-3-flash-preview", "openai/gpt-5-mini"],
+  ollama: ["llama3.3", "llama3.1", "llama3", "mistral"],
+};
+
+/**
+ * Executa uma chamada para um provedor específico, com auto-recuperação de modelo caso receba 404.
  */
 async function callSpecificProvider(
   prov: ProviderEndpointConfig,
@@ -145,41 +157,76 @@ async function callSpecificProvider(
   messages: ChatMessage[],
   opts: LlmCallOptions,
 ): Promise<{ text: string; provider: ProvedorNome; model: string }> {
-  const model = opts.model || prov.defaultModel;
-  const body = prov.formatBody(messages, model, opts.temperature, opts.maxTokens);
+  const initialModel = opts.model || prov.defaultModel;
+  const fallbacks = PROVIDER_FALLBACK_MODELS[prov.nome] || [];
+  const modelsToTry = [initialModel, ...fallbacks.filter((m) => m !== initialModel)];
+
   const targetUrl = prov.nome === "ollama" && opts.customKeys?.ollamaBaseUrl
     ? `${opts.customKeys.ollamaBaseUrl.replace(/\/+$/, "")}/chat/completions`
     : prov.url;
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s timeout
+  let lastError: Error | null = null;
 
-  try {
-    const res = await fetch(targetUrl, {
-      method: "POST",
-      headers: prov.getHeaders(key),
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
+  for (let i = 0; i < modelsToTry.length; i++) {
+    const currentModel = modelsToTry[i];
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s timeout
 
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      throw new Error(`Provedor ${prov.nome} retornou HTTP ${res.status}: ${errText.slice(0, 300)}`);
+    try {
+      const body = prov.formatBody(messages, currentModel, opts.temperature, opts.maxTokens);
+      const res = await fetch(targetUrl, {
+        method: "POST",
+        headers: prov.getHeaders(key),
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        const isModelNotFound =
+          res.status === 404 ||
+          errText.includes("model_not_found") ||
+          errText.includes("does not exist") ||
+          errText.includes("no longer available") ||
+          errText.includes("unavailable for free");
+
+        // Se o erro foi de modelo e ainda temos outros modelos para tentar, tenta o próximo
+        if (isModelNotFound && i < modelsToTry.length - 1) {
+          console.warn(
+            `[LlmProvider] Modelo '${currentModel}' em '${prov.nome}' retornou 404/indisponível. Tentando próximo modelo: '${modelsToTry[i + 1]}'`,
+          );
+          continue;
+        }
+
+        throw new Error(`Provedor ${prov.nome} retornou HTTP ${res.status}: ${errText.slice(0, 300)}`);
+      }
+
+      const data = (await res.json()) as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+
+      const content = data.choices?.[0]?.message?.content?.trim();
+      if (!content) {
+        throw new Error(`Provedor ${prov.nome} retornou resposta vazia`);
+      }
+
+      return { text: content, provider: prov.nome, model: currentModel };
+    } catch (err: any) {
+      lastError = err;
+      // Se for erro de rede/timeout ou erro que não seja de modelo, propaga direto
+      if (err.name === "AbortError") {
+        throw new Error(`Timeout de 45s excedido para provedor ${prov.nome}`);
+      }
+      if (i < modelsToTry.length - 1 && err.message?.includes("404")) {
+        continue;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-
-    const content = data.choices?.[0]?.message?.content?.trim();
-    if (!content) {
-      throw new Error(`Provedor ${prov.nome} retornou resposta vazia`);
-    }
-
-    return { text: content, provider: prov.nome, model };
-  } finally {
-    clearTimeout(timeoutId);
   }
+
+  throw lastError || new Error(`Falha ao conectar ao provedor ${prov.nome}`);
 }
 
 /**

@@ -12,6 +12,7 @@ export interface ApiTestResult {
     | "groq"
     | "gemini"
     | "openrouter"
+    | "cerebras"
     | "ollama";
   status: "online" | "unauthorized" | "error" | "unconfigured";
   latencyMs: number;
@@ -300,7 +301,7 @@ export const testApiConnection = createServerFn({ method: "POST" })
       }
       try {
         const { testarConexaoLlm } = await import("./llm-provider.server");
-        const res = await testarConexaoLlm("groq", key, "llama-3.3-70b-versatile");
+        const res = await testarConexaoLlm("groq", key, "llama-3.1-8b-instant");
         return {
           provider: "groq",
           status: res.ok ? "online" : "error",
@@ -335,7 +336,7 @@ export const testApiConnection = createServerFn({ method: "POST" })
       }
       try {
         const { testarConexaoLlm } = await import("./llm-provider.server");
-        const res = await testarConexaoLlm("gemini", key, "gemini-2.0-flash");
+        const res = await testarConexaoLlm("gemini", key, "gemini-3.8-flash");
         return {
           provider: "gemini",
           status: res.ok ? "online" : "error",
@@ -370,14 +371,14 @@ export const testApiConnection = createServerFn({ method: "POST" })
       }
       try {
         const { testarConexaoLlm } = await import("./llm-provider.server");
-        const res = await testarConexaoLlm("openrouter", key, "meta-llama/llama-3.3-70b-instruct:free");
+        const res = await testarConexaoLlm("openrouter", key, "openrouter/free");
         return {
           provider: "openrouter",
           status: res.ok ? "online" : "error",
           latencyMs: res.latencyMs,
           message: res.message,
           details: {
-            plan: "Free Tier (:free models)",
+            plan: "Free Tier (openrouter/free)",
             modelUsed: res.modelUsed,
             isFreeService: true,
           },
@@ -388,6 +389,41 @@ export const testApiConnection = createServerFn({ method: "POST" })
           status: "error",
           latencyMs: Date.now() - startTime,
           message: err.message || "Erro ao conectar com OpenRouter",
+        };
+      }
+    }
+
+    // 10. CEREBRAS (awesome-free-llm-apis: ultra veloz wafer-scale)
+    if (data.provider === "cerebras") {
+      const key = data.apiKey || process.env.CEREBRAS_API_KEY;
+      if (!key) {
+        return {
+          provider: "cerebras",
+          status: "unconfigured",
+          latencyMs: 0,
+          message: "Nenhuma chave Cerebras informada. Obtenha gratuitamente em cloud.cerebras.ai.",
+        };
+      }
+      try {
+        const { testarConexaoLlm } = await import("./llm-provider.server");
+        const res = await testarConexaoLlm("cerebras", key, "llama-3.3-70b");
+        return {
+          provider: "cerebras",
+          status: res.ok ? "online" : "error",
+          latencyMs: res.latencyMs,
+          message: res.message,
+          details: {
+            plan: "Free Tier (Wafer Scale / Alta Velocidade)",
+            modelUsed: res.modelUsed,
+            isFreeService: true,
+          },
+        };
+      } catch (err: any) {
+        return {
+          provider: "cerebras",
+          status: "error",
+          latencyMs: Date.now() - startTime,
+          message: err.message || "Erro ao conectar com Cerebras",
         };
       }
     }
