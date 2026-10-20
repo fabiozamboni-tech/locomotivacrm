@@ -553,6 +553,20 @@ Regras: Títulos de até 30 caracteres com a palavra-chave local e descrições 
               <span>{empresa.nome} · Pré-visualização em Tela Cheia</span>
             </DialogTitle>
             <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  if (!siteHtml) return;
+                  const blob = new Blob([siteHtml], { type: "text/html;charset=utf-8" });
+                  const url = URL.createObjectURL(blob);
+                  window.open(url, "_blank");
+                }}
+                className="h-7 text-xs gap-1"
+                title="Abrir em uma nova aba do navegador"
+              >
+                <ExternalLink className="h-3 w-3" /> Nova Aba
+              </Button>
               <Button size="sm" variant="outline" onClick={handleBaixarHtml} className="h-7 text-xs gap-1">
                 <Download className="h-3 w-3" /> Baixar HTML
               </Button>

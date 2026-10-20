@@ -18,6 +18,7 @@ import {
   FileCode,
   ArrowRightLeft,
   Archive,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -55,6 +56,17 @@ export function ComparadorVersoesSites({
   const copyCode = () => {
     navigator.clipboard.writeText(siteHtmlAtivo);
     toast.success("Código HTML copiado para a área de transferência!");
+  };
+
+  const handleAbrirNovaAba = () => {
+    if (!siteHtmlAtivo) {
+      toast.error("Nenhum conteúdo de site disponível para visualização.");
+      return;
+    }
+    const blob = new Blob([siteHtmlAtivo], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+    toast.success("Site aberto em uma nova aba do navegador!");
   };
 
   const versaoA = versoes[indexVersaoA] || { html: siteHtmlAtivo, provedor: "Ativo", modelo: "Atual", data: new Date().toISOString() };
@@ -131,6 +143,19 @@ export function ComparadorVersoesSites({
             >
               <Smartphone className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Mobile</span>
+            </Button>
+
+            <div className="h-4 w-px bg-border/80 mx-0.5" />
+
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleAbrirNovaAba}
+              className="h-7 px-2.5 text-xs gap-1 hover:text-foreground text-muted-foreground hover:bg-background/80"
+              title="Abrir site em uma nova aba do navegador"
+            >
+              <ExternalLink className="h-3.5 w-3.5 text-primary" />
+              <span className="hidden sm:inline font-medium">Nova Aba</span>
             </Button>
           </div>
         )}
