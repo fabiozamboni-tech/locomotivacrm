@@ -49,6 +49,10 @@ import { CadenciaModal } from "@/components/cadencia-modal";
 import { EnviarEmailModal } from "@/components/enviar-email-modal";
 import { EnviarWhatsAppModal } from "@/components/enviar-whatsapp-modal";
 import { SitePreviewModal } from "@/components/site-preview-modal";
+import { EmpresaLogo } from "@/components/empresa-logo";
+import { PaletaCoresCard } from "@/components/paleta-cores-card";
+import { QrCodeCard } from "@/components/qr-code-card";
+import { FeriadosCampanhasCard } from "@/components/feriados-campanhas-card";
 import { whatsappUrl } from "@/lib/links";
 import {
   Sparkles,
@@ -94,6 +98,7 @@ import {
   MapPin,
   CheckCircle,
   Heart,
+  Palette,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Empresa, ApresentacaoSlidesData } from "@/lib/mock-data";
@@ -239,7 +244,7 @@ function AnaliseClientePage() {
   const [devicePreview, setDevicePreview] = useState<"desktop" | "tablet" | "mobile">("desktop");
   const [siteFullscreenOpen, setSiteFullscreenOpen] = useState(false);
   const [tipoPrompt, setTipoPrompt] = useState<TipoPrompt>("site_novo");
-  const [subModoSite, setSubModoSite] = useState<"site" | "prompts">("site");
+  const [subModoSite, setSubModoSite] = useState<"site" | "paleta" | "prompts">("site");
 
   // ---------------------------------------------------------------------------
   // SINCRONIZAÇÃO QUANDO ALTERNA EMPRESA SELECIONADA
@@ -686,26 +691,41 @@ function AnaliseClientePage() {
          ========================================================================= */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-5 rounded-xl border border-border/80 bg-card shadow-sm print:hidden">
         <div className="space-y-1.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="p-2 rounded-lg bg-primary/10 text-primary">
-              <Sparkles className="h-5 w-5" />
-            </div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Análise do cliente</h1>
-            {empresa?.analiseAtualizadaEm || empresa?.dossier360 || empresa?.relatorioLead ? (
-              <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 gap-1">
-                <CheckCircle2 className="h-3 w-3" />
-                Análise Salva no Banco de Dados
-              </Badge>
+          <div className="flex flex-wrap items-center gap-3">
+            {empresa ? (
+              <EmpresaLogo site={empresa.site} nome={empresa.nome} size="md" />
             ) : (
-              <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 gap-1">
-                <Clock className="h-3 w-3" />
-                Análise Pendente de Geração
-              </Badge>
+              <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                <Sparkles className="h-5 w-5" />
+              </div>
             )}
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
+                  {empresa ? empresa.nome : "Análise do cliente"}
+                </h1>
+                {empresa && (
+                  <Badge variant="outline" className="text-xs font-normal">
+                    {empresa.cidade} · {empresa.segmento}
+                  </Badge>
+                )}
+                {empresa?.analiseAtualizadaEm || empresa?.dossier360 || empresa?.relatorioLead ? (
+                  <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Análise Salva no Banco de Dados
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 gap-1">
+                    <Clock className="h-3 w-3" />
+                    Análise Pendente de Geração
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                Diagnóstico 360, matriz de responsabilidades, roteiros de abordagem, estúdio de sites com GSAP e slides para o lead.
+              </p>
+            </div>
           </div>
-          <p className="text-xs sm:text-sm text-muted-foreground">
-            Diagnóstico 360, matriz de responsabilidades, roteiros de abordagem, estúdio de sites com GSAP e slides para o lead.
-          </p>
         </div>
 
         {/* SELETOR DE EMPRESA & AÇÃO MASTER */}
@@ -831,6 +851,9 @@ function AnaliseClientePage() {
 
             {/* MATRIZ DE RESPONSABILIDADES: O QUE A AGÊNCIA VAI ATENDER VS O QUE O LEAD DEVE ATENDER */}
             <MatrizResponsabilidades empresa={empresa} nomeAgencia="Locomotiva Comunicação" />
+
+            {/* PLANEJAMENTO DE CAMPANHAS & FERIADOS NACIONAIS (BRASILAPI) */}
+            <FeriadosCampanhasCard />
           </TabsContent>
 
           {/* =====================================================================
@@ -1426,7 +1449,7 @@ function AnaliseClientePage() {
               ABA 4: ESTÚDIO DE SITES (GSAP + IMAGENS) & PROMPTS IA
              ===================================================================== */}
           <TabsContent value="site" className="space-y-6 mt-0">
-            <div className="flex items-center gap-2 border-b pb-3">
+            <div className="flex flex-wrap items-center gap-2 border-b pb-3">
               <Button
                 variant={subModoSite === "site" ? "default" : "outline"}
                 size="sm"
@@ -1435,6 +1458,15 @@ function AnaliseClientePage() {
               >
                 <Globe className="h-3.5 w-3.5" />
                 Gerador de Site (Demo ao Vivo + GSAP)
+              </Button>
+              <Button
+                variant={subModoSite === "paleta" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSubModoSite("paleta")}
+                className="text-xs gap-1.5"
+              >
+                <Palette className="h-3.5 w-3.5 text-pink-500" />
+                Identidade Visual & Paleta Cromática (The Color API)
               </Button>
               <Button
                 variant={subModoSite === "prompts" ? "default" : "outline"}
@@ -1567,6 +1599,14 @@ function AnaliseClientePage() {
                   </Card>
                 )}
               </div>
+            ) : subModoSite === "paleta" ? (
+              /* IDENTIDADE VISUAL & PALETA CROMÁTICA COM THE COLOR API */
+              <div className="space-y-4">
+                <PaletaCoresCard
+                  nomeEmpresa={empresa.nome}
+                  segmento={empresa.segmento}
+                />
+              </div>
             ) : (
               /* PROMPTS TEXTUAIS DE BRIEFING */
               <div className="space-y-4">
@@ -1611,7 +1651,7 @@ function AnaliseClientePage() {
           </TabsContent>
 
           {/* =====================================================================
-              ABA 5: APRESENTAÇÃO DE SLIDES COMERCIAL (EXPORTÁVEL EM PDF)
+              ABA 5: APRESENTAÇÃO DE SLIDES COMERCIAL (EXPORTÁVEL EM PDF & PPTX)
              ===================================================================== */}
           <TabsContent value="slides" className="space-y-6 mt-0">
             <SlideDeckBuilder
@@ -1619,6 +1659,13 @@ function AnaliseClientePage() {
               dossier={dossier}
               relatorio={resRelatorio?.relatorio}
               onSave={handleSalvarSlides}
+            />
+
+            {/* QR CODE DINÂMICO PARA ACESSO RÁPIDO AO WHATSAPP E PROPOSTA */}
+            <QrCodeCard
+              nomeEmpresa={empresa.nome}
+              whatsapp={empresa.whatsapp || empresa.telefone}
+              site={empresa.site}
             />
           </TabsContent>
         </Tabs>

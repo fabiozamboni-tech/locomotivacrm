@@ -44,6 +44,7 @@ import {
 } from "@/lib/links";
 import { PromptsModal } from "@/components/prompts-modal";
 import { EmpresaCadastroModal } from "@/components/empresa-cadastro-modal";
+import { EmpresaLogo } from "@/components/empresa-logo";
 import { toast } from "sonner";
 import { Edit3, Building2 } from "lucide-react";
 
@@ -209,32 +210,37 @@ function EmpresasPage() {
                 <tr key={e.id} className="border-t border-border/50 hover:bg-accent/30 transition">
                   {/* Nome da Empresa */}
                   <td className="py-3 px-4">
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setEmpresaCadastro(e)}
-                        className="font-medium text-left hover:text-primary transition-colors flex items-center gap-1 group cursor-pointer"
-                        title="Clique para abrir e editar o cadastro da empresa"
-                      >
-                        <span className="group-hover:underline">{e.nome}</span>
-                        <Edit3 className="h-3 w-3 text-muted-foreground opacity-60 group-hover:opacity-100" />
-                      </button>
-                      <Link
-                        to={"/empresas/$id" as never}
-                        params={{ id: e.id } as never}
-                        className="text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-muted"
-                        title="Abrir página completa com auditoria"
-                      >
-                        <ArrowUpRight className="h-3 w-3" />
-                      </Link>
-                    </div>
-                    <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                      <span>{e.segmento}</span>
-                      {e.areaAtuacao && (
-                        <span className="text-[11px] text-primary/80 font-normal truncate max-w-[220px]" title={e.areaAtuacao}>
-                          · {e.areaAtuacao}
-                        </span>
-                      )}
+                    <div className="flex items-center gap-2.5">
+                      <EmpresaLogo site={e.site} nome={e.nome} size="sm" />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setEmpresaCadastro(e)}
+                            className="font-medium text-left hover:text-primary transition-colors flex items-center gap-1 group cursor-pointer truncate"
+                            title="Clique para abrir e editar o cadastro da empresa"
+                          >
+                            <span className="group-hover:underline truncate">{e.nome}</span>
+                            <Edit3 className="h-3 w-3 text-muted-foreground opacity-60 group-hover:opacity-100 shrink-0" />
+                          </button>
+                          <Link
+                            to={"/empresas/$id" as never}
+                            params={{ id: e.id } as never}
+                            className="text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-muted shrink-0"
+                            title="Abrir página completa com auditoria"
+                          >
+                            <ArrowUpRight className="h-3 w-3" />
+                          </Link>
+                        </div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                          <span className="truncate">{e.segmento}</span>
+                          {e.areaAtuacao && (
+                            <span className="text-[11px] text-primary/80 font-normal truncate max-w-[200px]" title={e.areaAtuacao}>
+                              · {e.areaAtuacao}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </td>
 

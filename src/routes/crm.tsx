@@ -30,6 +30,7 @@ import { CadenciaModal } from "@/components/cadencia-modal";
 import { EnviarEmailModal } from "@/components/enviar-email-modal";
 import { EnviarWhatsAppModal } from "@/components/enviar-whatsapp-modal";
 import { PromptsModal } from "@/components/prompts-modal";
+import { EmpresaLogo } from "@/components/empresa-logo";
 import {
   DndContext,
   PointerSensor,
@@ -400,6 +401,7 @@ function KanbanCard({
         >
           <GripVertical className="size-4" />
         </button>
+        <EmpresaLogo site={empresa.site} nome={empresa.nome} size="xs" />
         <button
           onClick={onOpen}
           className="text-sm font-semibold leading-tight text-left hover:text-primary line-clamp-2 flex-1"

@@ -9,6 +9,11 @@ import {
   sugerirPublicoAlvoIA_ServerFn,
 } from "@/lib/cadastro-ia.functions";
 import {
+  consultarCnpjBrasilAPI_ServerFn,
+  consultarCepBrasilAPI_ServerFn,
+  type BrasilApiCnpjResult,
+} from "@/lib/public-apis.functions";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -46,6 +51,11 @@ import {
   MessageSquareText,
   Share2,
   Users,
+  Landmark,
+  ChevronDown,
+  ChevronUp,
+  SearchCode,
+  Check,
 } from "lucide-react";
 
 interface EmpresaCadastroModalProps {
@@ -80,6 +90,8 @@ export function EmpresaCadastroModal({
   const { updateEmpresa } = useStore();
   const gerarDadosIA = useServerFn(gerarDadosCadastroIA_ServerFn);
   const sugerirPublicoAlvoIA = useServerFn(sugerirPublicoAlvoIA_ServerFn);
+  const consultarCnpjBrasilAPI = useServerFn(consultarCnpjBrasilAPI_ServerFn);
+  const consultarCepBrasilAPI = useServerFn(consultarCepBrasilAPI_ServerFn);
 
   const [nome, setNome] = useState("");
   const [razaoSocial, setRazaoSocial] = useState("");
@@ -90,6 +102,7 @@ export function EmpresaCadastroModal({
   const [cidade, setCidade] = useState("");
   const [bairro, setBairro] = useState("");
   const [endereco, setEndereco] = useState("");
+  const [cep, setCep] = useState("");
   const [telefone, setTelefone] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [email, setEmail] = useState("");
@@ -103,6 +116,10 @@ export function EmpresaCadastroModal({
 
   const [gerandoIA, setGerandoIA] = useState(false);
   const [gerandoPublicoAlvo, setGerandoPublicoAlvo] = useState(false);
+  const [buscandoCnpj, setBuscandoCnpj] = useState(false);
+  const [buscandoCep, setBuscandoCep] = useState(false);
+  const [dadosReceita, setDadosReceita] = useState<BrasilApiCnpjResult | null>(null);
+  const [mostrarQsa, setMostrarQsa] = useState(false);
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
@@ -116,6 +133,7 @@ export function EmpresaCadastroModal({
     setCidade(empresa.cidade || "");
     setBairro(empresa.bairro || "");
     setEndereco(empresa.endereco || "");
+    setCep((empresa as any).cep || "");
     setTelefone(empresa.telefone || "");
     setWhatsapp(empresa.whatsapp || "");
     setEmail(empresa.email || "");
@@ -126,6 +144,8 @@ export function EmpresaCadastroModal({
     setBuscasPartida(empresa.buscasPartida || "");
     setTermosEncontrados(empresa.termosEncontrados || "");
     setBuscaGoogleMaps(empresa.buscaGoogleMaps || "");
+    setDadosReceita(null);
+    setMostrarQsa(false);
   }, [empresa]);
 
   if (!empresa) return null;
@@ -193,6 +213,88 @@ export function EmpresaCadastroModal({
     }
   };
 
+  const handleBuscarCnpjReceita = async () => {
+    const raw = (cnpj || "").replace(/\D/g, "");
+    if (raw.length !== 14) {
+      toast.warning("Digite os 14 dígitos do CNPJ para buscar na Receita Federal.");
+      return;
+    }
+
+    setBuscandoCnpj(true);
+    try {
+      const res = await consultarCnpjBrasilAPI({ data: { cnpj: raw } });
+      if (!res.sucesso) {
+        toast.error(res.mensagemErro || "CNPJ não encontrado na Receita Federal.");
+        return;
+      }
+
+      setDadosReceita(res);
+      if (res.razaoSocial) setRazaoSocial(res.razaoSocial);
+      if (res.nomeFantasia && (!nome || nome === "Nova Empresa" || nome === res.razaoSocial)) {
+        setNome(res.nomeFantasia);
+      }
+      if (res.cnaeDescricao && !segmento) {
+        setSegmento(res.cnaeDescricao);
+      }
+      if (res.municipio) {
+        setCidade(res.uf ? `${res.municipio} (${res.uf})` : res.municipio);
+      }
+      if (res.bairro) setBairro(res.bairro);
+      if (res.logradouro) {
+        const compl = res.complemento ? ` - ${res.complemento}` : "";
+        const num = res.numero ? `, ${res.numero}` : "";
+        setEndereco(`${res.logradouro}${num}${compl}`);
+      }
+      if (res.cep) setCep(res.cep);
+      if (res.telefone && !telefone) {
+        setTelefone(res.telefone);
+        if (!whatsapp) setWhatsapp(res.telefone);
+      }
+      if (res.email && !email) setEmail(res.email);
+
+      if (!areaAtuacao && res.cnaeDescricao) {
+        setAreaAtuacao(`Atividade principal: ${res.cnaeDescricao}.`);
+      }
+
+      toast.success(
+        `CNPJ validado na Receita Federal! ${res.razaoSocial || ""} (${res.situacaoCadastral || "ATIVA"}).`,
+      );
+      if (res.qsa && res.qsa.length > 0) {
+        setMostrarQsa(true);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao consultar Receita Federal.");
+    } finally {
+      setBuscandoCnpj(false);
+    }
+  };
+
+  const handleBuscarCep = async () => {
+    const raw = (cep || "").replace(/\D/g, "");
+    if (raw.length !== 8) {
+      toast.warning("Digite os 8 dígitos do CEP para busca rápida.");
+      return;
+    }
+
+    setBuscandoCep(true);
+    try {
+      const res = await consultarCepBrasilAPI({ data: { cep: raw } });
+      if (!res.sucesso) {
+        toast.error(res.mensagemErro || "CEP não localizado.");
+        return;
+      }
+
+      if (res.rua) setEndereco(res.rua);
+      if (res.bairro) setBairro(res.bairro);
+      if (res.cidade) setCidade(res.estado ? `${res.cidade} (${res.estado})` : res.cidade);
+      toast.success("Endereço preenchido automaticamente pelo CEP!");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao consultar CEP.");
+    } finally {
+      setBuscandoCep(false);
+    }
+  };
+
   const handleSalvar = () => {
     setSalvando(true);
     try {
@@ -206,6 +308,7 @@ export function EmpresaCadastroModal({
         cidade,
         bairro: bairro || undefined,
         endereco,
+        cep: cep || undefined,
         telefone: telefone || undefined,
         whatsapp: whatsapp || undefined,
         email: email || undefined,
@@ -314,13 +417,45 @@ export function EmpresaCadastroModal({
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium">CNPJ</Label>
-                <Input
-                  value={cnpj}
-                  onChange={(e) => setCnpj(e.target.value)}
-                  placeholder="00.000.000/0000-00"
-                  className="text-xs h-9 font-mono"
-                />
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-medium flex items-center gap-1.5">
+                    <Landmark className="h-3 w-3 text-primary" />
+                    CNPJ (Receita Federal)
+                  </Label>
+                  <span className="text-[10px] text-muted-foreground font-mono">
+                    BrasilAPI v1
+                  </span>
+                </div>
+                <div className="flex gap-1.5">
+                  <Input
+                    value={cnpj}
+                    onChange={(e) => setCnpj(e.target.value)}
+                    placeholder="00.000.000/0000-00"
+                    className="text-xs h-9 font-mono flex-1"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleBuscarCnpjReceita();
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={buscandoCnpj || !cnpj}
+                    onClick={handleBuscarCnpjReceita}
+                    className="h-9 px-2.5 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10 shrink-0"
+                    title="Consultar dados cadastrais na Receita Federal"
+                  >
+                    {buscandoCnpj ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <SearchCode className="h-3.5 w-3.5" />
+                    )}
+                    <span className="hidden sm:inline">Buscar Receita</span>
+                  </Button>
+                </div>
               </div>
 
               <div className="space-y-1.5">
@@ -410,10 +545,126 @@ export function EmpresaCadastroModal({
                 Esta informação calibra o Relatório para o Lead, direcionando os hábitos de pesquisa, dores de compra e impacto em vendas para atrair esse perfil exato.
               </p>
             </div>
+            {/* DADOS OFICIAIS DA RECEITA FEDERAL & QUADRO SOCIETÁRIO (QSA) */}
+            {dadosReceita && (
+              <div className="p-3.5 rounded-lg border border-emerald-500/30 bg-emerald-500/5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                    <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                      Dados Oficiais da Receita Federal ({dadosReceita.situacaoCadastral || "ATIVA"})
+                    </span>
+                  </div>
+                  {dadosReceita.qsa && dadosReceita.qsa.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setMostrarQsa(!mostrarQsa)}
+                      className="h-6 text-[11px] gap-1 text-emerald-700 dark:text-emerald-300"
+                    >
+                      <Users className="h-3 w-3" />
+                      {dadosReceita.qsa.length} Sócios/QSA
+                      {mostrarQsa ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    </Button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px]">
+                  {dadosReceita.cnaeDescricao && (
+                    <div className="p-2 rounded bg-background/80 border border-border/50 col-span-2 sm:col-span-1">
+                      <span className="text-muted-foreground block text-[10px]">CNAE Principal:</span>
+                      <strong className="text-foreground leading-tight block truncate" title={dadosReceita.cnaeDescricao}>
+                        {dadosReceita.cnaeDescricao}
+                      </strong>
+                    </div>
+                  )}
+                  {dadosReceita.capitalSocial !== undefined && (
+                    <div className="p-2 rounded bg-background/80 border border-border/50">
+                      <span className="text-muted-foreground block text-[10px]">Capital Social:</span>
+                      <strong className="text-foreground">
+                        {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
+                          dadosReceita.capitalSocial,
+                        )}
+                      </strong>
+                    </div>
+                  )}
+                  {dadosReceita.dataAbertura && (
+                    <div className="p-2 rounded bg-background/80 border border-border/50">
+                      <span className="text-muted-foreground block text-[10px]">Abertura:</span>
+                      <strong className="text-foreground">{dadosReceita.dataAbertura}</strong>
+                    </div>
+                  )}
+                </div>
+
+                {mostrarQsa && dadosReceita.qsa && dadosReceita.qsa.length > 0 && (
+                  <div className="pt-2 border-t border-emerald-500/20 space-y-1.5">
+                    <span className="text-[11px] font-semibold text-emerald-900 dark:text-emerald-200 block">
+                      Quadro de Sócios e Administradores (Decisores):
+                    </span>
+                    <div className="grid sm:grid-cols-2 gap-1.5">
+                      {dadosReceita.qsa.map((s, idx) => (
+                        <div
+                          key={idx}
+                          className="p-2 rounded bg-background text-[11px] border border-border/60 flex items-center justify-between"
+                        >
+                          <span className="font-semibold text-foreground truncate">{s.nomeSocio}</span>
+                          <Badge variant="outline" className="text-[10px] ml-2 shrink-0">
+                            {s.qualificacaoSocio || "Sócio"}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </TabsContent>
 
           {/* ABA 2: LOCALIZAÇÃO & CONTATO */}
           <TabsContent value="contato" className="space-y-4 mt-0">
+            {/* LINHA DE CEP COM BUSCA BRASILAPI */}
+            <div className="p-3 rounded-lg border border-border/80 bg-muted/10 space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 text-emerald-500" />
+                  Localização por CEP (BrasilAPI v2)
+                </Label>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  Preenche cidade, bairro e rua com 1 clique
+                </span>
+              </div>
+              <div className="flex gap-2 max-w-sm">
+                <Input
+                  value={cep}
+                  onChange={(e) => setCep(e.target.value)}
+                  placeholder="00000-000"
+                  className="text-xs h-9 font-mono"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleBuscarCep();
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={buscandoCep || !cep}
+                  onClick={handleBuscarCep}
+                  className="h-9 px-3 text-xs gap-1.5 shrink-0"
+                >
+                  {buscandoCep ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Search className="h-3.5 w-3.5 text-primary" />
+                  )}
+                  Buscar CEP
+                </Button>
+              </div>
+            </div>
+
             <div className="grid sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Cidade (RS)</Label>

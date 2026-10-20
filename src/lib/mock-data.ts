@@ -71,6 +71,7 @@ export interface Empresa {
   segmento: string;
   cidade: string;
   cnpj?: string;
+  cep?: string;
   bairro?: string;
   endereco: string;
   telefone?: string;
