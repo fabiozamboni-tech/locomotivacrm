@@ -188,10 +188,25 @@ function ConfiguracoesPage() {
   };
 
   const handleSaveKey = (provider: ApiProviderKey) => {
-    const updated = saveApiSetting(provider, { key: settings[provider]?.key });
+    const updated = saveApiSetting(provider, {
+      key: settings[provider]?.key,
+      model: settings[provider]?.model,
+    });
     setSettings(updated);
     toast.success(`Chave da API ${provider.toUpperCase()} salva com sucesso!`);
-    testSingleApi(provider, settings[provider]?.key);
+    testSingleApi(provider, settings[provider]?.key, settings[provider]?.model);
+  };
+
+  const handleOpenRouterModelChange = (newModel: string) => {
+    const updated = saveApiSetting("openrouter", {
+      key: settings.openrouter.key,
+      model: newModel,
+    });
+    setSettings(updated);
+    toast.success(`Modelo padrão do OpenRouter atualizado para: ${newModel}`);
+    if (settings.openrouter.key) {
+      testSingleApi("openrouter", settings.openrouter.key, newModel);
+    }
   };
 
   const handleSaveProvedorAtivo = (val: ProvedorIaTipo) => {
@@ -200,13 +215,15 @@ function ConfiguracoesPage() {
     toast.success(`Motor de IA prioritário definido como: ${val.toUpperCase()}`);
   };
 
-  const testSingleApi = async (provider: string, apiKey?: string) => {
+  const testSingleApi = async (provider: string, apiKey?: string, model?: string) => {
     setTesting((prev) => ({ ...prev, [provider]: true }));
     try {
+      const conf = (settings as any)[provider];
       const res = await testConn({
         data: {
           provider,
-          apiKey: apiKey ?? (settings[provider as ApiProviderKey] as any)?.key,
+          apiKey: apiKey ?? conf?.key,
+          model: model ?? conf?.model,
         },
       });
       setTestResults((prev) => ({ ...prev, [provider]: res }));
@@ -876,7 +893,7 @@ function ConfiguracoesPage() {
                     <SelectItem value="auto">⚡ Automático (Melhor Rota + Fallback Dinâmico)</SelectItem>
                     <SelectItem value="groq">Groq (Llama 3.3 70B · 14.400 req/dia grátis)</SelectItem>
                     <SelectItem value="gemini">Google Gemini (Gemini 2.0 Flash · 1M Contexto)</SelectItem>
-                    <SelectItem value="openrouter">OpenRouter Free (:free models)</SelectItem>
+                    <SelectItem value="openrouter">OpenRouter Hub (Claude, GPT-4o, Kimi, GLM, DeepSeek)</SelectItem>
                     <SelectItem value="lovable">Lovable AI Gateway</SelectItem>
                     <SelectItem value="ollama">Ollama Local (Offline / Privado)</SelectItem>
                   </SelectContent>
@@ -1050,13 +1067,16 @@ function ConfiguracoesPage() {
                   </div>
                 </div>
 
-                {/* OPENROUTER FREE */}
-                <div className="p-3.5 rounded-lg border border-border/60 bg-card hover:border-border transition-colors space-y-2.5">
+                {/* OPENROUTER HUB (Claude, GPT-4o, Kimi, GLM, DeepSeek, Gemini) */}
+                <div className="p-4 rounded-lg border border-purple-500/30 bg-purple-500/5 hover:border-purple-500/50 transition-colors space-y-3">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-xs uppercase tracking-wider text-foreground">OpenRouter</span>
-                      <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-600 border-purple-500/30">
-                        openrouter/free · Modelos Gratuitos (Zero Custo)
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-xs uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                        <Sparkles className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                        OpenRouter Hub
+                      </span>
+                      <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-600 dark:text-purple-300 border-purple-500/30 font-semibold">
+                        1 Chave = Claude + GPT-4o + Kimi + GLM + DeepSeek + Gemini
                       </Badge>
                       <a
                         href="https://openrouter.ai/keys"
@@ -1064,7 +1084,7 @@ function ConfiguracoesPage() {
                         rel="noopener"
                         className="text-[11px] text-blue-500 hover:underline flex items-center gap-0.5 ml-1"
                       >
-                        Obter Chave <ExternalLink className="size-3" />
+                        Obter Chave OpenRouter <ExternalLink className="size-3" />
                       </a>
                     </div>
                     {testing["openrouter"] ? (
@@ -1085,13 +1105,15 @@ function ConfiguracoesPage() {
                       </Badge>
                     ) : null}
                   </div>
+
+                  {/* Campo de Chave API */}
                   <div className="flex items-center gap-2">
                     <div className="relative flex-1">
                       <Input
                         type={showKeys["openrouter"] ? "text" : "password"}
                         value={settings.openrouter.key || ""}
                         onChange={(e) => handleKeyChange("openrouter", e.target.value)}
-                        placeholder="sk-or-v1-... (Chave OpenRouter)"
+                        placeholder="sk-or-v1-... (Chave Unificada OpenRouter)"
                         className="text-xs font-mono pr-8"
                       />
                       <button
@@ -1108,12 +1130,42 @@ function ConfiguracoesPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => testSingleApi("openrouter", settings.openrouter.key)}
+                      onClick={() => testSingleApi("openrouter", settings.openrouter.key, settings.openrouter.model)}
                       disabled={testing["openrouter"]}
                       className="text-xs h-9 px-3"
                     >
                       Testar
                     </Button>
+                  </div>
+
+                  {/* Seletor do Modelo Padrão do OpenRouter */}
+                  <div className="grid sm:grid-cols-2 gap-3 pt-1 border-t border-purple-500/10 items-center">
+                    <div>
+                      <label className="text-[11px] font-semibold text-muted-foreground block mb-1">
+                        Modelo Padrão Ativo no OpenRouter:
+                      </label>
+                      <Select
+                        value={settings.openrouter.model || "openrouter/free"}
+                        onValueChange={(val) => handleOpenRouterModelChange(val)}
+                      >
+                        <SelectTrigger className="w-full text-xs h-8 font-mono">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="openrouter/free">openrouter/free (Gratuito · Zero Custo)</SelectItem>
+                          <SelectItem value="anthropic/claude-3.5-sonnet">Anthropic Claude 3.5 Sonnet (Elite UI/UX & Código)</SelectItem>
+                          <SelectItem value="openai/gpt-4o">OpenAI GPT-4o (Flagship Multimodal & Lógica)</SelectItem>
+                          <SelectItem value="moonshotai/moonshot-v1-8k">Moonshot Kimi (Contexto & Nuances)</SelectItem>
+                          <SelectItem value="thudm/glm-4-9b-chat">Zhipu GLM-4 (Alta Performance Global)</SelectItem>
+                          <SelectItem value="deepseek/deepseek-r1:free">DeepSeek R1 Free (Raciocínio Analítico Livre)</SelectItem>
+                          <SelectItem value="google/gemini-1.5-pro">Google Gemini 1.5 Pro (Janela de 1M Contexto)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="p-2.5 rounded-md bg-background/80 border border-border/60 text-[11px] text-muted-foreground leading-relaxed">
+                      <span className="font-semibold text-foreground">💡 Hub Multi-Modelos:</span> Com 1 única chave no OpenRouter, você alterna entre Claude, GPT, Kimi, GLM e Gemini sem pagar mensalidades fixas separadas em cada plataforma. O consumo é sob demanda (centavos por uso).
+                    </div>
                   </div>
                 </div>
 

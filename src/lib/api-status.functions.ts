@@ -34,10 +34,11 @@ const COMMON_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
 
 export const testApiConnection = createServerFn({ method: "POST" })
-  .validator((data: { provider: string; apiKey?: string }) => {
+  .validator((data: { provider: string; apiKey?: string; model?: string }) => {
     const provider = String(data?.provider ?? "").trim().toLowerCase();
     const apiKey = typeof data?.apiKey === "string" ? data.apiKey.trim() : undefined;
-    return { provider, apiKey };
+    const model = typeof data?.model === "string" ? data.model.trim() : undefined;
+    return { provider, apiKey, model };
   })
   .handler(async ({ data }): Promise<ApiTestResult> => {
     const startTime = Date.now();
@@ -358,7 +359,7 @@ export const testApiConnection = createServerFn({ method: "POST" })
       }
     }
 
-    // 9. OPENROUTER (awesome-free-llm-apis: modelos :free)
+    // 9. OPENROUTER (awesome-free-llm-apis: modelos :free e catálogo universal de ponta)
     if (data.provider === "openrouter") {
       const key = data.apiKey || process.env.OPENROUTER_API_KEY;
       if (!key) {
@@ -366,21 +367,22 @@ export const testApiConnection = createServerFn({ method: "POST" })
           provider: "openrouter",
           status: "unconfigured",
           latencyMs: 0,
-          message: "Nenhuma chave OpenRouter informada. Obtenha em openrouter.ai/keys para modelos gratuitos.",
+          message: "Nenhuma chave OpenRouter informada. Obtenha em openrouter.ai/keys para modelos gratuitos e pagos.",
         };
       }
       try {
         const { testarConexaoLlm } = await import("./llm-provider.server");
-        const res = await testarConexaoLlm("openrouter", key, "openrouter/free");
+        const modeloParaTestar = data.model || "openrouter/free";
+        const res = await testarConexaoLlm("openrouter", key, modeloParaTestar);
         return {
           provider: "openrouter",
           status: res.ok ? "online" : "error",
           latencyMs: res.latencyMs,
           message: res.message,
           details: {
-            plan: "Free Tier (openrouter/free)",
+            plan: `OpenRouter Hub (${modeloParaTestar})`,
             modelUsed: res.modelUsed,
-            isFreeService: true,
+            isFreeService: modeloParaTestar.includes(":free") || modeloParaTestar === "openrouter/free",
           },
         };
       } catch (err: any) {
