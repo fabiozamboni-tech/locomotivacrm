@@ -963,6 +963,10 @@ Efeito Parallax: Implemente parallax refinado nas imagens de transição.
 
 [Texto e Conteúdo]
 Tom de Voz Humano: Copies diretas, focadas em benefícios reais para o cliente. Proibido o uso de jargões clichês de IA (ex: "revolucionário", "a solução definitiva", "no mundo dinâmico de hoje"). Não use excesso de emojis ou exclamações.
+
+[Estilização e Dinamismo Frontend - Tailwind CSS & React]
+- Tailwind CSS Obrigatório: Utilize Tailwind CSS extensivamente para construir um design visual de altíssimo nível estético, elegante, harmônico e 100% responsivo, com tipografia editorial refinada, espaçamentos generosos (whitespace), micro-interações, sombras suaves e estados de hover envolventes.
+- React se Necessário: Se for necessário para deixar o site ainda mais bonito, fluido e dinâmico, utilize React (carregado via CDN com Babel standalone diretamente no documento HTML) ou JavaScript moderno para implementar componentes interativos reativos de alta conversão (como alternador de abas de soluções, filtros interativos de galeria/portfólio, calculadora/simulador de orçamento instantâneo, comparador antes/depois ou modais contextuais).
 ${
   data.logoBase64
     ? `\n[LOGO OFICIAL DA MARCA ANEXADO PELO CLIENTE]\nO cliente forneceu o logo oficial da empresa ('${data.logoNomeArquivo || "logo"}'). No cabeçalho (navbar/header) e no rodapé (footer), UTILIZE A IMAGEM DO LOGO fornecida através da tag <img src="${data.logoBase64}" alt="${data.empresa.nome}" class="h-10 sm:h-12 w-auto object-contain" /> ao invés de usar apenas texto tipográfico simples!`
@@ -976,6 +980,11 @@ ${
 REGRAS DE RETORNO TÉCNICO:
 - Retorne APENAS o código HTML5 completo (começando em <!DOCTYPE html> e terminando em </html>), sem blocos de texto ou explicações antes ou depois.
 - Carregue Tailwind CSS via CDN: <script src="https://cdn.tailwindcss.com"></script>
+- Se utilizar React para componentes dinâmicos, carregue no <head>:
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  E implemente os componentes dinâmicos em <script type="text/babel">.
 - Carregue GSAP e ScrollTrigger via CDN no <head>:
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
@@ -1012,6 +1021,9 @@ ${
     ? `\nINSTRUÇÕES ADICIONAIS DE DESIGN FORNECIDAS PELO USUÁRIO (.MD):\n${data.instrucoesDesignMd}`
     : ""
 }
+
+ESTILIZAÇÃO E DINAMISMO:
+- Use Tailwind CSS e React (se necessário) para deixar o site o mais bonito, moderno, refinado e dinâmico possível.
 
 Gere agora o código HTML5 completo do site (multi-páginas) seguindo rigorosamente todas as regras humanas Anti-IA (sem nenhum marquee), com GSAP e ScrollTrigger integrados.`;
 
