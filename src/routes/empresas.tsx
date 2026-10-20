@@ -20,6 +20,7 @@ import {
   InstagramBadge,
   CRM_STAGE_LABEL,
   CRM_STAGES_ORDER,
+  getCrmStageLabel,
 } from "@/components/badges";
 import {
   Globe,
@@ -46,7 +47,8 @@ import { PromptsModal } from "@/components/prompts-modal";
 import { EmpresaCadastroModal } from "@/components/empresa-cadastro-modal";
 import { EmpresaLogo } from "@/components/empresa-logo";
 import { toast } from "sonner";
-import { Edit3, Building2 } from "lucide-react";
+import { Edit3, Building2, Trash2, RotateCcw } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const Route = createFileRoute("/empresas")({
   component: EmpresasPage,
@@ -100,34 +102,72 @@ function filtrar(list: Empresa[], f: Filtros): Empresa[] {
 }
 
 function EmpresasPage() {
-  const { empresas, setStage } = useStore();
+  const {
+    empresas,
+    setStage,
+    kanbanColumns,
+    moverEmpresaParaExcluidos,
+    restaurarEmpresaDeExcluidos,
+    excluirEmpresaDefinitivamente,
+  } = useStore();
   const [f, setF] = useState<Filtros>(INITIAL);
+  const [aba, setAba] = useState<"ativas" | "excluidas">("ativas");
   const [promptEmpresa, setPromptEmpresa] = useState<Empresa | null>(null);
   const [empresaCadastro, setEmpresaCadastro] = useState<Empresa | null>(null);
 
-  const filtradas = useMemo(() => filtrar(empresas, f), [empresas, f]);
+  const empresasAtivas = useMemo(
+    () => empresas.filter((e) => e.crmStage !== "excluidos"),
+    [empresas],
+  );
+  const empresasExcluidas = useMemo(
+    () => empresas.filter((e) => e.crmStage === "excluidos"),
+    [empresas],
+  );
+
+  const listaBase = aba === "ativas" ? empresasAtivas : empresasExcluidas;
+  const filtradas = useMemo(() => filtrar(listaBase, f), [listaBase, f]);
   const set = <K extends keyof Filtros>(k: K, v: Filtros[K]) => setF((p) => ({ ...p, [k]: v }));
 
   const handleChangeStage = (empresaId: string, novoStage: CrmStage) => {
     setStage(empresaId, novoStage);
-    toast.success(`Etapa alterada para "${CRM_STAGE_LABEL[novoStage]}"!`);
+    toast.success(`Etapa alterada para "${getCrmStageLabel(novoStage)}"`);
   };
 
   return (
     <div className="px-4 md:px-8 py-6 md:py-8 space-y-5 max-w-[1600px]">
-      <div className="flex items-end justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-4 border-b pb-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Empresas Identificadas</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Gestão de Empresas</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {filtradas.length} de {empresas.length} empresas · filtros, alteração de etapa no funil e atalhos de abordagem da <strong>Locomotiva Comunicação</strong>.
+            {filtradas.length} de {listaBase.length} {aba === "ativas" ? "empresas ativas" : "empresas excluídas"} · filtros, etapas do funil e ações rápidas.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setF(INITIAL)}>
+        <div className="flex items-center gap-3 flex-wrap">
+          <Tabs value={aba} onValueChange={(v) => setAba(v as "ativas" | "excluidas")}>
+            <TabsList className="grid grid-cols-2 h-9 w-[300px]">
+              <TabsTrigger value="ativas" className="text-xs gap-1.5">
+                <Building2 className="h-3.5 w-3.5" />
+                Ativas ({empresasAtivas.length})
+              </TabsTrigger>
+              <TabsTrigger value="excluidas" className="text-xs gap-1.5 data-[state=active]:text-rose-600">
+                <Trash2 className="h-3.5 w-3.5" />
+                Excluídas ({empresasExcluidas.length})
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Button variant="outline" size="sm" onClick={() => setF(INITIAL)} className="h-9 text-xs">
             Limpar filtros
           </Button>
         </div>
       </div>
+
+      {aba === "excluidas" && (
+        <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-xs text-rose-700 dark:text-rose-300 flex items-center justify-between">
+          <span>
+            Estas empresas estão na etapa <strong>Excluídos</strong> e ficam ocultas no Kanban principal. Você pode restaurá-las para a lista ativa a qualquer momento ou excluí-las definitivamente.
+          </span>
+        </div>
+      )}
 
       <Card className="border-border/60">
         <CardContent className="p-4 space-y-4">
@@ -251,7 +291,7 @@ function EmpresasPage() {
                     </div>
                   </td>
 
-                  {/* COMBO DA ETAPA KANBAN (SOLICITADO PELO USUÁRIO) */}
+                  {/* COMBO DA ETAPA KANBAN */}
                   <td className="py-3 px-2">
                     <Select
                       value={e.crmStage}
@@ -261,9 +301,12 @@ function EmpresasPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {CRM_STAGES_ORDER.map((stage) => (
-                          <SelectItem key={stage} value={stage} className="text-xs">
-                            {CRM_STAGE_LABEL[stage]}
+                        {(kanbanColumns && kanbanColumns.length > 0
+                          ? kanbanColumns
+                          : CRM_STAGES_ORDER.map((stage) => ({ id: stage, titulo: getCrmStageLabel(stage) }))
+                        ).map((col) => (
+                          <SelectItem key={col.id} value={col.id} className="text-xs">
+                            {col.titulo}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -320,39 +363,88 @@ function EmpresasPage() {
                   {/* AÇÕES ESTRATÉGICAS: CADASTRO, ABORDAGEM & PROMPTS IA */}
                   <td className="py-3 px-4 text-right">
                     <div className="flex items-center justify-end gap-1.5">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setEmpresaCadastro(e)}
-                        className="h-7 text-xs px-2 gap-1 text-blue-600 border-blue-500/30 hover:bg-blue-500/10"
-                        title="Abrir e Editar Cadastro da Empresa"
-                      >
-                        <Building2 className="h-3 w-3 text-blue-500" />
-                        Cadastro
-                      </Button>
+                      {aba === "ativas" ? (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEmpresaCadastro(e)}
+                            className="h-7 text-xs px-2 gap-1 text-blue-600 border-blue-500/30 hover:bg-blue-500/10"
+                            title="Abrir e Editar Cadastro da Empresa"
+                          >
+                            <Building2 className="h-3 w-3 text-blue-500" />
+                            Cadastro
+                          </Button>
 
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPromptEmpresa(e)}
-                        className="h-7 text-xs px-2 gap-1"
-                        title="Gerar Prompts e Briefings com IA"
-                      >
-                        <Wand2 className="h-3 w-3 text-primary" />
-                        Prompts
-                      </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPromptEmpresa(e)}
+                            className="h-7 text-xs px-2 gap-1"
+                            title="Gerar Prompts e Briefings com IA"
+                          >
+                            <Wand2 className="h-3 w-3 text-primary" />
+                            Prompts
+                          </Button>
 
-                      <Button
-                        asChild
-                        size="sm"
-                        className="h-7 text-xs px-2.5 gap-1 bg-gradient-to-r from-emerald-600 to-primary text-white"
-                        title="Abrir Central de Abordagens e Dossiê 360"
-                      >
-                        <Link to="/analise-cliente" search={{ empresa: e.id, tab: "dossier" }}>
-                          <Zap className="h-3 w-3" />
-                          Analisar
-                        </Link>
-                      </Button>
+                          <Button
+                            asChild
+                            size="sm"
+                            className="h-7 text-xs px-2.5 gap-1 bg-gradient-to-r from-emerald-600 to-primary text-white"
+                            title="Abrir Central de Abordagens e Dossiê 360"
+                          >
+                            <Link to="/analise-cliente" search={{ empresa: e.id, tab: "dossier" }}>
+                              <Zap className="h-3 w-3" />
+                              Analisar
+                            </Link>
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              moverEmpresaParaExcluidos(e.id);
+                              toast.success(`"${e.nome}" movida para a lista de excluídos e coluna Excluídos do Kanban.`);
+                            }}
+                            className="h-7 text-xs px-2 gap-1 text-rose-600 border-rose-500/30 hover:bg-rose-500/10 hover:text-rose-600"
+                            title="Excluir da lista ativa e mover para a coluna Excluídos do Kanban"
+                          >
+                            <Trash2 className="h-3 w-3 text-rose-500" />
+                            Excluir
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              restaurarEmpresaDeExcluidos(e.id, "identificado");
+                              toast.success(`"${e.nome}" restaurada para empresas ativas!`);
+                            }}
+                            className="h-7 text-xs px-2.5 gap-1 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10"
+                            title="Restaurar para a lista de empresas ativas"
+                          >
+                            <RotateCcw className="h-3 w-3 text-emerald-500" />
+                            Restaurar
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => {
+                              if (confirm(`Atenção: Excluir definitivamente removerá "${e.nome}" permanentemente. Confirmar?`)) {
+                                excluirEmpresaDefinitivamente(e.id);
+                                toast.success(`"${e.nome}" excluída definitivamente.`);
+                              }
+                            }}
+                            className="h-7 text-xs px-2 gap-1 bg-rose-600 hover:bg-rose-700 text-white"
+                            title="Excluir permanentemente do banco de dados"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            Excluir Definitivo
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -360,7 +452,9 @@ function EmpresasPage() {
               {filtradas.length === 0 && (
                 <tr>
                   <td colSpan={8} className="py-16 text-center text-muted-foreground text-sm">
-                    Nenhuma empresa corresponde aos filtros aplicados.
+                    {aba === "excluidas"
+                      ? "Nenhuma empresa na lista de excluídas."
+                      : "Nenhuma empresa corresponde aos filtros aplicados."}
                   </td>
                 </tr>
               )}

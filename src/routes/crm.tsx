@@ -23,6 +23,8 @@ import {
   Zap,
   Mail,
   MessageCircle,
+  SlidersHorizontal,
+  EyeOff,
 } from "lucide-react";
 import { TimingRadarCard } from "@/components/timing-radar-card";
 import { CopilotoObjecoesModal } from "@/components/copiloto-objecoes-modal";
@@ -30,6 +32,8 @@ import { CadenciaModal } from "@/components/cadencia-modal";
 import { EnviarEmailModal } from "@/components/enviar-email-modal";
 import { EnviarWhatsAppModal } from "@/components/enviar-whatsapp-modal";
 import { PromptsModal } from "@/components/prompts-modal";
+import { GerenciarColunasModal } from "@/components/crm/gerenciar-colunas-modal";
+import { type KanbanColumnConfig, getKanbanColorPreset } from "@/lib/kanban-config";
 import { EmpresaLogo } from "@/components/empresa-logo";
 import {
   DndContext,
@@ -46,6 +50,7 @@ import { useStore } from "@/lib/store";
 import {
   CRM_STAGE_LABEL,
   CRM_STAGES_ORDER,
+  getCrmStageLabel,
   ScoreBadge,
   SiteBadge,
   InstagramBadge,
@@ -92,24 +97,24 @@ export const Route = createFileRoute("/crm")({
   }),
 });
 
-const STAGE_ACCENT: Record<CrmStage, string> = {
-  identificado: "from-slate-500/40 to-slate-500/0 border-slate-500/30",
-  analisado: "from-sky-500/40 to-sky-500/0 border-sky-500/30",
-  contato_preparado: "from-indigo-500/40 to-indigo-500/0 border-indigo-500/30",
-  primeiro_contato: "from-violet-500/40 to-violet-500/0 border-violet-500/30",
-  aguardando_retorno: "from-amber-500/40 to-amber-500/0 border-amber-500/30",
-  em_negociacao: "from-orange-500/40 to-orange-500/0 border-orange-500/30",
-  convertido: "from-emerald-500/40 to-emerald-500/0 border-emerald-500/30",
-  perdido: "from-rose-500/40 to-rose-500/0 border-rose-500/30",
-  sem_fit: "from-zinc-500/40 to-zinc-500/0 border-zinc-500/30",
-};
+
 
 function CrmPage() {
-  const { empresas, setStage } = useStore();
+  const {
+    empresas,
+    setStage,
+    kanbanColumns,
+    adicionarColunaKanban,
+    editarColunaKanban,
+    excluirColunaKanban,
+    toggleOcultarColunaKanban,
+    restaurarColunasPadrao,
+  } = useStore();
   const [openId, setOpenId] = useState<string | null>(null);
   const [promptsId, setPromptsId] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [overStage, setOverStage] = useState<CrmStage | null>(null);
+  const [overStage, setOverStage] = useState<string | null>(null);
+  const [openGerenciarColunas, setOpenGerenciarColunas] = useState(false);
 
   // Módulos Estratégicos
   const [showRadar, setShowRadar] = useState(false);
@@ -147,11 +152,38 @@ function CrmPage() {
     [empresas, whatsEmpresaId],
   );
 
+  const colunasVisiveis = useMemo(
+    () => (kanbanColumns || []).filter((c) => !c.oculto),
+    [kanbanColumns],
+  );
+  const colunasOcultasCount = useMemo(
+    () => (kanbanColumns || []).filter((c) => c.oculto).length,
+    [kanbanColumns],
+  );
+
   const grouped = useMemo(() => {
-    const map = new Map<CrmStage, Empresa[]>();
-    CRM_STAGES_ORDER.forEach((s) => map.set(s, []));
-    empresas.forEach((e) => map.get(e.crmStage)?.push(e));
+    const map = new Map<string, Empresa[]>();
+    (kanbanColumns || []).forEach((c) => map.set(c.id, []));
+    empresas.forEach((e) => {
+      const list = map.get(e.crmStage);
+      if (list) {
+        list.push(e);
+      } else {
+        if (!map.has(e.crmStage)) {
+          map.set(e.crmStage, []);
+        }
+        map.get(e.crmStage)?.push(e);
+      }
+    });
     return map;
+  }, [empresas, kanbanColumns]);
+
+  const cardCountByStage = useMemo(() => {
+    const counts: Record<string, number> = {};
+    empresas.forEach((e) => {
+      counts[e.crmStage] = (counts[e.crmStage] || 0) + 1;
+    });
+    return counts;
   }, [empresas]);
 
   const sensors = useSensors(
@@ -168,10 +200,16 @@ function CrmPage() {
     setOverStage(null);
     if (!over) return;
     const stage = over as CrmStage;
-    if (!CRM_STAGES_ORDER.includes(stage)) return;
+    const validColumn = (kanbanColumns || []).some((c) => c.id === stage);
+    if (!validColumn && !CRM_STAGES_ORDER.includes(stage)) return;
     const empresa = empresas.find((e) => e.id === id);
     if (empresa && empresa.crmStage !== stage) setStage(id, stage);
   };
+
+  const totalAtivas = useMemo(
+    () => empresas.filter((e) => e.crmStage !== "excluidos").length,
+    [empresas],
+  );
 
   return (
     <div className="px-4 md:px-8 py-6 md:py-8 space-y-5 max-w-full">
@@ -183,6 +221,22 @@ function CrmPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+          {/* Botão Gerenciar Colunas */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setOpenGerenciarColunas(true)}
+            className="h-8 text-xs gap-1.5"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            Gerenciar Colunas
+            {colunasOcultasCount > 0 && (
+              <Badge variant="secondary" className="text-[10px] h-4 px-1.5 ml-0.5 font-normal">
+                {colunasOcultasCount} oculta{colunasOcultasCount > 1 ? "s" : ""}
+              </Badge>
+            )}
+          </Button>
+
           {/* Toggle do Radar de Timing Perfeito (Módulo 4) */}
           <Button
             variant={showRadar ? "default" : "outline"}
@@ -195,7 +249,7 @@ function CrmPage() {
           </Button>
 
           <span className="inline-flex items-center gap-1 ml-2">
-            <span className="size-2 rounded-full bg-primary" /> {empresas.length} empresas no funil
+            <span className="size-2 rounded-full bg-primary" /> {totalAtivas} empresas ativas
           </span>
         </div>
       </div>
@@ -219,24 +273,26 @@ function CrmPage() {
           sensors={sensors}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
-          onDragOver={(ev) => setOverStage(ev.over?.id ? (String(ev.over.id) as CrmStage) : null)}
+          onDragOver={(ev) => setOverStage(ev.over?.id ? String(ev.over.id) : null)}
           onDragCancel={() => {
             setDraggingId(null);
             setOverStage(null);
           }}
         >
           <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 md:-mx-8 md:px-8">
-            {CRM_STAGES_ORDER.map((stage) => {
-              const items = grouped.get(stage) ?? [];
+            {colunasVisiveis.map((col) => {
+              const items = grouped.get(col.id) ?? [];
               return (
                 <KanbanColumn
-                  key={stage}
-                  stage={stage}
+                  key={col.id}
+                  column={col}
                   items={items}
-                  isOver={overStage === stage}
+                  isOver={overStage === col.id}
                   onOpen={setOpenId}
                   onPrompts={setPromptsId}
                   onChangeStage={setStage}
+                  onToggleOcultar={() => toggleOcultarColunaKanban(col.id)}
+                  allColumns={kanbanColumns}
                 />
               );
             })}
@@ -249,6 +305,7 @@ function CrmPage() {
                   onOpen={() => {}}
                   onPrompts={() => {}}
                   onChangeStage={() => {}}
+                  columns={kanbanColumns}
                   overlay
                 />
               </div>
@@ -256,6 +313,18 @@ function CrmPage() {
           </DragOverlay>
         </DndContext>
       )}
+
+      <GerenciarColunasModal
+        open={openGerenciarColunas}
+        onOpenChange={setOpenGerenciarColunas}
+        columns={kanbanColumns}
+        cardCountByStage={cardCountByStage}
+        onAddColumn={adicionarColunaKanban}
+        onEditColumn={editarColunaKanban}
+        onDeleteColumn={excluirColunaKanban}
+        onToggleHide={toggleOcultarColunaKanban}
+        onResetDefault={restaurarColunasPadrao}
+      />
 
       <EmpresaModal
         empresa={openEmpresa}
@@ -300,33 +369,50 @@ function CrmPage() {
 }
 
 function KanbanColumn({
-  stage,
+  column,
   items,
   isOver,
   onOpen,
   onPrompts,
   onChangeStage,
+  onToggleOcultar,
+  allColumns,
 }: {
-  stage: CrmStage;
+  column: KanbanColumnConfig;
   items: Empresa[];
   isOver: boolean;
   onOpen: (id: string) => void;
   onPrompts: (id: string) => void;
   onChangeStage: (id: string, s: CrmStage) => void;
+  onToggleOcultar: () => void;
+  allColumns: KanbanColumnConfig[];
 }) {
-  const { setNodeRef } = useDroppable({ id: stage });
+  const { setNodeRef } = useDroppable({ id: column.id });
+  const preset = getKanbanColorPreset(column.cor);
+
   return (
     <div className="w-[300px] shrink-0">
       <div
         className={cn(
-          "rounded-t-lg border-t border-x bg-gradient-to-b px-3 py-2.5",
-          STAGE_ACCENT[stage],
+          "rounded-t-lg border-t border-x bg-gradient-to-b px-3 py-2.5 flex items-center justify-between group/col",
+          preset.accentClass,
         )}
       >
-        <div className="flex items-center justify-between">
-          <div className="text-[11px] font-semibold uppercase tracking-wider">
-            {CRM_STAGE_LABEL[stage]}
-          </div>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className={cn("size-2 rounded-full shrink-0", preset.bgClass)} />
+          <span className="text-[11px] font-semibold uppercase tracking-wider truncate" title={column.titulo}>
+            {column.titulo}
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onToggleOcultar}
+            title="Ocultar esta coluna do Kanban"
+            className="opacity-0 group-hover/col:opacity-100 transition-opacity p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"
+          >
+            <EyeOff className="size-3" />
+          </button>
           <Badge variant="secondary" className="text-[10px] h-5 px-1.5 tabular-nums">
             {items.length}
           </Badge>
@@ -346,6 +432,7 @@ function KanbanColumn({
             onOpen={() => onOpen(e.id)}
             onPrompts={() => onPrompts(e.id)}
             onChangeStage={(s) => onChangeStage(e.id, s)}
+            columns={allColumns}
           />
         ))}
         {items.length === 0 && (
@@ -358,18 +445,19 @@ function KanbanColumn({
   );
 }
 
-
 function KanbanCard({
   empresa,
   onOpen,
   onPrompts,
   onChangeStage,
+  columns,
   overlay,
 }: {
   empresa: Empresa;
   onOpen: () => void;
   onPrompts?: () => void;
   onChangeStage: (s: CrmStage) => void;
+  columns?: KanbanColumnConfig[];
   overlay?: boolean;
 }) {
   const site = siteUrl(empresa.site);
@@ -449,9 +537,12 @@ function KanbanCard({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {CRM_STAGES_ORDER.map((s) => (
-            <SelectItem key={s} value={s} className="text-xs">
-              {CRM_STAGE_LABEL[s]}
+          {(columns && columns.length > 0
+            ? columns
+            : CRM_STAGES_ORDER.map((s) => ({ id: s, titulo: CRM_STAGE_LABEL[s] || s }))
+          ).map((c) => (
+            <SelectItem key={c.id} value={c.id} className="text-xs">
+              {c.titulo}
             </SelectItem>
           ))}
         </SelectContent>
@@ -569,7 +660,7 @@ function EmpresaModal({
             <div className="min-w-0">
               <DialogTitle className="text-xl truncate">{empresa.nome}</DialogTitle>
               <DialogDescription className="mt-1">
-                {empresa.segmento} · {empresa.cidade} · {CRM_STAGE_LABEL[empresa.crmStage]}
+                {empresa.segmento} · {empresa.cidade} · {getCrmStageLabel(empresa.crmStage)}
               </DialogDescription>
               <div className="flex flex-wrap gap-1.5 mt-3">
                 <SiteBadge status={empresa.statusSite} />

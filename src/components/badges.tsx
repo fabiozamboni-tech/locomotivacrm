@@ -52,7 +52,7 @@ export function InstagramBadge({ status }: { status: StatusInstagram }) {
   return <Badge variant="outline" className={cn("font-normal", s.cls)}>{s.label}</Badge>;
 }
 
-export const CRM_STAGE_LABEL: Record<CrmStage, string> = {
+export const CRM_STAGE_LABEL: Record<string, string> = {
   identificado: "Identificado",
   analisado: "Analisado",
   contato_preparado: "Contato preparado",
@@ -62,7 +62,12 @@ export const CRM_STAGE_LABEL: Record<CrmStage, string> = {
   convertido: "Convertido",
   perdido: "Perdido",
   sem_fit: "Sem fit",
+  excluidos: "Excluídos",
 };
+
+export function getCrmStageLabel(stage: string): string {
+  return CRM_STAGE_LABEL[stage] || stage;
+}
 
 export const CRM_STAGES_ORDER: CrmStage[] = [
   "identificado",
@@ -74,4 +79,5 @@ export const CRM_STAGES_ORDER: CrmStage[] = [
   "convertido",
   "perdido",
   "sem_fit",
+  "excluidos",
 ];

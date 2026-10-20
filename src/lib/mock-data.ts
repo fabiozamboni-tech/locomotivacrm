@@ -22,7 +22,9 @@ export type CrmStage =
   | "em_negociacao"
   | "convertido"
   | "perdido"
-  | "sem_fit";
+  | "sem_fit"
+  | "excluidos"
+  | (string & {});
 
 export type OrigemDado =
   | "google_places"

@@ -2,6 +2,14 @@ import { createContext, useContext, useEffect, useMemo, useState, useCallback, t
 import { EMPRESAS_INICIAIS, EMPRESAS_DEMO, type CrmStage, type Empresa } from "./mock-data";
 import { DEFAULT_WEIGHTS, calcularScore, type ScoreWeights } from "./scoring";
 import {
+  type KanbanColumnConfig,
+  DEFAULT_KANBAN_COLUMNS,
+  loadKanbanColumnsLocal,
+  saveKanbanColumnsLocal,
+  LS_KANBAN_COLUMNS,
+} from "./kanban-config";
+import { toast } from "sonner";
+import {
   getDatabaseState_ServerFn,
   saveEmpresa_ServerFn,
   saveAllEmpresas_ServerFn,
@@ -92,6 +100,18 @@ interface StoreValue {
   carregarDemo: () => void;
   theme: "light" | "dark";
   toggleTheme: () => void;
+  // Colunas do Kanban
+  kanbanColumns: KanbanColumnConfig[];
+  setKanbanColumns: (cols: KanbanColumnConfig[]) => void;
+  adicionarColunaKanban: (col: { titulo: string; cor?: string; oculto?: boolean }) => void;
+  editarColunaKanban: (id: string, patch: Partial<KanbanColumnConfig>) => void;
+  excluirColunaKanban: (id: string) => void;
+  toggleOcultarColunaKanban: (id: string) => void;
+  restaurarColunasPadrao: () => void;
+  // Ações de Exclusão e Restauração de Empresas
+  moverEmpresaParaExcluidos: (id: string) => void;
+  restaurarEmpresaDeExcluidos: (id: string, stageDestino?: CrmStage) => void;
+  excluirEmpresaDefinitivamente: (id: string) => void;
   // Sincronização com o Banco de Dados
   dbSyncStatus: DbSyncStatus;
   lastSyncTime: Date | null;
@@ -200,6 +220,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [empresas, setEmpresas] = useState<Empresa[]>(EMPRESAS_INICIAIS);
   const [empresasExcluidas, setEmpresasExcluidas] = useState<EmpresaExcluida[]>([]);
   const [instagramProfilesDb, setInstagramProfilesDb] = useState<InstagramProfile[]>([]);
+  const [kanbanColumns, setKanbanColumnsState] = useState<KanbanColumnConfig[]>(DEFAULT_KANBAN_COLUMNS);
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [hydrated, setHydrated] = useState(false);
   const [dbSyncStatus, setDbSyncStatus] = useState<DbSyncStatus>("idle");
@@ -265,6 +286,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setEmpresas(recalcAll(loadEmpresasLocal(), w));
     setEmpresasExcluidas(loadExcluidosLocal());
     setInstagramProfilesDb(loadInstagramDbLocal());
+    setKanbanColumnsState(loadKanbanColumnsLocal());
     setHydrated(true);
 
     // Carrega do banco de dados imediatamente
@@ -291,6 +313,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!hydrated) return;
     try { window.localStorage.setItem(LS_INSTAGRAM_DB, JSON.stringify(instagramProfilesDb)); } catch { /* noop */ }
   }, [instagramProfilesDb, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    saveKanbanColumnsLocal(kanbanColumns);
+  }, [kanbanColumns, hydrated]);
 
   useEffect(() => {
     if (typeof document !== "undefined") {
@@ -620,6 +647,188 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       });
   }, [weights]);
 
+  const setKanbanColumns = useCallback((cols: KanbanColumnConfig[]) => {
+    setKanbanColumnsState(cols);
+    saveKanbanColumnsLocal(cols);
+  }, []);
+
+  const adicionarColunaKanban = useCallback((nova: { titulo: string; cor?: string; oculto?: boolean }) => {
+    const slug = nova.titulo
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]/g, "_")
+      .slice(0, 30);
+    const id = `col_${slug || Date.now()}`;
+    const col: KanbanColumnConfig = {
+      id,
+      titulo: nova.titulo.trim(),
+      cor: nova.cor || "slate",
+      oculto: Boolean(nova.oculto),
+      sistema: false,
+    };
+
+    setKanbanColumnsState((prev) => {
+      const excluidosIndex = prev.findIndex((c) => c.id === "excluidos");
+      let next: KanbanColumnConfig[];
+      if (excluidosIndex >= 0) {
+        next = [...prev.slice(0, excluidosIndex), col, ...prev.slice(excluidosIndex)];
+      } else {
+        next = [...prev, col];
+      }
+      saveKanbanColumnsLocal(next);
+      return next;
+    });
+  }, []);
+
+  const editarColunaKanban = useCallback((id: string, patch: Partial<KanbanColumnConfig>) => {
+    setKanbanColumnsState((prev) => {
+      const next = prev.map((c) => (c.id === id ? { ...c, ...patch } : c));
+      saveKanbanColumnsLocal(next);
+      return next;
+    });
+  }, []);
+
+  const excluirColunaKanban = useCallback((id: string) => {
+    if (id === "excluidos") {
+      toast.error("A coluna Excluídos é nativa do sistema e não pode ser removida.");
+      return;
+    }
+    setKanbanColumnsState((prev) => {
+      const next = prev.filter((c) => c.id !== id);
+      saveKanbanColumnsLocal(next);
+      return next;
+    });
+    // Realoca empresas que estavam nesta coluna para 'identificado'
+    setEmpresas((prev) =>
+      prev.map((e) => (e.crmStage === id ? { ...e, crmStage: "identificado" } : e)),
+    );
+  }, []);
+
+  const toggleOcultarColunaKanban = useCallback((id: string) => {
+    setKanbanColumnsState((prev) => {
+      const next = prev.map((c) => (c.id === id ? { ...c, oculto: !c.oculto } : c));
+      saveKanbanColumnsLocal(next);
+      return next;
+    });
+  }, []);
+
+  const restaurarColunasPadrao = useCallback(() => {
+    setKanbanColumnsState(DEFAULT_KANBAN_COLUMNS);
+    saveKanbanColumnsLocal(DEFAULT_KANBAN_COLUMNS);
+  }, []);
+
+  const moverEmpresaParaExcluidos = useCallback((id: string) => {
+    let updatedEmpresa: Empresa | null = null;
+    setEmpresas((prev) =>
+      prev.map((e) => {
+        if (e.id === id) {
+          const updated: Empresa = {
+            ...e,
+            crmStage: "excluidos",
+            historico: [
+              {
+                data: new Date().toISOString(),
+                tipo: "nota",
+                texto: "Empresa movida para a lista de excluídos e funil correspondente.",
+              },
+              ...e.historico,
+            ],
+          };
+          updatedEmpresa = updated;
+          return updated;
+        }
+        return e;
+      }),
+    );
+
+    if (updatedEmpresa) {
+      const emp = updatedEmpresa as Empresa;
+      setDbSyncStatus("syncing");
+      saveEmpresa_ServerFn({ data: emp })
+        .then(() => {
+          setDbSyncStatus("synced");
+          setLastSyncTime(new Date());
+        })
+        .catch((err) => {
+          console.error("Erro ao mover empresa para excluidos no banco:", err);
+          setDbSyncStatus("error");
+        });
+
+      excluirEmpresa({
+        nome: emp.nome,
+        cnpj: emp.cnpj,
+        cidade: emp.cidade,
+        segmento: emp.segmento,
+        site: emp.site,
+        telefone: emp.telefone,
+        origem: emp.origem,
+      });
+    }
+  }, [excluirEmpresa]);
+
+  const restaurarEmpresaDeExcluidos = useCallback((id: string, stageDestino: CrmStage = "identificado") => {
+    let updatedEmpresa: Empresa | null = null;
+    setEmpresas((prev) =>
+      prev.map((e) => {
+        if (e.id === id) {
+          const updated: Empresa = {
+            ...e,
+            crmStage: stageDestino,
+            historico: [
+              {
+                data: new Date().toISOString(),
+                tipo: "nota",
+                texto: `Empresa restaurada para a lista ativa (etapa "${stageDestino}").`,
+              },
+              ...e.historico,
+            ],
+          };
+          updatedEmpresa = updated;
+          return updated;
+        }
+        return e;
+      }),
+    );
+
+    if (updatedEmpresa) {
+      const emp = updatedEmpresa as Empresa;
+      setDbSyncStatus("syncing");
+      saveEmpresa_ServerFn({ data: emp })
+        .then(() => {
+          setDbSyncStatus("synced");
+          setLastSyncTime(new Date());
+        })
+        .catch((err) => {
+          console.error("Erro ao restaurar empresa no banco:", err);
+          setDbSyncStatus("error");
+        });
+
+      // Remove de empresasExcluidas caso exista
+      setEmpresasExcluidas((prev) =>
+        prev.filter((ex) => {
+          if (emp.cnpj && ex.cnpj && cleanDigits(emp.cnpj) === cleanDigits(ex.cnpj)) return false;
+          if (cleanText(ex.nome) === cleanText(emp.nome)) return false;
+          return true;
+        }),
+      );
+    }
+  }, []);
+
+  const excluirEmpresaDefinitivamente = useCallback((id: string) => {
+    setEmpresas((prev) => prev.filter((e) => e.id !== id));
+    setDbSyncStatus("syncing");
+    deleteEmpresa_ServerFn({ data: { id } })
+      .then(() => {
+        setDbSyncStatus("synced");
+        setLastSyncTime(new Date());
+      })
+      .catch((err) => {
+        console.error("Erro ao excluir empresa definitivamente do banco:", err);
+        setDbSyncStatus("error");
+      });
+  }, []);
+
   const value = useMemo<StoreValue>(
     () => ({
       empresas,
@@ -642,6 +851,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       isEmpresaExcluida,
       resetPlataforma,
       carregarDemo,
+      kanbanColumns,
+      setKanbanColumns,
+      adicionarColunaKanban,
+      editarColunaKanban,
+      excluirColunaKanban,
+      toggleOcultarColunaKanban,
+      restaurarColunasPadrao,
+      moverEmpresaParaExcluidos,
+      restaurarEmpresaDeExcluidos,
+      excluirEmpresaDefinitivamente,
       dbSyncStatus,
       lastSyncTime,
       databaseInfo,
@@ -651,6 +870,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       empresas,
       empresasExcluidas,
       instagramProfilesDb,
+      kanbanColumns,
       weights,
       theme,
       dbSyncStatus,
@@ -671,6 +891,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       resetPlataforma,
       carregarDemo,
       setWeights,
+      setKanbanColumns,
+      adicionarColunaKanban,
+      editarColunaKanban,
+      excluirColunaKanban,
+      toggleOcultarColunaKanban,
+      restaurarColunasPadrao,
+      moverEmpresaParaExcluidos,
+      restaurarEmpresaDeExcluidos,
+      excluirEmpresaDefinitivamente,
     ],
   );
 
