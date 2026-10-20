@@ -47,7 +47,7 @@ export type OrigemDado =
 
 export interface SlideItem {
   id: string;
-  tipo: "capa" | "mercado" | "diagnostico" | "responsabilidades_agencia" | "responsabilidades_cliente" | "plano_acao" | "personalizado" | "fim";
+  tipo: "capa" | "mercado" | "diagnostico" | "responsabilidades_agencia" | "responsabilidades_cliente" | "plano_acao" | "proximos_passos" | "cta_orcamento" | "personalizado" | "fim";
   titulo: string;
   subtitulo?: string;
   pontos: string[];

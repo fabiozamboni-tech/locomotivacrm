@@ -28,6 +28,43 @@ function getNomeArquivoBase(empresa: Empresa): string {
 }
 
 /**
+ * Sanitiza qualquer texto para exportação no jsPDF com fontes padrão (WinAnsi).
+ * Remove emojis e símbolos multibyte que quebram em bytes 'Ø=Ü¡', normaliza aspas curvas,
+ * travessões e pontuações especiais para caracteres padrão suportados.
+ */
+export function sanitizarTextoParaPDF(str?: string): string {
+  if (!str) return "";
+  return str
+    // Remove emojis e pictogramas (faixas Unicode comuns de emojis)
+    .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2300}-\u{23FF}\u{2B50}\u{200D}\u{FE0F}]/gu, "")
+    // Normaliza aspas curvas para aspas simples e duplas padrão
+    .replace(/[\u201C\u201D\u201E\u201F\u00AB\u00BB]/g, '"')
+    .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
+    // Normaliza travessões (em-dash, en-dash) para hífen
+    .replace(/[\u2013\u2014\u2015]/g, "-")
+    // Normaliza marcadores de bullet e setas
+    .replace(/[\u2022\u25CF\u25AA\u25AB]/g, "-")
+    .replace(/[\u2192\u279C\u2794]/g, "->")
+    // Remove caracteres de controle estranhos
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, "")
+    // Limpa espaços duplos deixados pela remoção dos emojis
+    .replace(/[ \t]+/g, " ")
+    .trim();
+}
+
+/**
+ * Extrai o título base da apresentação sem duplicar o nome do cliente no header
+ */
+function extrairTituloHeader(deckTitulo?: string, empresaNome?: string): string {
+  if (!deckTitulo) return "APRESENTAÇÃO ESTRATÉGICA";
+  let t = deckTitulo;
+  if (empresaNome) {
+    t = t.replace(new RegExp(`\\s*[—\\-]\\s*${empresaNome}.*`, "i"), "").trim();
+  }
+  return sanitizarTextoParaPDF(t || "APRESENTAÇÃO ESTRATÉGICA").toUpperCase();
+}
+
+/**
  * Exporta a apresentação completa como arquivo PDF usando os templates oficiais da Locomotiva
  */
 export async function exportarApresentacaoPDF(
@@ -41,9 +78,9 @@ export async function exportarApresentacaoPDF(
     compress: true,
   });
 
-  const dataExtenso = getDataFormatadaExtenso();
-  const tituloGeral = (deck.titulo || "Apresentação Estratégica").toUpperCase();
-  const clienteNome = (empresa.nome || "Cliente").toUpperCase();
+  const dataExtenso = sanitizarTextoParaPDF(getDataFormatadaExtenso());
+  const tituloHeader = extrairTituloHeader(deck.titulo, empresa.nome);
+  const clienteNome = sanitizarTextoParaPDF(empresa.nome || "Cliente").toUpperCase();
   const slides = deck.slides.filter((s) => !s.oculto);
 
   slides.forEach((slide, index) => {
@@ -63,7 +100,8 @@ export async function exportarApresentacaoPDF(
       doc.setFont("helvetica", "bold");
       doc.setFontSize(26);
       doc.setTextColor(30, 41, 59); // Slate-800
-      const tituloLinhas = doc.splitTextToSize(slide.titulo || deck.titulo, 620);
+      const tituloCapa = sanitizarTextoParaPDF(slide.titulo || deck.titulo);
+      const tituloLinhas = doc.splitTextToSize(tituloCapa, 620);
       doc.text(tituloLinhas, 88, 220);
 
       // CLIENTE (ONDE DIZ CLIENTE NO TEMPLATE)
@@ -89,9 +127,9 @@ export async function exportarApresentacaoPDF(
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10.5);
       doc.setTextColor(30, 41, 59);
-      doc.text(tituloGeral, 68, 53);
+      doc.text(tituloHeader, 68, 53);
 
-      const largTitulo = doc.getTextWidth(tituloGeral);
+      const largTitulo = doc.getTextWidth(tituloHeader);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 116, 139);
       doc.text(` - ${clienteNome}`, 68 + largTitulo, 53);
@@ -106,7 +144,8 @@ export async function exportarApresentacaoPDF(
       doc.setFont("helvetica", "bold");
       doc.setFontSize(22);
       doc.setTextColor(15, 23, 42); // Slate-900
-      const slideTituloLinhas = doc.splitTextToSize(slide.titulo, 700);
+      const slideTitulo = sanitizarTextoParaPDF(slide.titulo);
+      const slideTituloLinhas = doc.splitTextToSize(slideTitulo, 700);
       doc.text(slideTituloLinhas, 64, 105);
 
       let curY = 105 + slideTituloLinhas.length * 24;
@@ -114,48 +153,66 @@ export async function exportarApresentacaoPDF(
       // SUBTÍTULO
       if (slide.subtitulo) {
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(12);
+        doc.setFontSize(11.5);
         doc.setTextColor(100, 116, 139); // Slate-500
-        const subLinhas = doc.splitTextToSize(slide.subtitulo, 700);
+        const subTexto = sanitizarTextoParaPDF(slide.subtitulo);
+        const subLinhas = doc.splitTextToSize(subTexto, 700);
         doc.text(subLinhas, 64, curY);
-        curY += subLinhas.length * 16 + 10;
+        curY += subLinhas.length * 15 + 10;
       } else {
         curY += 10;
       }
 
       // TÓPICOS / BULLET POINTS
-      const espacoDisponivel = 480 - curY;
-      const numPontos = slide.pontos?.length || 1;
-      const espacamento = Math.min(36, Math.max(22, Math.floor(espacoDisponivel / numPontos)));
+      const totalTextoLen = slide.pontos.reduce((acc, p) => acc + (p?.length || 0), 0);
+      const fontSizePontos = totalTextoLen > 550 || slide.pontos.length > 4 ? 10.5 : 11.5;
+      const pontoLineH = fontSizePontos === 10.5 ? 13.5 : 15;
 
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(12);
+      doc.setFontSize(fontSizePontos);
       doc.setTextColor(30, 41, 59);
 
-      slide.pontos.forEach((ponto) => {
+      slide.pontos.forEach((pontoRaw) => {
+        const ponto = sanitizarTextoParaPDF(pontoRaw);
+        if (!ponto) return;
+
         // Marcador rosa da Locomotiva (#D22D67)
         doc.setFillColor(210, 45, 103);
-        doc.circle(70, curY - 4, 3, "F");
+        doc.circle(70, curY - 3.5, 2.5, "F");
 
-        const pontoLinhas = doc.splitTextToSize(ponto, 675);
+        const pontoLinhas = doc.splitTextToSize(ponto, 680);
         doc.text(pontoLinhas, 82, curY);
-        curY += Math.max(espacamento, pontoLinhas.length * 15 + 8);
+        curY += pontoLinhas.length * pontoLineH + 6;
       });
 
-      // BOX DE DESTAQUE / TAKEAWAY
-      if (slide.destaque && curY < 490) {
-        curY = Math.max(curY, 445);
-        const cardH = 55;
-        // Fundo suave rosa/cinza
-        doc.setFillColor(253, 242, 246); // #fdf2f6
-        doc.setDrawColor(251, 207, 232); // #fbcfe8
-        doc.roundedRect(64, curY, 715, cardH, 6, 6, "FD");
+      // BOX DE DESTAQUE / TAKEAWAY / PRÓXIMO PASSO
+      if (slide.destaque) {
+        let destaqueTexto = sanitizarTextoParaPDF(slide.destaque);
+        const isCtaSlide = slide.tipo === "proximos_passos" || slide.tipo === "cta_orcamento";
+
+        if (
+          !destaqueTexto.toUpperCase().startsWith("DESTAQUE") &&
+          !destaqueTexto.toUpperCase().startsWith("INSIGHT") &&
+          !destaqueTexto.toUpperCase().startsWith("PRÓXIMO PASSO") &&
+          !destaqueTexto.toUpperCase().startsWith("PROPOSTA")
+        ) {
+          destaqueTexto = isCtaSlide ? `PRÓXIMO PASSO: ${destaqueTexto}` : `DESTAQUE: ${destaqueTexto}`;
+        }
 
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(10.5);
+        doc.setFontSize(10);
         doc.setTextColor(157, 23, 77); // Pink-800
-        const destLinhas = doc.splitTextToSize(`💡 ${slide.destaque}`, 690);
-        doc.text(destLinhas, 76, curY + 22);
+
+        const destLinhas = doc.splitTextToSize(destaqueTexto, 680);
+        const cardLineH = 13.5;
+        const cardH = Math.max(46, destLinhas.length * cardLineH + 16);
+        const boxY = Math.min(525 - cardH, Math.max(curY + 10, 520 - cardH));
+
+        doc.setFillColor(253, 242, 246); // #fdf2f6
+        doc.setDrawColor(251, 207, 232); // #fbcfe8
+        doc.roundedRect(64, boxY, 715, cardH, 5, 5, "FD");
+
+        doc.text(destLinhas, 76, boxY + 16);
       }
     }
   });
@@ -177,9 +234,9 @@ export async function exportarApresentacaoPPTX(
   pres.defineLayout({ name: "A4_LANDSCAPE", width: 11.69, height: 8.27 });
   pres.layout = "A4_LANDSCAPE";
 
-  const dataExtenso = getDataFormatadaExtenso();
-  const tituloGeral = (deck.titulo || "Apresentação Estratégica").toUpperCase();
-  const clienteNome = (empresa.nome || "Cliente").toUpperCase();
+  const dataExtenso = sanitizarTextoParaPDF(getDataFormatadaExtenso());
+  const tituloHeader = extrairTituloHeader(deck.titulo, empresa.nome);
+  const clienteNome = sanitizarTextoParaPDF(empresa.nome || "Cliente").toUpperCase();
   const slides = deck.slides.filter((s) => !s.oculto);
 
   slides.forEach((slide, index) => {
@@ -199,7 +256,7 @@ export async function exportarApresentacaoPPTX(
       });
 
       // TÍTULO DA APRESENTAÇÃO
-      s.addText(slide.titulo || deck.titulo, {
+      s.addText(sanitizarTextoParaPDF(slide.titulo || deck.titulo), {
         x: 1.2,
         y: 3.1,
         w: 9.2,
@@ -255,7 +312,7 @@ export async function exportarApresentacaoPPTX(
       // HEADER NO TOPO ESQUERDO: TITULO EM NEGRITO - CLIENTE
       s.addText(
         [
-          { text: tituloGeral, options: { bold: true, color: "334155" } },
+          { text: tituloHeader, options: { bold: true, color: "334155" } },
           { text: ` - ${clienteNome}`, options: { bold: false, color: "64748B" } },
         ],
         {
@@ -283,7 +340,7 @@ export async function exportarApresentacaoPPTX(
       });
 
       // TÍTULO DO SLIDE
-      s.addText(slide.titulo, {
+      s.addText(sanitizarTextoParaPDF(slide.titulo), {
         x: 0.88,
         y: 1.3,
         w: 9.8,
@@ -296,7 +353,7 @@ export async function exportarApresentacaoPPTX(
 
       // SUBTÍTULO
       if (slide.subtitulo) {
-        s.addText(slide.subtitulo, {
+        s.addText(sanitizarTextoParaPDF(slide.subtitulo), {
           x: 0.88,
           y: 1.85,
           w: 9.8,
@@ -309,7 +366,7 @@ export async function exportarApresentacaoPPTX(
 
       // LISTA DE PONTOS / BULLETS
       const itensTexto = slide.pontos.map((p, idx) => ({
-        text: p,
+        text: sanitizarTextoParaPDF(p),
         options: {
           bullet: { type: "bullet" as const, color: "D22D67" },
           breakLine: idx < slide.pontos.length - 1,
@@ -330,6 +387,17 @@ export async function exportarApresentacaoPPTX(
 
       // BOX DE DESTAQUE
       if (slide.destaque) {
+        let destaqueTexto = sanitizarTextoParaPDF(slide.destaque);
+        const isCtaSlide = slide.tipo === "proximos_passos" || slide.tipo === "cta_orcamento";
+        if (
+          !destaqueTexto.toUpperCase().startsWith("DESTAQUE") &&
+          !destaqueTexto.toUpperCase().startsWith("INSIGHT") &&
+          !destaqueTexto.toUpperCase().startsWith("PRÓXIMO PASSO") &&
+          !destaqueTexto.toUpperCase().startsWith("PROPOSTA")
+        ) {
+          destaqueTexto = isCtaSlide ? `PRÓXIMO PASSO: ${destaqueTexto}` : `DESTAQUE: ${destaqueTexto}`;
+        }
+
         s.addShape(pres.ShapeType.roundRect, {
           x: 0.88,
           y: 6.2,
@@ -340,7 +408,7 @@ export async function exportarApresentacaoPPTX(
           rectRadius: 0.08,
         });
 
-        s.addText(`💡 ${slide.destaque}`, {
+        s.addText(destaqueTexto, {
           x: 1.05,
           y: 6.25,
           w: 9.45,

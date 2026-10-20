@@ -38,6 +38,8 @@ import {
   gerarApresentacaoPadrao,
   gerarSlideDiagnosticoPilar,
   adicionarSlideAoDeck,
+  gerarSlideCtaOrcamento,
+  gerarSlideCtaOrcamentoIA_ServerFn,
   DIAGNOSTICO_PILARES_INFO,
   type DiagnosticoPilarKey,
 } from "@/lib/slide-deck.functions";
@@ -45,6 +47,18 @@ import type { Dossier360Result } from "@/lib/dossier-360.functions";
 import type { Relatorio } from "@/lib/relatorio.functions";
 import { exportarApresentacaoPDF, exportarApresentacaoPPTX } from "@/lib/slide-deck-exporter";
 import { SLIDE_TEMPLATE_ASSETS } from "@/lib/slide-templates-assets";
+
+/**
+ * Extrai o título base da apresentação sem duplicar o nome do cliente no cabeçalho
+ */
+function extrairTituloBase(deckTitulo?: string, empresaNome?: string): string {
+  if (!deckTitulo) return "APRESENTAÇÃO ESTRATÉGICA";
+  let t = deckTitulo;
+  if (empresaNome) {
+    t = t.replace(new RegExp(`\\s*[—\\-]\\s*${empresaNome}.*`, "i"), "").trim();
+  }
+  return (t || "APRESENTAÇÃO ESTRATÉGICA").toUpperCase();
+}
 
 interface SlideDeckBuilderProps {
   empresa: Empresa;
@@ -72,6 +86,7 @@ export function SlideDeckBuilder({
   const [novoTopicoTexto, setNovoTopicoTexto] = useState("");
   const [exportandoPDF, setExportandoPDF] = useState(false);
   const [exportandoPPTX, setExportandoPPTX] = useState(false);
+  const [gerandoSlideOrcamento, setGerandoSlideOrcamento] = useState(false);
 
   // Atualiza se a empresa mudar ou se a apresentação for atualizada externamente
   useEffect(() => {
@@ -108,6 +123,58 @@ export function SlideDeckBuilder({
         ? `Slide de Diagnóstico (${DIAGNOSTICO_PILARES_INFO[pilar].nome}) atualizado!`
         : `Slide de Diagnóstico (${DIAGNOSTICO_PILARES_INFO[pilar].nome}) adicionado ao deck!`,
     );
+  };
+
+  /**
+   * Gera ou regenera com IA o slide decisivo de Próximos Passos & Solicitação de Orçamento
+   * Posicionado estrategicamente antes do slide final de contatos.
+   */
+  const handleGerarSlideOrcamentoIA = async () => {
+    try {
+      setGerandoSlideOrcamento(true);
+
+      // Coleta sugestões e tópicos mapeados nos slides atuais
+      const sugestoes = deck.slides
+        .filter(
+          (s) =>
+            s.tipo !== "capa" &&
+            s.tipo !== "fim" &&
+            s.tipo !== "proximos_passos" &&
+            s.tipo !== "cta_orcamento",
+        )
+        .map((s) => s.titulo)
+        .filter(Boolean);
+
+      const res = await gerarSlideCtaOrcamentoIA_ServerFn({
+        data: {
+          empresaNome: empresa.nome,
+          segmento: empresa.segmento,
+          cidade: empresa.cidade,
+          sugestoes,
+        },
+      });
+
+      if (res?.slide) {
+        const { deckAtualizado, substituido, novoIndice } = adicionarSlideAoDeck(deck, res.slide);
+        setDeck(deckAtualizado);
+        setSlideAtivoIndex(novoIndice);
+
+        if (onSave) {
+          onSave(deckAtualizado);
+        }
+
+        toast.success(
+          substituido
+            ? "Slide de Próximos Passos & Orçamento atualizado com IA!"
+            : "Slide de Próximos Passos & Orçamento gerado com IA e inserido antes do encerramento!",
+        );
+      }
+    } catch (err: any) {
+      console.error("Erro ao gerar slide de orçamento com IA:", err);
+      toast.error("Falha ao gerar slide com IA: " + (err?.message || "Erro desconhecido"));
+    } finally {
+      setGerandoSlideOrcamento(false);
+    }
   };
 
   const slideAtual = deck.slides[slideAtivoIndex] || deck.slides[0];
@@ -427,12 +494,31 @@ export function SlideDeckBuilder({
                   <span className="truncate">Branding</span>
                 </Button>
               </div>
+              <div className="pt-1.5 border-t border-border/40">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGerarSlideOrcamentoIA}
+                  disabled={gerandoSlideOrcamento}
+                  className="w-full h-7 text-[10px] px-2 justify-center gap-1.5 font-semibold text-emerald-700 dark:text-emerald-300 border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20"
+                  title="Gerar via IA o slide estratégico de Próximos Passos & Orçamento (posicionado antes do slide final)"
+                >
+                  {gerandoSlideOrcamento ? (
+                    <Loader2 className="h-3 w-3 animate-spin text-emerald-600" />
+                  ) : (
+                    <Sparkles className="h-3 w-3 text-emerald-600" />
+                  )}
+                  <span>Slide de Orçamento (IA)</span>
+                </Button>
+              </div>
             </div>
             <CardContent className="p-2 space-y-1.5 max-h-[650px] overflow-y-auto">
               {deck.slides.map((s, idx) => {
                 const ativo = idx === slideAtivoIndex;
                 const isCapa = s.tipo === "capa" || idx === 0;
                 const isFim = s.tipo === "fim" || idx === deck.slides.length - 1;
+                const isCta = s.id === "slide_cta_orcamento" || s.tipo === "proximos_passos" || s.tipo === "cta_orcamento";
                 return (
                   <div
                     key={s.id || idx}
@@ -448,7 +534,7 @@ export function SlideDeckBuilder({
                         <span className="w-4 h-4 rounded-full bg-[#d22d67]/10 text-[#d22d67] text-[9px] flex items-center justify-center font-bold">
                           {idx + 1}
                         </span>
-                        {isCapa ? "Capa" : isFim ? "Encerramento" : `Slide ${idx + 1}`}
+                        {isCapa ? "Capa" : isFim ? "Encerramento" : isCta ? "Orçamento / CTA" : `Slide ${idx + 1}`}
                       </span>
                       <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity gap-0.5">
                         <button
@@ -527,9 +613,30 @@ export function SlideDeckBuilder({
               <CardHeader className="pb-3 border-b border-border/60">
                 <CardTitle className="text-sm font-semibold flex items-center justify-between">
                   <span>Editar Conteúdo do Slide {slideAtivoIndex + 1}</span>
-                  <Badge variant="outline" className="text-[10px] font-normal uppercase">
-                    {slideAtual.tipo}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    {(slideAtual.tipo === "cta_orcamento" ||
+                      slideAtual.tipo === "proximos_passos" ||
+                      slideAtual.id === "slide_cta_orcamento") && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleGerarSlideOrcamentoIA}
+                        disabled={gerandoSlideOrcamento}
+                        className="h-7 text-xs gap-1 border-pink-300 text-pink-700 hover:bg-pink-50 dark:border-pink-800 dark:text-pink-300"
+                        title="Regenerar texto deste slide com IA persuasiva para solicitar orçamento"
+                      >
+                        {gerandoSlideOrcamento ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3 w-3 text-pink-600" />
+                        )}
+                        Regenerar com IA
+                      </Button>
+                    )}
+                    <Badge variant="outline" className="text-[10px] font-normal uppercase">
+                      {slideAtual.tipo}
+                    </Badge>
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 space-y-4">
@@ -736,7 +843,7 @@ export function SlideDeckBuilder({
             >
               {/* HEADER TOPO ESQUERDO: TITULO EM NEGRITO - CLIENTE */}
               <div className="absolute top-[7.2%] left-[7.6%] text-xs tracking-wide">
-                <span className="font-bold text-slate-800">{deck.titulo.toUpperCase()}</span>
+                <span className="font-bold text-slate-800">{extrairTituloBase(deck.titulo, empresa.nome)}</span>
                 <span className="text-slate-500 font-normal"> - {empresa.nome.toUpperCase()}</span>
               </div>
 
@@ -769,7 +876,10 @@ export function SlideDeckBuilder({
 
                 {s.destaque && (
                   <div className="p-3.5 rounded-xl bg-pink-50/70 border border-pink-200 text-pink-900 font-semibold text-xs leading-relaxed">
-                    💡 {s.destaque}
+                    <span className="text-[#d22d67] font-bold mr-2 uppercase text-[11px] tracking-wider">
+                      {s.tipo === "cta_orcamento" || s.tipo === "proximos_passos" ? "Próximo Passo:" : "Destaque:"}
+                    </span>
+                    {s.destaque}
                   </div>
                 )}
               </div>
@@ -878,7 +988,7 @@ function SlideCardVisual({
     >
       {/* HEADER NO TOPO ESQUERDO: TITULO EM NEGRITO - CLIENTE */}
       <div className="absolute top-[6.5%] sm:top-[7.2%] left-[7.6%] text-[10px] sm:text-xs tracking-wide">
-        <span className="font-bold text-slate-800">{deckTitulo.toUpperCase()}</span>
+        <span className="font-bold text-slate-800">{extrairTituloBase(deckTitulo, empresa.nome)}</span>
         <span className="text-slate-500 font-normal"> - {empresa.nome.toUpperCase()}</span>
       </div>
 
@@ -925,7 +1035,10 @@ function SlideCardVisual({
         {/* BOX DE DESTAQUE */}
         {slide.destaque && (
           <div className="p-2.5 sm:p-3 rounded-lg bg-pink-50/70 border border-pink-200 text-pink-900 font-semibold text-[11px] sm:text-xs leading-relaxed">
-            💡 {slide.destaque}
+            <span className="text-[#d22d67] font-bold mr-1.5 uppercase text-[10px] tracking-wider">
+              {slide.tipo === "cta_orcamento" || slide.tipo === "proximos_passos" ? "Próximo Passo:" : "Destaque:"}
+            </span>
+            {slide.destaque}
           </div>
         )}
       </div>
