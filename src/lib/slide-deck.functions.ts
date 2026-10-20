@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { Empresa, SlideItem, ApresentacaoSlidesData } from "./mock-data";
 import type { Dossier360Result } from "./dossier-360.functions";
-import type { Relatorio } from "./relatorio.functions";
+import type { Relatorio, SecaoRelatorio } from "./relatorio.functions";
 
 /**
  * Monta automaticamente a apresentação de slides padrão
@@ -230,3 +230,264 @@ Retorne EXATAMENTE este formato JSON:
       },
     };
   });
+
+/**
+ * Identificadores dos 4 pilares de diagnóstico solicitados: site, comunicação, redes sociais e branding
+ */
+export type DiagnosticoPilarKey = "site" | "comunicacao" | "redes" | "branding";
+
+export interface DiagnosticoPilarMeta {
+  key: DiagnosticoPilarKey;
+  nome: string;
+  badge: string;
+  icone: "Globe" | "MessageCircle" | "Instagram" | "Palette";
+  descricaoCurta: string;
+}
+
+export const DIAGNOSTICO_PILARES_INFO: Record<DiagnosticoPilarKey, DiagnosticoPilarMeta> = {
+  site: {
+    key: "site",
+    nome: "Site Oficial & Google",
+    badge: "Web & Google Maps",
+    icone: "Globe",
+    descricaoCurta: "Indexação, conversão mobile, velocidade e captação orgânica.",
+  },
+  comunicacao: {
+    key: "comunicacao",
+    nome: "Comunicação & Atendimento",
+    badge: "WhatsApp Comercial",
+    icone: "MessageCircle",
+    descricaoCurta: "Velocidade de retorno, scripts de abordagem e quebra de objeções.",
+  },
+  redes: {
+    key: "redes",
+    nome: "Redes Sociais & Conteúdo",
+    badge: "Instagram & Autoridade",
+    icone: "Instagram",
+    descricaoCurta: "Linha editorial, posicionamento de autoridade e atração regional.",
+  },
+  branding: {
+    key: "branding",
+    nome: "Branding & Valor Percebido",
+    badge: "Identidade & Marca",
+    icone: "Palette",
+    descricaoCurta: "Diferenciação visual de mercado e sustentação de ticket mais alto.",
+  },
+};
+
+/**
+ * Identifica o pilar correspondente a uma seção do relatório
+ */
+export function mapearPilarSecao(secao: SecaoRelatorio): DiagnosticoPilarKey | null {
+  const p = (secao.pilar || "").toLowerCase();
+  const t = (secao.titulo || "").toLowerCase();
+  if (p === "site" || t.includes("site") || t.includes("web") || t.includes("google")) return "site";
+  if (p === "comunicacao" || t.includes("comunicação") || t.includes("comunicacao") || t.includes("atendimento") || t.includes("whatsapp")) return "comunicacao";
+  if (p === "redes" || t.includes("rede") || t.includes("instagram") || t.includes("social")) return "redes";
+  if (p === "branding" || t.includes("brand") || t.includes("marca") || t.includes("identidade") || t.includes("visual")) return "branding";
+  return null;
+}
+
+/**
+ * Cria um SlideItem formatado e resumido a partir do diagnóstico de um pilar específico
+ */
+export function gerarSlideDiagnosticoPilar(
+  pilar: DiagnosticoPilarKey,
+  empresa: Empresa,
+  secao?: SecaoRelatorio | null,
+  relatorio?: Relatorio | null,
+): SlideItem {
+  const cidade = empresa.cidade || "Região";
+  const nomeEmpresa = empresa.nome || "Cliente";
+
+  switch (pilar) {
+    case "site": {
+      const pontos: string[] = [];
+      if (secao && secao.dores?.length) {
+        pontos.push(
+          empresa.site
+            ? `Site Atual (${empresa.statusSite}): ${secao.dores[0]}`
+            : `Ausência de Site Próprio: ${secao.dores[0]}`,
+        );
+        if (secao.dores[1]) pontos.push(`Gargalo Comercial: ${secao.dores[1]}`);
+        if (secao.solucao?.[0]) pontos.push(`Aceleração Proposta: ${secao.solucao[0]}`);
+        if (secao.impactoVendas) pontos.push(`Impacto em Vendas: ${secao.impactoVendas}`);
+      } else {
+        pontos.push(
+          empresa.site
+            ? `Site Atual: Avaliado como ${empresa.statusSite} — necessita de modernização para padrão mobile responsivo e carregamento instantâneo.`
+            : `Site Institucional: A empresa NÃO possui site próprio indexado, perdendo até 70% das buscas orgânicas de clientes prontos para comprar.`,
+        );
+        pontos.push(
+          `Comportamento no Google: Consumidores em ${cidade} pesquisam ativamente por serviços no Google antes de entrar em contato.`,
+        );
+        pontos.push(
+          `Solução Locomotiva: Novo site de alta conversão, responsivo, com botão WhatsApp flutuante e carregamento ultra-rápido.`,
+        );
+        pontos.push(
+          `Impacto Esperado: Captação orgânica contínua de novos contatos qualificados e elevação do faturamento comercial.`,
+        );
+      }
+      return {
+        id: "slide_diagnostico_site",
+        tipo: "diagnostico",
+        titulo: secao?.titulo || "Diagnóstico: Site Oficial & Presença no Google",
+        subtitulo: `Análise de Indexação, Conversão Mobile e Velocidade para ${nomeEmpresa}`,
+        pontos: pontos.slice(0, 4),
+        destaque:
+          secao?.impactoVendas ||
+          "Um site moderno transmite autoridade imediata e converte visitantes em clientes reais no WhatsApp.",
+        tags: ["Diagnóstico", "Site", cidade],
+      };
+    }
+
+    case "comunicacao": {
+      const pontos: string[] = [];
+      if (secao && secao.dores?.length) {
+        pontos.push(`Ponto de Atenção: ${secao.dores[0]}`);
+        if (secao.dores[1]) pontos.push(`Risco de Vendas: ${secao.dores[1]}`);
+        if (secao.solucao?.[0]) pontos.push(`Solução Proposta: ${secao.solucao[0]}`);
+        if (secao.impactoVendas) pontos.push(`Impacto Comercial: ${secao.impactoVendas}`);
+      } else {
+        pontos.push(
+          "Atendimento Comercial: Necessidade de padronização nos roteiros de primeiro contato para aumentar a conversão.",
+        );
+        pontos.push(
+          "Velocidade de Resposta: Leads atendidos em menos de 5 minutos convertem até 7 vezes mais no WhatsApp.",
+        );
+        pontos.push(
+          "Solução Locomotiva: Roteiros humanizados de abordagem, scripts para quebra de objeções e matriz de alinhamento.",
+        );
+        pontos.push(
+          "Impacto Esperado: Redução drástica da perda de orçamentos e aumento na retenção de clientes recorrentes.",
+        );
+      }
+      return {
+        id: "slide_diagnostico_comunicacao",
+        tipo: "diagnostico",
+        titulo: secao?.titulo || "Diagnóstico: Comunicação & Atendimento WhatsApp",
+        subtitulo: `Análise de Tempo de Resposta e Estrutura Comercial para ${nomeEmpresa}`,
+        pontos: pontos.slice(0, 4),
+        destaque:
+          secao?.impactoVendas ||
+          "Velocidade e cordialidade no primeiro contato são os fatores que mais aumentam o fechamento de propostas.",
+        tags: ["Diagnóstico", "Comunicação", "WhatsApp"],
+      };
+    }
+
+    case "redes": {
+      const pontos: string[] = [];
+      if (secao && secao.dores?.length) {
+        pontos.push(`Cenário Atual: ${secao.dores[0]}`);
+        if (secao.dores[1]) pontos.push(`Oportunidade: ${secao.dores[1]}`);
+        if (secao.solucao?.[0]) pontos.push(`Solução Proposta: ${secao.solucao[0]}`);
+        if (secao.impactoVendas) pontos.push(`Impacto Comercial: ${secao.impactoVendas}`);
+      } else {
+        pontos.push(
+          empresa.instagram
+            ? `Instagram (@${empresa.instagram}): Status avaliado como "${empresa.statusInstagram}" — potencial inexplorado de atração.`
+            : "Instagram: Ausência de canal visual ativo para demonstração diária de produtos, autoridade e bastidores.",
+        );
+        pontos.push(
+          "Validação do Consumidor: O público moderno consulta as redes para conferir trabalhos recentes e avaliações antes de decidir.",
+        );
+        pontos.push(
+          "Solução Locomotiva: Linha editorial com foco em autoridade, fotos reais de alta qualidade e anúncios locais segmentados.",
+        );
+        pontos.push(
+          "Impacto Esperado: Marca mantida no topo da mente do consumidor na hora da decisão de compra.",
+        );
+      }
+      return {
+        id: "slide_diagnostico_redes",
+        tipo: "diagnostico",
+        titulo: secao?.titulo || "Diagnóstico: Posicionamento & Redes Sociais",
+        subtitulo: `Análise de Linha Editorial, Autoridade e Prova Social para ${nomeEmpresa}`,
+        pontos: pontos.slice(0, 4),
+        destaque:
+          secao?.impactoVendas ||
+          "Redes sociais ativas constroem reputação sólida e mantêm a empresa como primeira opção de compra.",
+        tags: ["Diagnóstico", "Redes Sociais", "Instagram"],
+      };
+    }
+
+    case "branding": {
+      const pontos: string[] = [];
+      if (secao && secao.dores?.length) {
+        pontos.push(`Diagnóstico de Marca: ${secao.dores[0]}`);
+        if (secao.dores[1]) pontos.push(`Risco de Comoditização: ${secao.dores[1]}`);
+        if (secao.solucao?.[0]) pontos.push(`Solução Proposta: ${secao.solucao[0]}`);
+        if (secao.impactoVendas) pontos.push(`Impacto Comercial: ${secao.impactoVendas}`);
+      } else {
+        pontos.push(
+          "Identidade Visual: A imagem da empresa é o primeiro fator que define se o serviço parece de alto padrão ou comum.",
+        );
+        pontos.push(
+          "Guerra de Preços: Negócios sem marca diferenciada são forçados a disputar por preço menor e margem reduzida.",
+        );
+        pontos.push(
+          "Solução Locomotiva: Padronização visual corporativa, paleta cromática de autoridade e apresentação de alto impacto.",
+        );
+        pontos.push(
+          "Impacto Esperado: Elevação do valor percebido, permitindo cobrar preços superiores com menor atrito comercial.",
+        );
+      }
+      return {
+        id: "slide_diagnostico_branding",
+        tipo: "diagnostico",
+        titulo: secao?.titulo || "Diagnóstico: Branding & Percepção de Valor",
+        subtitulo: `Análise de Diferenciação de Marca e Margem Comercial para ${nomeEmpresa}`,
+        pontos: pontos.slice(0, 4),
+        destaque:
+          secao?.impactoVendas ||
+          "Quem investe em branding não disputa clientes por menor preço; é escolhido pela autoridade e excelência.",
+        tags: ["Diagnóstico", "Branding", "Autoridade"],
+      };
+    }
+  }
+}
+
+/**
+ * Insere ou atualiza um slide no deck da apresentação, posicionando-o de forma coerente antes do encerramento
+ */
+export function adicionarSlideAoDeck(
+  deck: ApresentacaoSlidesData,
+  novoSlide: SlideItem,
+): { deckAtualizado: ApresentacaoSlidesData; substituido: boolean; novoIndice: number } {
+  const slides = [...deck.slides];
+  const indiceExistente = slides.findIndex((s) => s.id === novoSlide.id);
+
+  if (indiceExistente >= 0) {
+    slides[indiceExistente] = novoSlide;
+    return {
+      deckAtualizado: {
+        ...deck,
+        slides,
+        atualizadoEm: new Date().toISOString(),
+      },
+      substituido: true,
+      novoIndice: indiceExistente,
+    };
+  }
+
+  // Se não existe, insere antes do slide "fim"
+  const indiceFim = slides.findIndex((s) => s.tipo === "fim");
+  let novoIndice = slides.length;
+  if (indiceFim >= 0) {
+    slides.splice(indiceFim, 0, novoSlide);
+    novoIndice = indiceFim;
+  } else {
+    slides.push(novoSlide);
+    novoIndice = slides.length - 1;
+  }
+
+  return {
+    deckAtualizado: {
+      ...deck,
+      slides,
+      atualizadoEm: new Date().toISOString(),
+    },
+    substituido: false,
+    novoIndice,
+  };
+}

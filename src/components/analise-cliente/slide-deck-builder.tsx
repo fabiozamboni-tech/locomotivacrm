@@ -26,12 +26,21 @@ import {
   Globe,
   Instagram,
   Facebook,
+  MessageCircle,
+  Palette,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { Empresa, SlideItem, ApresentacaoSlidesData } from "@/lib/mock-data";
-import { gerarApresentacaoPadrao } from "@/lib/slide-deck.functions";
+import {
+  gerarApresentacaoPadrao,
+  gerarSlideDiagnosticoPilar,
+  adicionarSlideAoDeck,
+  DIAGNOSTICO_PILARES_INFO,
+  type DiagnosticoPilarKey,
+} from "@/lib/slide-deck.functions";
 import type { Dossier360Result } from "@/lib/dossier-360.functions";
 import type { Relatorio } from "@/lib/relatorio.functions";
 import { exportarApresentacaoPDF, exportarApresentacaoPPTX } from "@/lib/slide-deck-exporter";
@@ -64,15 +73,42 @@ export function SlideDeckBuilder({
   const [exportandoPDF, setExportandoPDF] = useState(false);
   const [exportandoPPTX, setExportandoPPTX] = useState(false);
 
-  // Atualiza se a empresa mudar
+  // Atualiza se a empresa mudar ou se a apresentação for atualizada externamente
   useEffect(() => {
     if (empresa.apresentacaoSlides && empresa.apresentacaoSlides.slides?.length) {
       setDeck(empresa.apresentacaoSlides);
     } else {
       setDeck(gerarApresentacaoPadrao(empresa, dossier, relatorio));
     }
-    setSlideAtivoIndex(0);
-  }, [empresa.id]);
+  }, [empresa.id, empresa.apresentacaoSlides?.atualizadoEm, empresa.apresentacaoSlides?.slides?.length]);
+
+  const handleAdicionarSlideDiagnostico = (pilar: DiagnosticoPilarKey) => {
+    const secao = relatorio?.secoes?.find((s) => {
+      const p = (s.pilar || "").toLowerCase();
+      const t = (s.titulo || "").toLowerCase();
+      if (pilar === "site") return p === "site" || t.includes("site") || t.includes("web");
+      if (pilar === "comunicacao") return p === "comunicacao" || t.includes("comunicação") || t.includes("comunicacao") || t.includes("atendimento");
+      if (pilar === "redes") return p === "redes" || t.includes("rede") || t.includes("instagram");
+      if (pilar === "branding") return p === "branding" || t.includes("brand") || t.includes("marca");
+      return false;
+    });
+
+    const novoSlide = gerarSlideDiagnosticoPilar(pilar, empresa, secao, relatorio);
+    const { deckAtualizado, substituido, novoIndice } = adicionarSlideAoDeck(deck, novoSlide);
+
+    setDeck(deckAtualizado);
+    setSlideAtivoIndex(novoIndice);
+
+    if (onSave) {
+      onSave(deckAtualizado);
+    }
+
+    toast.success(
+      substituido
+        ? `Slide de Diagnóstico (${DIAGNOSTICO_PILARES_INFO[pilar].nome}) atualizado!`
+        : `Slide de Diagnóstico (${DIAGNOSTICO_PILARES_INFO[pilar].nome}) adicionado ao deck!`,
+    );
+  };
 
   const slideAtual = deck.slides[slideAtivoIndex] || deck.slides[0];
 
@@ -323,7 +359,7 @@ export function SlideDeckBuilder({
         <div className="grid lg:grid-cols-[300px_1fr] gap-6 items-start print:hidden">
           {/* COLUNA ESQUERDA: LISTA DE SLIDES */}
           <Card className="border-border/80">
-            <CardHeader className="pb-3 border-b border-border/60">
+            <CardHeader className="pb-2.5 border-b border-border/60">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Slides ({deck.slides.length})
@@ -339,6 +375,59 @@ export function SlideDeckBuilder({
                 </Button>
               </div>
             </CardHeader>
+            {/* ATALHOS RÁPIDOS PARA INSERIR DIAGNÓSTICO DOS 4 PILARES */}
+            <div className="p-2 border-b border-border/50 bg-muted/20 space-y-1.5">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                <Sparkles className="h-3 w-3 text-[#d22d67]" />
+                Inserir Diagnóstico:
+              </p>
+              <div className="grid grid-cols-2 gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleAdicionarSlideDiagnostico("site")}
+                  className="h-6 text-[10px] px-1.5 justify-start gap-1 font-medium hover:border-blue-400 hover:text-blue-600 bg-background"
+                  title="Inserir slide de Diagnóstico do Site"
+                >
+                  <Globe className="h-2.5 w-2.5 text-blue-500 shrink-0" />
+                  <span className="truncate">Site</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleAdicionarSlideDiagnostico("comunicacao")}
+                  className="h-6 text-[10px] px-1.5 justify-start gap-1 font-medium hover:border-emerald-400 hover:text-emerald-600 bg-background"
+                  title="Inserir slide de Diagnóstico de Comunicação e WhatsApp"
+                >
+                  <MessageCircle className="h-2.5 w-2.5 text-emerald-500 shrink-0" />
+                  <span className="truncate">Comunicação</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleAdicionarSlideDiagnostico("redes")}
+                  className="h-6 text-[10px] px-1.5 justify-start gap-1 font-medium hover:border-pink-400 hover:text-pink-600 bg-background"
+                  title="Inserir slide de Diagnóstico de Redes Sociais"
+                >
+                  <Instagram className="h-2.5 w-2.5 text-pink-500 shrink-0" />
+                  <span className="truncate">Redes Sociais</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleAdicionarSlideDiagnostico("branding")}
+                  className="h-6 text-[10px] px-1.5 justify-start gap-1 font-medium hover:border-purple-400 hover:text-purple-600 bg-background"
+                  title="Inserir slide de Diagnóstico de Branding"
+                >
+                  <Palette className="h-2.5 w-2.5 text-purple-500 shrink-0" />
+                  <span className="truncate">Branding</span>
+                </Button>
+              </div>
+            </div>
             <CardContent className="p-2 space-y-1.5 max-h-[650px] overflow-y-auto">
               {deck.slides.map((s, idx) => {
                 const ativo = idx === slideAtivoIndex;

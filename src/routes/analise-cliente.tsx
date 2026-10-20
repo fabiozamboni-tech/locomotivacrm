@@ -44,6 +44,14 @@ import {
 import { gerarAbordagemAmigavelIA_ServerFn } from "@/lib/abordagem-ia.functions";
 import { MatrizResponsabilidades } from "@/components/analise-cliente/matriz-responsabilidades";
 import { SlideDeckBuilder } from "@/components/analise-cliente/slide-deck-builder";
+import {
+  gerarApresentacaoPadrao,
+  gerarSlideDiagnosticoPilar,
+  adicionarSlideAoDeck,
+  mapearPilarSecao,
+  DIAGNOSTICO_PILARES_INFO,
+  type DiagnosticoPilarKey,
+} from "@/lib/slide-deck.functions";
 import { CopilotoObjecoesModal } from "@/components/copiloto-objecoes-modal";
 import { CadenciaModal } from "@/components/cadencia-modal";
 import { EnviarEmailModal } from "@/components/enviar-email-modal";
@@ -661,6 +669,98 @@ function AnaliseClientePage() {
     });
   };
 
+  // 4.1 Adicionar Item Individual de Diagnóstico na Apresentação em Slides (Resumido)
+  const handleAdicionarDiagnosticoAosSlides = (pilar: DiagnosticoPilarKey) => {
+    if (!empresa) return;
+
+    const currentDeck =
+      empresa.apresentacaoSlides && empresa.apresentacaoSlides.slides?.length
+        ? empresa.apresentacaoSlides
+        : gerarApresentacaoPadrao(empresa, dossier, resRelatorio?.relatorio);
+
+    const secao = resRelatorio?.relatorio?.secoes?.find((s) => {
+      const p = (s.pilar || "").toLowerCase();
+      const t = (s.titulo || "").toLowerCase();
+      if (pilar === "site") return p === "site" || t.includes("site") || t.includes("web") || t.includes("google");
+      if (pilar === "comunicacao") return p === "comunicacao" || t.includes("comunicação") || t.includes("comunicacao") || t.includes("atendimento") || t.includes("whatsapp");
+      if (pilar === "redes") return p === "redes" || t.includes("rede") || t.includes("instagram") || t.includes("social");
+      if (pilar === "branding") return p === "branding" || t.includes("brand") || t.includes("marca") || t.includes("identidade");
+      return false;
+    });
+
+    const novoSlide = gerarSlideDiagnosticoPilar(pilar, empresa, secao, resRelatorio?.relatorio);
+    const { deckAtualizado, substituido } = adicionarSlideAoDeck(currentDeck, novoSlide);
+
+    updateEmpresa(empresa.id, {
+      apresentacaoSlides: deckAtualizado,
+      analiseAtualizadaEm: new Date().toISOString(),
+    });
+
+    addHistorico(empresa.id, {
+      data: new Date().toISOString(),
+      tipo: "nota",
+      texto: `Slide de Diagnóstico (${DIAGNOSTICO_PILARES_INFO[pilar].nome}) adicionado à apresentação de slides.`,
+    });
+
+    toast.success(
+      substituido
+        ? `Diagnóstico de ${DIAGNOSTICO_PILARES_INFO[pilar].nome} atualizado na Apresentação!`
+        : `Diagnóstico de ${DIAGNOSTICO_PILARES_INFO[pilar].nome} adicionado aos Slides!`,
+      {
+        action: {
+          label: "Ver Slides",
+          onClick: () => handleTrocaTab("slides"),
+        },
+      },
+    );
+  };
+
+  // 4.2 Adicionar Todos os 4 Itens de Diagnóstico na Apresentação em Slides
+  const handleAdicionarTodosDiagnosticosAosSlides = () => {
+    if (!empresa) return;
+
+    let currentDeck =
+      empresa.apresentacaoSlides && empresa.apresentacaoSlides.slides?.length
+        ? empresa.apresentacaoSlides
+        : gerarApresentacaoPadrao(empresa, dossier, resRelatorio?.relatorio);
+
+    const pilaresChaves: DiagnosticoPilarKey[] = ["site", "comunicacao", "redes", "branding"];
+
+    for (const pilar of pilaresChaves) {
+      const secao = resRelatorio?.relatorio?.secoes?.find((s) => {
+        const p = (s.pilar || "").toLowerCase();
+        const t = (s.titulo || "").toLowerCase();
+        if (pilar === "site") return p === "site" || t.includes("site") || t.includes("web") || t.includes("google");
+        if (pilar === "comunicacao") return p === "comunicacao" || t.includes("comunicação") || t.includes("comunicacao") || t.includes("atendimento") || t.includes("whatsapp");
+        if (pilar === "redes") return p === "redes" || t.includes("rede") || t.includes("instagram") || t.includes("social");
+        if (pilar === "branding") return p === "branding" || t.includes("brand") || t.includes("marca") || t.includes("identidade");
+        return false;
+      });
+
+      const novoSlide = gerarSlideDiagnosticoPilar(pilar, empresa, secao, resRelatorio?.relatorio);
+      const { deckAtualizado } = adicionarSlideAoDeck(currentDeck, novoSlide);
+      currentDeck = deckAtualizado;
+    }
+
+    updateEmpresa(empresa.id, {
+      apresentacaoSlides: currentDeck,
+      analiseAtualizadaEm: new Date().toISOString(),
+    });
+
+    addHistorico(empresa.id, {
+      data: new Date().toISOString(),
+      tipo: "nota",
+      texto: `Os 4 slides de Diagnóstico (Site, Comunicação, Redes e Branding) foram adicionados à apresentação.`,
+    });
+
+    toast.success("Os 4 diagnósticos foram sintetizados e adicionados aos slides!", {
+      action: {
+        label: "Ver Slides",
+        onClick: () => handleTrocaTab("slides"),
+      },
+    });
+  };
+
   // 5. Botão Master: Atualiza Análise Completa de Uma Vez
   const [atualizandoTudo, setAtualizandoTudo] = useState(false);
   const handleAtualizarTudo = async () => {
@@ -949,6 +1049,169 @@ function AnaliseClientePage() {
               </CardContent>
             </Card>
 
+            {/* ===================================================================
+                INTEGRAÇÃO COM SLIDES: BOTÕES DE DIAGNÓSTICO RESUMIDO (4 PILARES)
+               =================================================================== */}
+            <Card className="border-[#d22d67]/30 bg-gradient-to-r from-pink-500/5 via-card to-card shadow-xs print:hidden">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline" className="text-[10px] bg-[#d22d67]/10 text-[#d22d67] border-[#d22d67]/30 font-semibold">
+                        Apresentação em Slides
+                      </Badge>
+                      <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                        <Presentation className="h-4 w-4 text-[#d22d67]" />
+                        Adicionar Diagnóstico na Apresentação em Slides (Resumido)
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Sintetize os diagnósticos em slides oficiais da Locomotiva para apresentar ao cliente ou exportar em PDF e PPTX.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleAdicionarTodosDiagnosticosAosSlides}
+                      className="h-8 text-xs gap-1.5 bg-[#d22d67] hover:bg-[#b81d54] text-white shadow-xs font-medium"
+                      title="Adiciona todos os 4 slides de diagnóstico de uma só vez"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Adicionar Todos aos Slides
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleTrocaTab("slides")}
+                      className="h-8 text-xs gap-1 border-border/80 text-muted-foreground hover:text-foreground"
+                      title="Ir para a aba de slides da apresentação"
+                    >
+                      <Presentation className="h-3.5 w-3.5 text-[#d22d67]" />
+                      Ver Slides
+                    </Button>
+                  </div>
+                </div>
+
+                {/* BOTÕES INDIVIDUAIS: UM BOTÃO PARA CADA ITEM (SITE, COMUNICAÇÃO, REDES SOCIAIS, BRANDING) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+                  {/* 1. SITE */}
+                  <div className="p-3 rounded-lg border border-blue-200/70 dark:border-blue-900/40 bg-blue-50/30 dark:bg-blue-950/10 flex flex-col justify-between gap-2.5 hover:border-blue-400 transition-colors">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                          <Globe className="h-3.5 w-3.5 text-blue-500" />
+                          Site Oficial
+                        </span>
+                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-blue-300 text-blue-600 bg-blue-50 dark:bg-blue-950">
+                          Google
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        Indexação, responsividade mobile, velocidade e captação de clientes locais.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleAdicionarDiagnosticoAosSlides("site")}
+                      className="h-7 text-xs gap-1.5 w-full border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100/50 dark:hover:bg-blue-900/30 font-medium"
+                    >
+                      <Presentation className="h-3 w-3 text-blue-500" />
+                      Adicionar Site aos Slides
+                    </Button>
+                  </div>
+
+                  {/* 2. COMUNICAÇÃO */}
+                  <div className="p-3 rounded-lg border border-emerald-200/70 dark:border-emerald-900/40 bg-emerald-50/30 dark:bg-emerald-950/10 flex flex-col justify-between gap-2.5 hover:border-emerald-400 transition-colors">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                          <MessageCircle className="h-3.5 w-3.5 text-emerald-500" />
+                          Comunicação
+                        </span>
+                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-emerald-300 text-emerald-600 bg-emerald-50 dark:bg-emerald-950">
+                          WhatsApp
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        Tempo de resposta no primeiro contato e scripts de quebra de objeções.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleAdicionarDiagnosticoAosSlides("comunicacao")}
+                      className="h-7 text-xs gap-1.5 w-full border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/50 dark:hover:bg-emerald-900/30 font-medium"
+                    >
+                      <Presentation className="h-3 w-3 text-emerald-500" />
+                      Adicionar Comunicação aos Slides
+                    </Button>
+                  </div>
+
+                  {/* 3. REDES SOCIAIS */}
+                  <div className="p-3 rounded-lg border border-pink-200/70 dark:border-pink-900/40 bg-pink-50/30 dark:bg-pink-950/10 flex flex-col justify-between gap-2.5 hover:border-pink-400 transition-colors">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                          <Instagram className="h-3.5 w-3.5 text-pink-500" />
+                          Redes Sociais
+                        </span>
+                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-pink-300 text-pink-600 bg-pink-50 dark:bg-pink-950">
+                          Instagram
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        Linha editorial, frequência, autoridade visual e desejo de compra diário.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleAdicionarDiagnosticoAosSlides("redes")}
+                      className="h-7 text-xs gap-1.5 w-full border-pink-300 dark:border-pink-800 text-pink-700 dark:text-pink-300 hover:bg-pink-100/50 dark:hover:bg-pink-900/30 font-medium"
+                    >
+                      <Presentation className="h-3 w-3 text-pink-500" />
+                      Adicionar Redes aos Slides
+                    </Button>
+                  </div>
+
+                  {/* 4. BRANDING */}
+                  <div className="p-3 rounded-lg border border-purple-200/70 dark:border-purple-900/40 bg-purple-50/30 dark:bg-purple-950/10 flex flex-col justify-between gap-2.5 hover:border-purple-400 transition-colors">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                          <Palette className="h-3.5 w-3.5 text-purple-500" />
+                          Branding
+                        </span>
+                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-purple-300 text-purple-600 bg-purple-50 dark:bg-purple-950">
+                          Marca
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        Padronização visual corporativa, percepção de valor e ticket médio elevado.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleAdicionarDiagnosticoAosSlides("branding")}
+                      className="h-7 text-xs gap-1.5 w-full border-purple-300 dark:border-purple-800 text-purple-700 dark:text-purple-300 hover:bg-purple-100/50 dark:hover:bg-purple-900/30 font-medium"
+                    >
+                      <Presentation className="h-3 w-3 text-purple-500" />
+                      Adicionar Branding aos Slides
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* RELATÓRIO CARREGADO DO BANCO OU RECÉM-GERADO */}
             {resRelatorio ? (
               <div className="space-y-6">
@@ -1068,28 +1331,46 @@ function AnaliseClientePage() {
                   </Card>
 
                   {/* SEÇÕES DOS PILARES */}
-                  {resRelatorio.relatorio.secoes.map((s, idx) => (
-                    <section key={idx} className="space-y-2 border-t pt-4">
-                      <h4 className="font-bold text-base">{s.titulo}</h4>
-                      <div className="grid md:grid-cols-2 gap-4 text-xs">
-                        <div>
-                          <p className="font-semibold text-destructive mb-1">Onde a marca está perdendo</p>
-                          <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
-                            {s.dores.map((d, dIdx) => <li key={dIdx}>{d}</li>)}
-                          </ul>
+                  {resRelatorio.relatorio.secoes.map((s, idx) => {
+                    const pilarMapeado = mapearPilarSecao(s);
+                    return (
+                      <section key={idx} className="space-y-2 border-t pt-4">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <h4 className="font-bold text-base">{s.titulo}</h4>
+                          {pilarMapeado && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleAdicionarDiagnosticoAosSlides(pilarMapeado)}
+                              className="h-7 text-xs gap-1.5 border-[#d22d67]/30 text-[#d22d67] hover:bg-[#d22d67]/10"
+                              title={`Adicionar resumo deste diagnóstico (${DIAGNOSTICO_PILARES_INFO[pilarMapeado].nome}) na apresentação`}
+                            >
+                              <Presentation className="h-3.5 w-3.5" />
+                              Adicionar aos Slides
+                            </Button>
+                          )}
                         </div>
-                        <div>
-                          <p className="font-semibold text-primary mb-1">O que a Locomotiva propõe</p>
-                          <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
-                            {s.solucao.map((sol, sIdx) => <li key={sIdx}>{sol}</li>)}
-                          </ul>
+                        <div className="grid md:grid-cols-2 gap-4 text-xs">
+                          <div>
+                            <p className="font-semibold text-destructive mb-1">Onde a marca está perdendo</p>
+                            <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
+                              {s.dores.map((d, dIdx) => <li key={dIdx}>{d}</li>)}
+                            </ul>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-primary mb-1">O que a Locomotiva propõe</p>
+                            <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
+                              {s.solucao.map((sol, sIdx) => <li key={sIdx}>{sol}</li>)}
+                            </ul>
+                          </div>
                         </div>
-                      </div>
-                      <div className="p-3 rounded-lg bg-muted/40 text-xs">
-                        <strong>Impacto nas Vendas:</strong> {s.impactoVendas}
-                      </div>
-                    </section>
-                  ))}
+                        <div className="p-3 rounded-lg bg-muted/40 text-xs">
+                          <strong>Impacto nas Vendas:</strong> {s.impactoVendas}
+                        </div>
+                      </section>
+                    );
+                  })}
                 </article>
               </div>
             ) : (
