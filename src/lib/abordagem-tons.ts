@@ -5,7 +5,12 @@ export type TomAbordagemId =
   | "consultivo_parceiro"
   | "descontraido_curioso"
   | "valorizacao_marca"
-  | "direto_gentil";
+  | "direto_gentil"
+  | "ajuda_desinteressada"
+  | "indicacao_comunidade"
+  | "demanda_aquecida"
+  | "diagnostico_amigo"
+  | "humanizado_historias";
 
 export interface TomAbordagemItem {
   id: TomAbordagemId;
@@ -21,7 +26,7 @@ export interface TomAbordagemItem {
 export const TONS_ABORDAGEM: TomAbordagemItem[] = [
   {
     id: "amigavel_elogio",
-    nome: "Amigável & Elogio Genuíno",
+    nome: "1. Amigável & Elogio Genuíno",
     subtitulo: "Rapport caloroso e valorização da qualidade do cliente",
     descricao: "Começa elogiando sinceramente o trabalho ou reputação da empresa na cidade. Quebra a barreira defensiva logo na primeira linha.",
     icone: "Sparkles",
@@ -31,7 +36,7 @@ export const TONS_ABORDAGEM: TomAbordagemItem[] = [
   },
   {
     id: "consultivo_parceiro",
-    nome: "Consultivo & Parceiro Regional",
+    nome: "2. Consultivo & Parceiro Regional",
     subtitulo: "Troca de ideias entre empreendedores da mesma região",
     descricao: "Postura de parceiro estratégico que identificou oportunidades de mercado na região e quer compartilhar insights sem forçar venda.",
     icone: "Users",
@@ -41,7 +46,7 @@ export const TONS_ABORDAGEM: TomAbordagemItem[] = [
   },
   {
     id: "descontraido_curioso",
-    nome: "Descontraído & Curioso",
+    nome: "3. Descontraído & Café Rápido",
     subtitulo: "Linguagem leve e natural, zero jargões corporativos",
     descricao: "Tom de conversa informal como um conhecido puxando assunto. Gera alta taxa de resposta por parecer 100% humano.",
     icone: "MessageCircle",
@@ -51,7 +56,7 @@ export const TONS_ABORDAGEM: TomAbordagemItem[] = [
   },
   {
     id: "valorizacao_marca",
-    nome: "Valorização & Padrão de Excelência",
+    nome: "4. Valorização & Padrão de Excelência",
     subtitulo: "Apelo ao orgulho da empresa e fim da briga por preço",
     descricao: "Reconhece o esforço em construir um negócio de qualidade e propõe alinhar a vitrine digital para que o cliente pague o valor justo.",
     icone: "Target",
@@ -61,13 +66,63 @@ export const TONS_ABORDAGEM: TomAbordagemItem[] = [
   },
   {
     id: "direto_gentil",
-    nome: "Direto ao Ponto & Gentil",
+    nome: "5. Direto ao Ponto & Gentil",
     subtitulo: "Objetivo, educado e focado no tempo escasso do decisor",
     descricao: "Vai direto à oportunidade de novos clientes, mas com máxima cordialidade e consideração pela rotina corrida do empresário.",
     icone: "Zap",
     tagline: "Decisores Ocupados",
     canalRecomendado: "WhatsApp & Ligação Rápida",
     badgeCls: "bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-500/30",
+  },
+  {
+    id: "ajuda_desinteressada",
+    nome: "6. Ajuda Desinteressada & Cortesia",
+    subtitulo: "Entrega uma dica prática de imediato sem pedir nada em troca",
+    descricao: "Oferece uma melhoria simples e útil nos canais atuais do cliente. Mostra generosidade profissional e gera reciprocidade imediata.",
+    icone: "Gift",
+    tagline: "Gera Reciprocidade",
+    canalRecomendado: "Direct Instagram & WhatsApp",
+    badgeCls: "bg-teal-500/10 text-teal-600 border-teal-500/30",
+  },
+  {
+    id: "indicacao_comunidade",
+    nome: "7. Indicação & Conexão Local",
+    subtitulo: "Abordagem com base na proximidade e força da comunidade",
+    descricao: "Cita a presença marcante da empresa no bairro ou cidade. Aproxima os laços como conterrâneo que valoriza o comércio e serviços locais.",
+    icone: "MapPin",
+    tagline: "Relação Comunitária",
+    canalRecomendado: "WhatsApp & Ligação",
+    badgeCls: "bg-rose-500/10 text-rose-600 border-rose-500/30",
+  },
+  {
+    id: "demanda_aquecida",
+    nome: "8. Demanda Aquecida & Tendência",
+    subtitulo: "Compartilha buscas reais e volume de clientes em alta na cidade",
+    descricao: "Apresenta dados de pessoas pesquisando ativamente por aquele produto ou serviço na região e mostra como captar esses clientes.",
+    icone: "TrendingUp",
+    tagline: "Foco em Vendas",
+    canalRecomendado: "WhatsApp & E-mail",
+    badgeCls: "bg-indigo-500/10 text-indigo-600 border-indigo-500/30",
+  },
+  {
+    id: "diagnostico_amigo",
+    nome: "9. Diagnóstico Amigo & Construtivo",
+    subtitulo: "Sugestão amigável para não perder contatos no WhatsApp",
+    descricao: "Alerta com simpatia sobre um detalhe no perfil ou na busca local que pode estar deixando dinheiro na mesa, como um amigo aconselhando.",
+    icone: "CheckCircle",
+    tagline: "Anti-Bloqueio",
+    canalRecomendado: "WhatsApp & Instagram Direct",
+    badgeCls: "bg-cyan-500/10 text-cyan-600 border-cyan-500/30",
+  },
+  {
+    id: "humanizado_historias",
+    nome: "10. Humanizado & Histórias Reais",
+    subtitulo: "Foco nas pessoas por trás do negócio e atendimento acolhedor",
+    descricao: "Destaca o atendimento humanizado que a empresa já tem no presencial e sugere levar esse mesmo carinho para o ambiente digital.",
+    icone: "Heart",
+    tagline: "Conexão Emocional",
+    canalRecomendado: "Instagram Direct & WhatsApp",
+    badgeCls: "bg-pink-500/10 text-pink-600 border-pink-500/30",
   },
 ];
 
@@ -179,7 +234,7 @@ export function gerarTextoProntoPorTom(
   }
 
   // =========================================================================
-  // 3. TOM: DESCONTRAÍDO & CURIOSO (WHATSAPP ÁGIL / ZERO FORMALISMO)
+  // 3. TOM: DESCONTRAÍDO & CAFÉ RÁPIDO (LEVE / ESPONTÂNEO)
   // =========================================================================
   if (tom === "descontraido_curioso") {
     switch (canal) {
@@ -267,41 +322,256 @@ export function gerarTextoProntoPorTom(
   // =========================================================================
   // 5. TOM: DIRETO AO PONTO & GENTIL (EXECUTIVO ÁGIL)
   // =========================================================================
+  if (tom === "direto_gentil") {
+    switch (canal) {
+      case "whatsapp":
+        return {
+          ganchoAbertura: `Oportunidade prática para a ${nome} em ${cid}`,
+          dicaEnvio: "Ideal para horários de início de expediente (entre 8h30 e 10h).",
+          texto: `Olá, [Nome do contato]! Sei que sua rotina é corrida, então serei bem breve e direto. 😊\n\nSou o [Seu Nome], da ${agencia} aqui da região. Mapeamos que há dezenas de pesquisas mensais no Google em ${cid} buscando por '${seg}' que não estão encontrando a ${nome} nas primeiras posições.\n\nEstruturamos um caminho bem prático para colocar sua empresa no topo dessas buscas e receber esses contatos direto no WhatsApp comercial.\n\nSe você tiver 5 minutos livres nesta semana, me avise por aqui para conversarmos. Abraço e bom trabalho por aí!`,
+        };
+
+      case "instagram":
+        return {
+          ganchoAbertura: `Contato rápido sobre novos clientes em ${cid}`,
+          dicaEnvio: "Mensagem objetiva que respeita a caixa de entrada.",
+          texto: `Olá, pessoal da ${nome}! Tudo bem?\n\nPassando só para compartilhar que mapeamos uma busca expressiva por ${seg} aqui em ${cid} no Google, e queremos ajudar a direcionar esses orçamentos para vocês.\n\nQual o melhor WhatsApp comercial do responsável para eu enviar os números em 1 minuto?\n\nObrigado!`,
+        };
+
+      case "email":
+        return {
+          assunto: `Demanda de ${seg} em ${cid} — Contato direto ${nome}`,
+          ganchoAbertura: `Direto ao ponto: como captar os clientes de ${seg} que buscam no Google em ${cid}`,
+          dicaEnvio: "Use bullet points curtos para facilitar a leitura no smartphone.",
+          texto: `Olá, [Nome do contato],\n\nSei que seu tempo é valioso, então vou direto ao ponto:\n\nIdentificamos que a ${nome} vem perdendo oportunidades diárias de orçamentos de ${seg} em ${cid} porque seus concorrentes diretos estão ocupando o topo do Google Maps e buscas locais.\n\nMontamos um diagnóstico de 2 minutos mostrando como reverter esse cenário e gerar contatos imediatos no seu WhatsApp:\n👉 ${auditLink}\n\nSe fizer sentido, me avise para agendarmos uma rápida ligação de 10 minutos.\n\nAtenciosamente,\n[Seu Nome]\n${agencia}`,
+        };
+
+      case "ligacaoReuniao":
+        return {
+          ganchoAbertura: `Olá, [Nome]! Prometo ser breve, tenho apenas um dado rápido sobre ${cid} para te passar.`,
+          dicaEnvio: "Respeite o tempo do empresário. Se disser que está ocupado, pergunte o melhor horário.",
+          texto: `Olá, [Nome]! Me chamo [Seu Nome], da ${agencia}. Prometo ser bem rápido para não atrapalhar seu dia: estamos ajudando empresas de ${seg} aqui em ${cid} a captarem clientes que pesquisam no Google todo dia. Vimos que a ${nome} tem potencial para dobrar os contatos que recebe pelo WhatsApp. Você tem 5 minutos na quinta-feira para eu te mostrar como funciona na prática?`,
+        };
+
+      case "propostaValor360":
+        return {
+          ganchoAbertura: `Velocidade de execução e foco estrito em aumento de orçamentos.`,
+          dicaEnvio: "Apresente números e prazo de retorno.",
+          texto: `PROPOSTA EXECUTIVA DE RETORNO RÁPIDO — ${nome.toUpperCase()}\n\nSolução enxuta, sem burocracia e com início imediato para colocar a ${nome} no topo das pesquisas locais e estruturar o atendimento digital em até 14 dias úteis.`,
+        };
+    }
+  }
+
+  // =========================================================================
+  // 6. TOM: AJUDA DESINTERESSADA & CORTESIA
+  // =========================================================================
+  if (tom === "ajuda_desinteressada") {
+    switch (canal) {
+      case "whatsapp":
+        return {
+          ganchoAbertura: `Uma dica simples que notei no perfil da ${nome} em ${cid}`,
+          dicaEnvio: "Excelente para criar confiança imediata, pois você ajuda primeiro sem cobrar nada.",
+          texto: `Olá, pessoal da ${nome}! Tudo bem? Me chamo [Seu Nome], da ${agencia} aqui da serra.\n\nEstava navegando no Google procurando empresas de ${seg} em ${cid} e notei um detalhe simples no perfil de vocês que pode estar fazendo alguns clientes desistirem antes de chamar no Whats.\n\nComo trabalho com isso todo dia, gravei uma dica prática de 40 segundos mostrando como ajustar isso em 2 minutos, sem custo nenhum.\n\nPosso te mandar aqui? É de coração, só para ajudar mesmo!\n\nAbraço e ótimo trabalho!`,
+        };
+
+      case "instagram":
+        return {
+          ganchoAbertura: `Uma dica rápida sobre o link do perfil de vocês!`,
+          dicaEnvio: "Aponte um ajuste real (ex: link direto de WhatsApp ou biografia).",
+          texto: `Oi, pessoal da ${nome}! Tudo bem? Adoro o trabalho de vocês!\n\nNotei um detalhe técnico bem simples no link de atendimento aqui do Instagram que às vezes trava o clique de quem tenta chamar pelo celular.\n\nTenho um passo a passo de 1 minuto para corrigir isso bem rápido. Posso te mandar por aqui? Fico feliz em ajudar!\n\nAbraços!`,
+        };
+
+      case "email":
+        return {
+          assunto: `Dica de cortesia para a equipe da ${nome} (${cid})`,
+          ganchoAbertura: `Um ajuste simples para não perder orçamentos pelo smartphone`,
+          dicaEnvio: "Compartilhe uma vitória rápida logo no primeiro e-mail.",
+          texto: `Olá, equipe da ${nome},\n\nTudo bem? Meu nome é [Seu Nome], da ${agencia}.\n\nEstive pesquisando sobre ${seg} em ${cid} e notei uma pequena melhoria no direcionamento de contatos da ${nome} que pode aumentar imediatamente o número de orçamentos recebidos.\n\nPreparamos esse diagnóstico completo e gratuito para vocês:\n👉 ${auditLink}\n\nFiquem à vontade para aplicar internamente. Se precisarem de qualquer ajuda ou quiserem tirar dúvidas, estou 100% à disposição.\n\nUm grande abraço,\n[Seu Nome] · ${agencia}`,
+        };
+
+      case "ligacaoReuniao":
+        return {
+          ganchoAbertura: `Olá, [Nome]! Estou ligando só para te passar uma dica rápida que vi sobre ${cid}.`,
+          dicaEnvio: "Não tente vender na ligação. Apenas entregue a dica e se coloque à disposição.",
+          texto: `Olá, [Nome]! Tudo bem? Me chamo [Seu Nome], da ${agencia}. Não estou ligando para te vender nada, só queria te avisar de um detalhe rápido que vi no cadastro da ${nome} no Google Maps que pode estar impedindo clientes de ligarem diretamente para vocês. Você prefere que eu te mande o print pelo WhatsApp para você ajustar com a sua equipe?`,
+        };
+
+      case "propostaValor360":
+        return {
+          ganchoAbertura: `Generosidade profissional e parceria contínua sem letras miúdas.`,
+          dicaEnvio: "Enfatize suporte próximo e consultoria amiga.",
+          texto: `PARCERIA DE SUPORTE E CRESCIMENTO — ${nome.toUpperCase()}\n\nMais do que fornecedores, somos conselheiros de comunicação que cuidam para que cada ponto de contato da ${nome} funcione perfeitamente, gerando confiança e novos clientes todos os dias.`,
+        };
+    }
+  }
+
+  // =========================================================================
+  // 7. TOM: INDICAÇÃO & CONEXÃO LOCAL
+  // =========================================================================
+  if (tom === "indicacao_comunidade") {
+    switch (canal) {
+      case "whatsapp":
+        return {
+          ganchoAbertura: `Conexão local aqui em ${cid} — Trabalho da ${nome}`,
+          dicaEnvio: "Cite o orgulho da cidade e a importância de fortalecer empresas locais.",
+          texto: `Olá, [Nome do contato]! Tudo bem? Me chamo [Seu Nome], sou daqui da região e atuo com comunicação na ${agencia}.\n\nSempre vejo o nome da ${nome} sendo mencionado quando o assunto é ${seg} aqui em ${cid}. Como conterrâneo, fico muito feliz em ver negócios sérios prosperando na nossa cidade.\n\nEstive pensando em algumas ideias locais para fortalecer ainda mais essa presença entre os moradores e condomínios da região.\n\nSe tiver um minutinho livre, adoraria te mandar um áudio rápido para me apresentar e compartilhar essas ideias. Pode ser?\n\nUm abraço fraterno!`,
+        };
+
+      case "instagram":
+        return {
+          ganchoAbertura: `Mais um fã do trabalho de vocês aqui de ${cid}!`,
+          dicaEnvio: "Aproxime-se como cliente e vizinho comercial da cidade.",
+          texto: `Olá, vizinhos da ${nome}! Tudo bem? 😊\n\nSou daqui de ${cid} também e acompanho a evolução de vocês em ${seg}. Muito bacana ver a empresa crescendo com tanta dedicação!\n\nDepois me passem o WhatsApp de vocês para eu dar um oi e trocar umas ideias com o time comercial.\n\nSucesso sempre por aqui!`,
+        };
+
+      case "email":
+        return {
+          assunto: `Parceria local em ${cid} — Fortalecendo a ${nome}`,
+          ganchoAbertura: `Valorizando o comércio e os serviços tradicionais da nossa cidade`,
+          dicaEnvio: "Use linguagem respeitosa que ressalte o sentimento de comunidade gaúcha.",
+          texto: `Prezados amigos da ${nome},\n\nComo moradores e empreendedores da nossa querida região de ${cid}, acompanhamos com muito orgulho a trajetória de vocês em ${seg}.\n\nSabemos que a melhor indicação é a de quem confia no trabalho local. Por isso, estruturamos uma estratégia comunitária que conecta a ${nome} com quem procura por serviços de excelência na cidade:\n👉 ${auditLink}\n\nSerá uma grande honra tomar um café e estreitar laços com a equipe de vocês.\n\nUm abraço cordial,\n[Seu Nome]\n${agencia} · Valorizando Nossa Terra`,
+        };
+
+      case "ligacaoReuniao":
+        return {
+          ganchoAbertura: `Olá, [Nome]! Sou daqui de ${cid} e liguei para prestigiar o trabalho da ${nome}.`,
+          dicaEnvio: "Fale com acolhimento e sotaque regional caloroso.",
+          texto: `Olá, [Nome]! Tudo bem? Me chamo [Seu Nome], sou daqui de ${cid} e trabalho na ${agencia}. Liguei rapidinho para parabenizar vocês pelo trabalho em ${seg} e comentar uma ideia bacana para valorizar ainda mais a marca de vocês entre os clientes aqui da nossa cidade. Podemos tomar um café nesta semana para nos conhecermos pessoalmente?`,
+        };
+
+      case "propostaValor360":
+        return {
+          ganchoAbertura: `Fortalecimento da marca regional com raízes profundas na comunidade.`,
+          dicaEnvio: "Destaque a identificação cultural com o público da Serra Gaúcha.",
+          texto: `ESTRATÉGIA DE LIDERANÇA REGIONAL — ${nome.toUpperCase()}\n\nConsolidação da ${nome} como a principal autoridade e referência afetiva em ${cid}, unindo o orgulho local com o que há de mais moderno em tecnologia e comunicação.`,
+        };
+    }
+  }
+
+  // =========================================================================
+  // 8. TOM: DEMANDA AQUECIDA & TENDÊNCIA LOCAL
+  // =========================================================================
+  if (tom === "demanda_aquecida") {
+    switch (canal) {
+      case "whatsapp":
+        return {
+          ganchoAbertura: `Alta procura por ${seg} em ${cid} esta semana`,
+          dicaEnvio: "Apresente números concretos de intenção de busca para chamar a atenção comercial.",
+          texto: `Oi, [Nome do contato]! Tudo bem?\n\nPassando com um dado fresco que pode te interessar: mapeamos que nas últimas 4 semanas houve um aumento de mais de 35% nas buscas no Google por '${seg}' aqui em ${cid} e arredores.\n\nHoje grande parte dessas pessoas não encontra a ${nome} logo de cara, e nós temos a estrutura pronta para canalizar esses orçamentos diretamente para o seu WhatsApp comercial.\n\nQuer dar uma olhada nos dados que levantamos? Posso te mandar em 1 minuto por aqui.\n\nAbraço e boas vendas!`,
+        };
+
+      case "instagram":
+        return {
+          ganchoAbertura: `Clientes procurando por ${seg} em ${cid}!`,
+          dicaEnvio: "Use emojis dinâmicos e mostre senso de oportunidade.",
+          texto: `Olá, pessoal da ${nome}! Tudo certo? 🚀\n\nIdentificamos uma procura muito aquecida por ${seg} aqui em ${cid} nos últimos dias, e achamos que vocês deveriam estar recebendo a maioria desses contatos.\n\nQual o melhor Whats para eu mandar os dados desse levantamento para vocês?\n\nAbraços!`,
+        };
+
+      case "email":
+        return {
+          assunto: `Relatório de Demanda: Procura por ${seg} em alta em ${cid}`,
+          ganchoAbertura: `Mais de 100 buscas locais mapeadas para o seu segmento neste mês`,
+          dicaEnvio: "Excelente para equipes de vendas e diretores comerciais.",
+          texto: `Olá, [Nome do contato ou Equipe Comercial],\n\nTudo bem? Nosso núcleo de inteligência de mercado na ${agencia} identificou um volume expressivo de buscas ativas por ${seg} em ${cid}.\n\nElaboramos um comparativo prático mostrando para onde esses clientes estão indo e como posicionar a ${nome} para absorver essa fatia de mercado:\n👉 ${auditLink}\n\nPodemos fazer um alinhamento rápido de 10 minutos para mostrar como captar essa demanda?\n\nAtenciosamente,\n[Seu Nome]\n${agencia} · Inteligência de Mercado`,
+        };
+
+      case "ligacaoReuniao":
+        return {
+          ganchoAbertura: `Olá, [Nome]! Tenho um número importante sobre a busca de ${seg} em ${cid} para te compartilhar.`,
+          dicaEnvio: "Vá direto ao ponto sobre o aumento de procura na cidade.",
+          texto: `Olá, [Nome]! Me chamo [Seu Nome], da ${agencia}. Estou ligando rapidinho porque fechamos hoje um relatório sobre ${cid} e vimos que a procura por ${seg} está batendo recorde no Google. A ${nome} tem hoje capacidade para atender mais pedidos se esses clientes chegarem no seu Whats? Queria te mostrar como capturar essa demanda em 10 minutos de conversa.`,
+        };
+
+      case "propostaValor360":
+        return {
+          ganchoAbertura: `Captação massiva da demanda reprimida com retorno sobre investimento mensurável.`,
+          dicaEnvio: "Apresente projeções de orçamentos e conversão.",
+          texto: `ACELERAÇÃO DE VENDAS 360 — ${nome.toUpperCase()}\n\nCaptura ativa da demanda reprimida em ${cid}, posicionando a ${nome} no topo de todos os mecanismos de busca e transformando tráfego em orçamentos fechados de forma contínua.`,
+        };
+    }
+  }
+
+  // =========================================================================
+  // 9. TOM: DIAGNÓSTICO AMIGO & CONSTRUTIVO
+  // =========================================================================
+  if (tom === "diagnostico_amigo") {
+    switch (canal) {
+      case "whatsapp":
+        return {
+          ganchoAbertura: `Um detalhe rápido sobre o WhatsApp da ${nome} no Google`,
+          dicaEnvio: "Aborde com sinceridade de quem encontrou um obstáculo real e quer ajudar.",
+          texto: `Oi, [Nome do contato]! Tudo bem?\n\nFui pesquisar o contato da ${nome} hoje cedo e reparei que o botão de ligação/WhatsApp no Google não está abrindo direto no celular de primeira.\n\nComo vocês têm um trabalho muito bom em ${seg}, fiquei preocupado de vocês estarem perdendo orçamentos por uma bobagem técnica simples de arrumar.\n\nSe você quiser, posso te mandar um print mostrando o que está acontecendo e como resolver rapidinho.\n\nUm abraço e parabéns pelo negócio!`,
+        };
+
+      case "instagram":
+        return {
+          ganchoAbertura: `Aviso amigo sobre o contato de vocês!`,
+          dicaEnvio: "Tom de alerta camarada e solícito.",
+          texto: `Olá, pessoal da ${nome}! Tudo bem? 😊\n\nTentei achar o contato de vocês no Google para tirar uma dúvida e percebi que o link está direcionando para uma página quebrada. Queria avisar para vocês não perderem vendas!\n\nMe dá um alô no Whats para eu te mandar o print se ajudar!\n\nAbraço!`,
+        };
+
+      case "email":
+        return {
+          assunto: `Aviso importante sobre os canais de contato da ${nome} em ${cid}`,
+          ganchoAbertura: `Identificamos uma falha no fluxo de atendimento que pode ser corrigida em minutos`,
+          dicaEnvio: "Mostre que a intenção é proteger o faturamento da empresa.",
+          texto: `Olá, [Nome do contato],\n\nTudo bem? Durante uma checagem técnica de rotina no mercado de ${seg} em ${cid}, notamos que o canal principal de contato da ${nome} está com uma instabilidade técnica que dificulta o clique do cliente no smartphone.\n\nDocumentamos o diagnóstico completo e a solução passo a passo aqui:\n👉 ${auditLink}\n\nEsperamos que seja útil para a equipe de vocês!\n\nCordialmente,\n[Seu Nome] · ${agencia}`,
+        };
+
+      case "ligacaoReuniao":
+        return {
+          ganchoAbertura: `Olá, [Nome]! Liguei só para te avisar de um detalhe no número de vocês no Google.`,
+          dicaEnvio: "Mantenha postura amiga e tranquila.",
+          texto: `Olá, [Nome]! Me chamo [Seu Nome], da ${agencia}. Liguei só para te avisar com carinho que o link de WhatsApp da ${nome} no Google Maps está falhando quando alguém clica pelo celular. Achei importante te dar esse toque para vocês não perderem clientes. Você já estava sabendo disso?`,
+        };
+
+      case "propostaValor360":
+        return {
+          ganchoAbertura: `Blindagem técnica e otimização total de canais para conversão máxima.`,
+          dicaEnvio: "Apresente auditoria técnica preventiva.",
+          texto: `BLINDAGEM E OTIMIZAÇÃO DE CANAIS 360 — ${nome.toUpperCase()}\n\nEliminação de todos os atritos técnicos que fazem o cliente desistir da compra. Garantia de que cada clique vire uma conversa com a sua equipe comercial.`,
+        };
+    }
+  }
+
+  // =========================================================================
+  // 10. TOM: HUMANIZADO & HISTÓRIAS REAIS
+  // =========================================================================
   switch (canal) {
     case "whatsapp":
       return {
-        ganchoAbertura: `Oportunidade prática para a ${nome} em ${cid}`,
-        dicaEnvio: "Ideal para horários de início de expediente (entre 8h30 e 10h).",
-        texto: `Olá, [Nome do contato]! Sei que sua rotina é corrida, então serei bem breve e direto. 😊\n\nSou o [Seu Nome], da ${agencia} aqui da região. Mapeamos que há dezenas de pesquisas mensais no Google em ${cid} buscando por '${seg}' que não estão encontrando a ${nome} nas primeiras posições.\n\nEstruturamos um caminho bem prático para colocar sua empresa no topo dessas buscas e receber esses contatos direto no WhatsApp comercial.\n\nSe você tiver 5 minutos livres nesta semana, me avise por aqui para conversarmos. Abraço e bom trabalho por aí!`,
+        ganchoAbertura: `A história e o carinho da equipe da ${nome} em ${cid}`,
+        dicaEnvio: "Conecte-se com o fator humano, a dedicação da equipe e a confiança dos clientes.",
+        texto: `Olá, pessoal da ${nome}! Tudo bem com vocês? ❤️\n\nEstava admirando a trajetória de vocês e é muito bonito ver o carinho e o atendimento humano que vocês oferecem aos clientes de ${seg} aqui em ${cid}.\n\nHoje em dia o mercado anda tão frio e robotizado que empresas com esse toque acolhedor são verdadeiras preciosidades.\n\nNós na ${agencia} adoramos contar essas histórias reais para que mais pessoas da cidade conheçam quem está por trás desse trabalho incrível.\n\nPosso te mandar um áudio de 1 minutinho para trocarmos uma ideia sobre isso? Seria um prazer!\n\nUm abraço afetuoso a toda equipe!`,
       };
 
     case "instagram":
       return {
-        ganchoAbertura: `Contato rápido sobre novos clientes em ${cid}`,
-        dicaEnvio: "Mensagem objetiva que respeita a caixa de entrada.",
-        texto: `Olá, pessoal da ${nome}! Tudo bem?\n\nPassando só para compartilhar que mapeamos uma busca expressiva por ${seg} aqui em ${cid} no Google, e queremos ajudar a direcionar esses orçamentos para vocês.\n\nQual o melhor WhatsApp comercial do responsável para eu enviar os números em 1 minuto?\n\nObrigado!`,
+        ganchoAbertura: `Adoro ver a energia da equipe de vocês!`,
+        dicaEnvio: "Elogie as pessoas da equipe que aparecem nas postagens.",
+        texto: `Olá, time da ${nome}! Que energia linda no perfil de vocês! 👏\n\nDá para sentir de longe a paixão e o cuidado com que vocês atendem cada cliente em ${cid}.\n\nQueremos muito somar para que mais pessoas da serra conheçam essa história!\n\nUm grande abraço de todos nós da ${agencia}!`,
       };
 
     case "email":
       return {
-        assunto: `Demanda de ${seg} em ${cid} — Contato direto ${nome}`,
-        ganchoAbertura: `Direto ao ponto: como captar os clientes de ${seg} que buscam no Google em ${cid}`,
-        dicaEnvio: "Use bullet points curtos para facilitar a leitura no smartphone.",
-        texto: `Olá, [Nome do contato],\n\nSei que seu tempo é valioso, então vou direto ao ponto:\n\nIdentificamos que a ${nome} vem perdendo oportunidades diárias de orçamentos de ${seg} em ${cid} porque seus concorrentes diretos estão ocupando o topo do Google Maps e buscas locais.\n\nMontamos um diagnóstico de 2 minutos mostrando como reverter esse cenário e gerar contatos imediatos no seu WhatsApp:\n👉 ${auditLink}\n\nSe fizer sentido, me avise para agendarmos uma rápida ligação de 10 minutos.\n\nAtenciosamente,\n[Seu Nome]\n${agencia}`,
+        assunto: `A história da ${nome} inspira quem empreende em ${cid}`,
+        ganchoAbertura: `Humanização que gera confiança e fidelidade no setor de ${seg}`,
+        dicaEnvio: "Foque em branding humanizado e conexão com as famílias da região.",
+        texto: `Olá, fundadores e equipe da ${nome},\n\nEm um mundo onde tudo parece impessoal e automatizado, empresas que mantêm o compromisso com o calor humano e a excelência no atendimento são raras.\n\nAcompanhamos a dedicação com que vocês tratam os clientes de ${seg} em ${cid}. Nossa proposta na ${agencia} é amplificar essa verdade, criando uma comunicação que emociona e gera fidelidade de longo prazo:\n👉 ${auditLink}\n\nSeria um privilégio conhecer melhor a história de vocês em um café descontraído.\n\nCom carinho e respeito,\n[Seu Nome]\n${agencia} · Comunicação Humanizada`,
       };
 
     case "ligacaoReuniao":
       return {
-        ganchoAbertura: `Olá, [Nome]! Prometo ser breve, tenho apenas um dado rápido sobre ${cid} para te passar.`,
-        dicaEnvio: "Respeite o tempo do empresário. Se disser que está ocupado, pergunte o melhor horário.",
-        texto: `Olá, [Nome]! Me chamo [Seu Nome], da ${agencia}. Prometo ser bem rápido para não atrapalhar seu dia: estamos ajudando empresas de ${seg} aqui em ${cid} a captarem clientes que pesquisam no Google todo dia. Vimos que a ${nome} tem potencial para dobrar os contatos que recebe pelo WhatsApp. Você tem 5 minutos na quinta-feira para eu te mostrar como funciona na prática?`,
+        ganchoAbertura: `Olá, [Nome]! Liguei porque me encantei com a dedicação da equipe de vocês em ${cid}.`,
+        dicaEnvio: "Fale com entusiasmo e admiração sincera pelas pessoas do time.",
+        texto: `Olá, [Nome]! Me chamo [Seu Nome], da ${agencia}. Liguei para te dar os parabéns pela forma acolhedora com que vocês atendem as pessoas aqui em ${cid}. Dá para ver que não é só um negócio, é um propósito de vida. Eu queria muito te apresentar uma ideia para valorizar essa história no digital. Topa bater um papo rápido nesta semana?`,
       };
 
     case "propostaValor360":
       return {
-        ganchoAbertura: `Velocidade de execução e foco estrito em aumento de orçamentos.`,
-        dicaEnvio: "Apresente números e prazo de retorno.",
-        texto: `PROPOSTA EXECUTIVA DE RETORNO RÁPIDO — ${nome.toUpperCase()}\n\nSolução enxuta, sem burocracia e com início imediato para colocar a ${nome} no topo das pesquisas locais e estruturar o atendimento digital em até 14 dias úteis.`,
+        ganchoAbertura: `Comunicação centrada em pessoas que constrói marcas inesquecíveis.`,
+        dicaEnvio: "Foque em autoridade afetiva e retenção de clientes por recomendação.",
+        texto: `COMUNICAÇÃO AFETIVA & POSICIONAMENTO 360 — ${nome.toUpperCase()}\n\nPessoas compram de pessoas em quem confiam. Conectamos a autenticidade e o calor humano da ${nome} com uma estrutura digital impecável para encantar e fidelizar os melhores clientes de ${cid}.`,
       };
   }
 }

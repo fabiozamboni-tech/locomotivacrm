@@ -29,6 +29,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
+  HoverCard,
+  HoverCardTrigger,
+  HoverCardContent,
+} from "@/components/ui/hover-card";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -65,6 +70,7 @@ import {
   Cloud,
   Clock,
   ExternalLink,
+  HelpCircle,
 } from "lucide-react";
 
 export const Route = createFileRoute("/configuracoes")({
@@ -620,9 +626,105 @@ function ConfiguracoesPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
-                    Tipo de Integração / Gateway:
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                      <span>Tipo de Integração / Gateway:</span>
+                    </label>
+                    <HoverCard openDelay={100} closeDelay={200}>
+                      <HoverCardTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground font-medium transition-colors cursor-help p-1 rounded-md hover:bg-muted"
+                          title="Como funciona a integração e onde conseguir as API keys / webhooks"
+                        >
+                          <HelpCircle className="h-3.5 w-3.5 text-blue-500" />
+                          <span className="underline decoration-dotted text-blue-600 dark:text-blue-400">Como funciona?</span>
+                        </button>
+                      </HoverCardTrigger>
+                      <HoverCardContent side="top" align="end" className="w-80 sm:w-96 text-xs p-4 space-y-3 z-50 shadow-xl border-border">
+                        <div className="flex items-center gap-2 border-b pb-2">
+                          <MessageCircle className="h-4 w-4 text-emerald-500" />
+                          <h4 className="font-bold text-xs text-foreground">
+                            Guia de Integrações & Gateways de WhatsApp
+                          </h4>
+                        </div>
+                        <div className="space-y-2.5 text-[11px] leading-relaxed max-h-[380px] overflow-y-auto pr-1">
+                          {/* 1. WhatsApp Web */}
+                          <div className="p-2.5 rounded-lg bg-muted/50 border border-border/60 space-y-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <strong className="font-semibold text-foreground">1. WhatsApp Web / Desktop Oficial</strong>
+                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+                                Sem Chave (Grátis)
+                              </Badge>
+                            </div>
+                            <p className="text-muted-foreground">
+                              <strong>Como funciona:</strong> Abre diretamente a conversa no aplicativo oficial do WhatsApp com a mensagem pronta para revisão e envio em 1 clique.
+                            </p>
+                            <p className="text-muted-foreground">
+                              <strong>API Key / Webhook:</strong> <span className="text-emerald-600 font-semibold">NÃO é necessário</span>. É 100% gratuito, sem custo de mensalidade e com risco zero de banimento do número.
+                            </p>
+                          </div>
+
+                          {/* 2. Z-API */}
+                          <div className="p-2.5 rounded-lg bg-muted/50 border border-border/60 space-y-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <strong className="font-semibold text-foreground">2. Z-API Gateway</strong>
+                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-amber-500/10 text-amber-600 border-amber-500/30">
+                                Requer Chave
+                              </Badge>
+                            </div>
+                            <p className="text-muted-foreground">
+                              <strong>Como funciona:</strong> Disparo automatizado e silencioso em segundo plano através de instâncias do serviço Z-API.
+                            </p>
+                            <p className="text-muted-foreground">
+                              <strong>API Key / Webhook:</strong> <span className="text-amber-600 font-semibold">SIM, obrigatório</span>.
+                            </p>
+                            <p className="text-muted-foreground">
+                              <strong>Onde conseguir:</strong> Crie uma conta em <a href="https://z-api.io" target="_blank" rel="noreferrer" className="text-blue-500 underline">z-api.io</a>, adicione sua instância, escaneie o QR Code no painel e copie a <em>URL da Instância</em> e o <em>Client-Token</em> no campo abaixo.
+                            </p>
+                          </div>
+
+                          {/* 3. Evolution API */}
+                          <div className="p-2.5 rounded-lg bg-muted/50 border border-border/60 space-y-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <strong className="font-semibold text-foreground">3. Evolution API</strong>
+                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-amber-500/10 text-amber-600 border-amber-500/30">
+                                Requer Servidor
+                              </Badge>
+                            </div>
+                            <p className="text-muted-foreground">
+                              <strong>Como funciona:</strong> Gateway open-source para automação auto-hospedada em Docker ou VPS própria.
+                            </p>
+                            <p className="text-muted-foreground">
+                              <strong>API Key / Webhook:</strong> <span className="text-amber-600 font-semibold">SIM, obrigatório</span>.
+                            </p>
+                            <p className="text-muted-foreground">
+                              <strong>Onde conseguir:</strong> No painel da sua Evolution API, gere uma <em>Global API Key</em> e copie o endpoint de envio da sua instância (ex: <code>https://api.seudominio.com/message/sendText/sua-instancia</code>).
+                            </p>
+                          </div>
+
+                          {/* 4. Custom Webhook */}
+                          <div className="p-2.5 rounded-lg bg-muted/50 border border-border/60 space-y-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <strong className="font-semibold text-foreground">4. Webhook Customizado (HTTP POST)</strong>
+                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-purple-500/10 text-purple-600 border-purple-500/30">
+                                n8n / Make / Zapier
+                              </Badge>
+                            </div>
+                            <p className="text-muted-foreground">
+                              <strong>Como funciona:</strong> Dispara um payload JSON completo via requisição HTTP POST para qualquer ferramenta de automação externa.
+                            </p>
+                            <p className="text-muted-foreground">
+                              <strong>API Key / Webhook:</strong> <span className="text-purple-600 font-semibold">SIM, obrigatório</span>.
+                            </p>
+                            <p className="text-muted-foreground">
+                              <strong>Onde conseguir:</strong> Crie um nó de gatilho "Webhook" no seu n8n, Make.com ou Zapier, copie a <em>Webhook URL</em> de produção gerada e cole no campo abaixo. O CRM enviará <code>&#123; telefone, mensagem, nomeEmpresa, contato &#125;</code>.
+                            </p>
+                          </div>
+                        </div>
+                      </HoverCardContent>
+                    </HoverCard>
+                  </div>
                   <Select
                     value={comunicacao.whatsapp.gatewayTipo}
                     onValueChange={(v: any) =>

@@ -90,6 +90,10 @@ import {
   SlidersHorizontal,
   HelpCircle,
   Send,
+  Gift,
+  MapPin,
+  CheckCircle,
+  Heart,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Empresa, ApresentacaoSlidesData } from "@/lib/mock-data";
@@ -776,7 +780,7 @@ function AnaliseClientePage() {
             </TabsTrigger>
             <TabsTrigger value="slides" className="text-xs py-2 px-3.5 flex items-center gap-2">
               <Presentation className="h-3.5 w-3.5 text-purple-500" />
-              <span>5. Apresentação em Slides (PDF)</span>
+              <span>5. Apresentação em Slides (PDF & PPTX)</span>
             </TabsTrigger>
           </TabsList>
 
@@ -1140,11 +1144,16 @@ function AnaliseClientePage() {
                           <div className="space-y-1">
                             <div className="flex items-center justify-between gap-1">
                               <span className="text-xs font-bold leading-tight flex items-center gap-1.5">
-                                {t.id === "amigavel_elogio" && <HeartHandshake className="h-3.5 w-3.5 text-rose-500" />}
-                                {t.id === "consultivo_parceiro" && <Users className="h-3.5 w-3.5 text-blue-500" />}
-                                {t.id === "descontraido_curioso" && <Coffee className="h-3.5 w-3.5 text-amber-500" />}
-                                {t.id === "valorizacao_marca" && <Award className="h-3.5 w-3.5 text-purple-500" />}
-                                {t.id === "direto_gentil" && <Zap className="h-3.5 w-3.5 text-emerald-500" />}
+                                {t.id === "amigavel_elogio" && <HeartHandshake className="h-3.5 w-3.5 text-rose-500 shrink-0" />}
+                                {t.id === "consultivo_parceiro" && <Users className="h-3.5 w-3.5 text-blue-500 shrink-0" />}
+                                {t.id === "descontraido_curioso" && <Coffee className="h-3.5 w-3.5 text-amber-500 shrink-0" />}
+                                {t.id === "valorizacao_marca" && <Award className="h-3.5 w-3.5 text-purple-500 shrink-0" />}
+                                {t.id === "direto_gentil" && <Zap className="h-3.5 w-3.5 text-emerald-500 shrink-0" />}
+                                {t.id === "ajuda_desinteressada" && <Gift className="h-3.5 w-3.5 text-teal-500 shrink-0" />}
+                                {t.id === "indicacao_comunidade" && <MapPin className="h-3.5 w-3.5 text-rose-500 shrink-0" />}
+                                {t.id === "demanda_aquecida" && <TrendingUp className="h-3.5 w-3.5 text-indigo-500 shrink-0" />}
+                                {t.id === "diagnostico_amigo" && <CheckCircle className="h-3.5 w-3.5 text-cyan-500 shrink-0" />}
+                                {t.id === "humanizado_historias" && <Heart className="h-3.5 w-3.5 text-pink-500 shrink-0" />}
                                 {t.nome}
                               </span>
                             </div>

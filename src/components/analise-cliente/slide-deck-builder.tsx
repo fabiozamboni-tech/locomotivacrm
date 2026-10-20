@@ -652,7 +652,7 @@ export function SlideDeckBuilder({
               </div>
 
               {/* NÚMERO DA PÁGINA NO BADGE ROSA NO CANTO INFERIOR ESQUERDO */}
-              <div className="absolute bottom-[3.2%] left-0 w-11 h-7 bg-[#d22d67] flex items-center justify-center font-bold text-white text-xs">
+              <div className="absolute bottom-[3.2%] left-0 w-11 h-7 flex items-center justify-center font-bold text-white text-xs">
                 {numeroPagina}
               </div>
 
@@ -794,7 +794,7 @@ function SlideCardVisual({
       </div>
 
       {/* BADGE ROSA COM O NÚMERO DA PÁGINA NO CANTO INFERIOR ESQUERDO */}
-      <div className="absolute bottom-[3.2%] left-0 w-8 sm:w-11 h-5 sm:h-7 bg-[#d22d67] flex items-center justify-center font-bold text-white text-[10px] sm:text-xs">
+      <div className="absolute bottom-[2.8%] sm:bottom-[3.2%] left-0 w-8 sm:w-11 h-5 sm:h-7 flex items-center justify-center font-bold text-white text-[10px] sm:text-xs">
         {numero}
       </div>
 

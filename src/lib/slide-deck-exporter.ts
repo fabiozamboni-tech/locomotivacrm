@@ -56,51 +56,51 @@ export async function exportarApresentacaoPDF(
     const isFim = slide.tipo === "fim" || index === slides.length - 1;
 
     if (isCapa) {
-      // SLIDE 1: CAPA
-      doc.addImage(SLIDE_TEMPLATE_ASSETS.capaBgBase64, "JPEG", 0, 0, 842, 595);
+      // SLIDE 1: CAPA COM ASSETS ORIGINAIS DA LOCOMOTIVA
+      doc.addImage(SLIDE_TEMPLATE_ASSETS.capaBgBase64, "PNG", 0, 0, 842, 595);
 
-      // TÍTULO DA APRESENTAÇÃO
+      // TÍTULO DA APRESENTAÇÃO (ONDE DIZ TÍTULO NO TEMPLATE)
       doc.setFont("helvetica", "bold");
       doc.setFontSize(26);
       doc.setTextColor(30, 41, 59); // Slate-800
       const tituloLinhas = doc.splitTextToSize(slide.titulo || deck.titulo, 620);
-      doc.text(tituloLinhas, 87, 230);
+      doc.text(tituloLinhas, 88, 220);
 
-      // CLIENTE
-      const yAposTitulo = 230 + tituloLinhas.length * 30;
+      // CLIENTE (ONDE DIZ CLIENTE NO TEMPLATE)
+      const yAposTitulo = 220 + tituloLinhas.length * 28;
       doc.setFont("helvetica", "normal");
       doc.setFontSize(18);
       doc.setTextColor(51, 65, 85); // Slate-700
-      doc.text(clienteNome, 87, yAposTitulo + 10);
+      doc.text(clienteNome, 88, Math.max(265, yAposTitulo));
 
-      // DATA
+      // DATA (ONDE DIZ DATA NO TEMPLATE)
       doc.setFont("helvetica", "normal");
       doc.setFontSize(11);
       doc.setTextColor(100, 116, 139); // Slate-500
-      doc.text(dataExtenso, 87, yAposTitulo + 55);
+      doc.text(dataExtenso, 88, Math.max(345, yAposTitulo + 60));
     } else if (isFim) {
-      // SLIDE FINAL: FIM COM LOGO CENTRAL E CONTATOS
-      doc.addImage(SLIDE_TEMPLATE_ASSETS.fimBgBase64, "JPEG", 0, 0, 842, 595);
+      // SLIDE FINAL: FIM COM LOGO CENTRAL E CONTATOS ORIGINAIS
+      doc.addImage(SLIDE_TEMPLATE_ASSETS.fimBgBase64, "PNG", 0, 0, 842, 595);
     } else {
       // SLIDES INTERNOS (Páginas 2 até N-1)
-      doc.addImage(SLIDE_TEMPLATE_ASSETS.internoBgBase64, "JPEG", 0, 0, 842, 595);
+      doc.addImage(SLIDE_TEMPLATE_ASSETS.internoBgBase64, "PNG", 0, 0, 842, 595);
 
       // HEADER NO TOPO ESQUERDO: TITULO EM NEGRITO - CLIENTE
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.setTextColor(51, 65, 85);
-      doc.text(tituloGeral, 64, 52);
+      doc.setFontSize(10.5);
+      doc.setTextColor(30, 41, 59);
+      doc.text(tituloGeral, 68, 53);
 
       const largTitulo = doc.getTextWidth(tituloGeral);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 116, 139);
-      doc.text(` - ${clienteNome}`, 64 + largTitulo, 52);
+      doc.text(` - ${clienteNome}`, 68 + largTitulo, 53);
 
-      // NÚMERO DA PÁGINA DENTRO DO BADGE ROSA NO CANTO INFERIOR ESQUERDO
+      // NÚMERO DA PÁGINA NO BADGE ROSA NO CANTO INFERIOR ESQUERDO
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11);
       doc.setTextColor(255, 255, 255);
-      doc.text(String(numeroPagina), 20, 562, { align: "center" });
+      doc.text(String(numeroPagina), 20, 563, { align: "center" });
 
       // TÍTULO DA SEÇÃO DO SLIDE
       doc.setFont("helvetica", "bold");
