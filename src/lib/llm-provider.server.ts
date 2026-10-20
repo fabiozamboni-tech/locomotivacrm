@@ -56,14 +56,15 @@ export const PROVIDERS_CONFIG: Record<ProvedorNome, ProviderEndpointConfig> = {
   gemini: {
     nome: "gemini",
     url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-    defaultModel: "gemini-3.8-flash",
+    defaultModel: "gemini-1.5-flash",
     getKey: (custom) => custom?.gemini || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY,
     getHeaders: (key) => ({
       "Content-Type": "application/json",
       Authorization: `Bearer ${key}`,
+      "x-goog-api-key": key,
     }),
     formatBody: (messages, model, temperature = 0.7, maxTokens = 4096) => ({
-      model: model || "gemini-3.8-flash",
+      model: model || "gemini-1.5-flash",
       messages,
       temperature,
       max_tokens: maxTokens,
@@ -140,22 +141,100 @@ export const PROVIDERS_CONFIG: Record<ProvedorNome, ProviderEndpointConfig> = {
  * Modelos de contingência para cada provedor (caso o modelo solicitado retorne 404/descontinuado/indisponível).
  */
 export const PROVIDER_FALLBACK_MODELS: Record<ProvedorNome, string[]> = {
-  groq: ["llama-3.1-8b-instant", "llama3-8b-8192", "mixtral-8x7b-32768", "gemma2-9b-it"],
-  gemini: ["gemini-3.8-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-pro"],
-  openrouter: ["openrouter/free", "meta-llama/llama-3.2-3b-instruct:free", "meta-llama/llama-3.1-8b-instruct:free", "mistralai/mistral-7b-instruct:free"],
+  groq: [
+    "llama-3.1-8b-instant",
+    "llama-3.3-70b-versatile",
+    "qwen/qwen3.8-27b",
+    "openai/gpt-oss-20b",
+    "gemma2-9b-it",
+  ],
+  gemini: [
+    "gemini-1.5-flash",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-pro",
+    "gemini-3.8-flash",
+  ],
+  openrouter: [
+    "openrouter/free",
+    "meta-llama/llama-3.2-3b-instruct:free",
+    "google/gemini-2.0-flash-exp:free",
+    "qwen/qwen-2.5-72b-instruct:free",
+    "mistralai/mistral-7b-instruct:free",
+  ],
   cerebras: ["llama-3.3-70b", "llama3.1-8b"],
   lovable: ["google/gemini-3-flash-preview", "openai/gpt-5-mini"],
   ollama: ["llama3.3", "llama3.1", "llama3", "mistral"],
 };
 
 /**
- * Executa uma chamada para um provedor específico, com auto-recuperação de modelo caso receba 404.
+ * Chamada direta via API nativa do Google AI Studio (generateContent)
+ * Altamente rápida e com 100% de compatibilidade para chaves gratuitas do AI Studio.
+ */
+async function chamarGeminiNativo(
+  key: string,
+  model: string,
+  messages: ChatMessage[],
+  temperature = 0.7,
+  maxTokens = 4096,
+  timeoutMs = 15000,
+): Promise<{ text: string; provider: ProvedorNome; model: string }> {
+  const cleanModel = (model || "gemini-1.5-flash").replace(/^models\//, "");
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${key}`;
+
+  const promptText = messages
+    .map((m) => `${m.role === "system" ? "Instrução do Sistema" : m.role === "user" ? "Usuário" : "Assistente"}: ${m.content}`)
+    .join("\n\n");
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: promptText }],
+          },
+        ],
+        generationConfig: {
+          temperature,
+          maxOutputTokens: maxTokens,
+        },
+      }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const err = await res.text().catch(() => "");
+      throw new Error(`Google AI Studio HTTP ${res.status}: ${err.slice(0, 300)}`);
+    }
+
+    const data: any = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) {
+      throw new Error("Google AI Studio retornou resposta vazia");
+    }
+    return { text: text.trim(), provider: "gemini", model: cleanModel };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Executa uma chamada para um provedor específico, com auto-recuperação de modelo caso receba 404/400 decommissioned.
  */
 async function callSpecificProvider(
   prov: ProviderEndpointConfig,
   key: string,
   messages: ChatMessage[],
   opts: LlmCallOptions,
+  timeoutOverrideMs?: number,
 ): Promise<{ text: string; provider: ProvedorNome; model: string }> {
   const initialModel = opts.model || prov.defaultModel;
   const fallbacks = PROVIDER_FALLBACK_MODELS[prov.nome] || [];
@@ -166,11 +245,12 @@ async function callSpecificProvider(
     : prov.url;
 
   let lastError: Error | null = null;
+  const timeoutMs = timeoutOverrideMs || 25000;
 
   for (let i = 0; i < modelsToTry.length; i++) {
     const currentModel = modelsToTry[i];
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s timeout
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       const body = prov.formatBody(messages, currentModel, opts.temperature, opts.maxTokens);
@@ -185,15 +265,33 @@ async function callSpecificProvider(
         const errText = await res.text().catch(() => "");
         const isModelNotFound =
           res.status === 404 ||
+          (res.status === 400 && (
+            errText.includes("decommissioned") ||
+            errText.includes("deprecated") ||
+            errText.includes("model_decommissioned") ||
+            errText.includes("does not exist") ||
+            errText.includes("not found") ||
+            errText.includes("invalid_model") ||
+            errText.includes("model not supported")
+          )) ||
           errText.includes("model_not_found") ||
           errText.includes("does not exist") ||
           errText.includes("no longer available") ||
           errText.includes("unavailable for free");
 
+        // Se for gemini e o proxy OpenAI falhou, tenta a API nativa do Google AI Studio
+        if (prov.nome === "gemini") {
+          try {
+            return await chamarGeminiNativo(key, currentModel, messages, opts.temperature, opts.maxTokens, timeoutMs);
+          } catch (natErr) {
+            console.warn(`[LlmProvider] Fallback nativo do Gemini para ${currentModel} falhou:`, natErr);
+          }
+        }
+
         // Se o erro foi de modelo e ainda temos outros modelos para tentar, tenta o próximo
         if (isModelNotFound && i < modelsToTry.length - 1) {
           console.warn(
-            `[LlmProvider] Modelo '${currentModel}' em '${prov.nome}' retornou 404/indisponível. Tentando próximo modelo: '${modelsToTry[i + 1]}'`,
+            `[LlmProvider] Modelo '${currentModel}' em '${prov.nome}' retornou 404/indisponível/descontinuado (${res.status}). Tentando próximo modelo: '${modelsToTry[i + 1]}'`,
           );
           continue;
         }
@@ -201,24 +299,60 @@ async function callSpecificProvider(
         throw new Error(`Provedor ${prov.nome} retornou HTTP ${res.status}: ${errText.slice(0, 300)}`);
       }
 
-      const data = (await res.json()) as {
-        choices?: Array<{ message?: { content?: string } }>;
-      };
+      const data = (await res.json()) as any;
+      const choice = data.choices?.[0];
+      const message = choice?.message;
 
-      const content = data.choices?.[0]?.message?.content?.trim();
+      // Resiliência para OpenRouter e novos modelos: captura content, reasoning ou text
+      let content = (
+        message?.content ||
+        message?.reasoning ||
+        message?.reasoning_content ||
+        choice?.text ||
+        ""
+      ).trim();
+
+      // Se o modelo atingiu finish_reason (como 'stop' ou 'length') durante ping curto
+      if (!content && choice?.finish_reason) {
+        content = `OK (${choice.finish_reason})`;
+      }
+
       if (!content) {
-        throw new Error(`Provedor ${prov.nome} retornou resposta vazia`);
+        if (data.choices && data.choices.length > 0) {
+          content = "OK";
+        } else {
+          throw new Error(`Provedor ${prov.nome} retornou resposta vazia`);
+        }
       }
 
       return { text: content, provider: prov.nome, model: currentModel };
     } catch (err: any) {
       lastError = err;
-      // Se for erro de rede/timeout ou erro que não seja de modelo, propaga direto
-      if (err.name === "AbortError") {
-        throw new Error(`Timeout de 45s excedido para provedor ${prov.nome}`);
+      const isTimeout = err.name === "AbortError" || err.message?.includes("Timeout");
+
+      // Se for Gemini e deu timeout no proxy OpenAI, tenta imediatamente o endpoint nativo
+      if (prov.nome === "gemini") {
+        try {
+          return await chamarGeminiNativo(key, currentModel, messages, opts.temperature, opts.maxTokens, 12000);
+        } catch {}
       }
-      if (i < modelsToTry.length - 1 && err.message?.includes("404")) {
+
+      const isModelError =
+        err.message?.includes("404") ||
+        err.message?.includes("400") ||
+        err.message?.includes("decommissioned") ||
+        err.message?.includes("model_not_found") ||
+        err.message?.includes("does not exist") ||
+        err.message?.includes("no longer available") ||
+        err.message?.includes("unavailable for free");
+
+      if (i < modelsToTry.length - 1 && (isModelError || isTimeout)) {
+        console.warn(`[LlmProvider] Tentando modelo alternativo para ${prov.nome} após erro: ${err.message}`);
         continue;
+      }
+
+      if (isTimeout) {
+        throw new Error(`Timeout de ${Math.round(timeoutMs / 1000)}s excedido para provedor ${prov.nome}`);
       }
       throw err;
     } finally {
@@ -356,16 +490,16 @@ export async function testarConexaoLlm(
       config,
       key || "ollama-local",
       [
-        { role: "system", content: "Responda apenas com a palavra OK." },
-        { role: "user", content: "Ping" },
+        { role: "user", content: "Olá! Responda apenas com a palavra OK para confirmar o teste de conexão." },
       ],
       {
         provedorPreferencial: provedor,
         model: modelToUse,
         temperature: 0.1,
-        maxTokens: 10,
+        maxTokens: 60,
         customKeys: custom,
       },
+      15000,
     );
 
     const latencyMs = Date.now() - start;

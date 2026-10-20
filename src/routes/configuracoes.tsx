@@ -989,7 +989,7 @@ function ConfiguracoesPage() {
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-xs uppercase tracking-wider text-foreground">Google Gemini</span>
                       <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-600 border-blue-500/30">
-                        Gemini 3.8 Flash · 15 RPM · 1.500 req/dia (Sem Cartão)
+                        Gemini 1.5 Flash · 15 RPM · 1.500 req/dia (Sem Cartão)
                       </Badge>
                       <a
                         href="https://aistudio.google.com/app/apikey"

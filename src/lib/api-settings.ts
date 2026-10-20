@@ -61,7 +61,7 @@ const DEFAULT_SETTINGS: ApiSettingsMap = {
   gemini: {
     key: "",
     enabled: true,
-    model: "gemini-3.8-flash",
+    model: "gemini-1.5-flash",
   },
   openrouter: {
     key: "",
@@ -89,21 +89,28 @@ export function getApiSettings(): ApiSettingsMap {
     if (!raw) return DEFAULT_SETTINGS;
     const parsed = JSON.parse(raw);
 
-    // Migração de modelos depreciados para versões ativas
+    // Migração de modelos depreciados/decommissioned para versões ativas
     const groqModel =
-      parsed.groq?.model === "llama-3.3-70b-versatile"
+      !parsed.groq?.model ||
+      parsed.groq.model === "llama3-8b-8192" ||
+      parsed.groq.model === "llama-3.3-70b-versatile" ||
+      parsed.groq.model === "mixtral-8x7b-32768" ||
+      parsed.groq.model.includes("8192")
         ? "llama-3.1-8b-instant"
-        : (parsed.groq?.model || DEFAULT_SETTINGS.groq.model);
+        : parsed.groq.model;
 
     const geminiModel =
-      parsed.gemini?.model === "gemini-2.0-flash"
-        ? "gemini-3.8-flash"
-        : (parsed.gemini?.model || DEFAULT_SETTINGS.gemini.model);
+      !parsed.gemini?.model ||
+      parsed.gemini.model === "gemini-2.0-flash" ||
+      parsed.gemini.model === "gemini-3.8-flash"
+        ? "gemini-1.5-flash"
+        : parsed.gemini.model;
 
     const openrouterModel =
-      parsed.openrouter?.model === "meta-llama/llama-3.3-70b-instruct:free"
+      !parsed.openrouter?.model ||
+      parsed.openrouter.model === "meta-llama/llama-3.3-70b-instruct:free"
         ? "openrouter/free"
-        : (parsed.openrouter?.model || DEFAULT_SETTINGS.openrouter.model);
+        : parsed.openrouter.model;
 
     return {
       ...DEFAULT_SETTINGS,

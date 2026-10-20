@@ -336,14 +336,14 @@ export const testApiConnection = createServerFn({ method: "POST" })
       }
       try {
         const { testarConexaoLlm } = await import("./llm-provider.server");
-        const res = await testarConexaoLlm("gemini", key, "gemini-3.8-flash");
+        const res = await testarConexaoLlm("gemini", key, "gemini-1.5-flash");
         return {
           provider: "gemini",
           status: res.ok ? "online" : "error",
           latencyMs: res.latencyMs,
           message: res.message,
           details: {
-            plan: "Free Tier (15 RPM / 1.500 RPD / 1M Contexto)",
+            plan: "Free Tier (15 RPM / 1.500 RPD / Google AI Studio)",
             modelUsed: res.modelUsed,
             isFreeService: true,
           },
