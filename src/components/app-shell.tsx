@@ -17,6 +17,7 @@ import {
   LogOut,
   Database,
   Sparkles,
+  Palette,
 } from "lucide-react";
 import { lockSite } from "@/lib/gate.functions";
 import { useStore } from "@/lib/store";
@@ -41,6 +42,7 @@ const NAV: NavItem[] = [
   { to: "/empresas", label: "Empresas", icon: Building2 },
   { to: "/crm", label: "Funil CRM", icon: Kanban },
   { to: "/analise-cliente", label: "Análise do cliente", icon: Sparkles },
+  { to: "/estudio-criacao", label: "Estúdio de Criação", icon: Palette },
   { to: "/importar", label: "Importar / Exportar", icon: Upload },
   { to: "/configuracoes", label: "Configurações", icon: Settings },
   { to: "/compliance", label: "Compliance & LGPD", icon: ShieldCheck },

@@ -107,6 +107,7 @@ import {
   CheckCircle,
   Heart,
   Palette,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Empresa, ApresentacaoSlidesData } from "@/lib/mock-data";
@@ -880,29 +881,38 @@ function AnaliseClientePage() {
 
       {empresa && (
         <Tabs value={activeTab} onValueChange={handleTrocaTab} className="space-y-6">
-          {/* BARRA DE NAVEGAÇÃO ENTRE AS 5 ABAS */}
-          <TabsList className="bg-muted/60 p-1 border border-border/80 rounded-xl flex-wrap h-auto gap-1 print:hidden">
-            <TabsTrigger value="visao-geral" className="text-xs py-2 px-3.5 flex items-center gap-2">
-              <LayoutDashboard className="h-3.5 w-3.5 text-blue-500" />
-              <span>1. Visão Geral & Matriz de Responsabilidades</span>
-            </TabsTrigger>
-            <TabsTrigger value="relatorio" className="text-xs py-2 px-3.5 flex items-center gap-2">
-              <FileText className="h-3.5 w-3.5 text-amber-500" />
-              <span>2. Diagnóstico & Relatório</span>
-            </TabsTrigger>
-            <TabsTrigger value="dossier" className="text-xs py-2 px-3.5 flex items-center gap-2">
-              <MessageSquareText className="h-3.5 w-3.5 text-indigo-500" />
-              <span>3. Dossiê 360 & Abordagens</span>
-            </TabsTrigger>
-            <TabsTrigger value="site" className="text-xs py-2 px-3.5 flex items-center gap-2">
-              <Globe className="h-3.5 w-3.5 text-emerald-500" />
-              <span>4. Estúdio de Sites (GSAP) & Prompts</span>
-            </TabsTrigger>
-            <TabsTrigger value="slides" className="text-xs py-2 px-3.5 flex items-center gap-2">
-              <Presentation className="h-3.5 w-3.5 text-purple-500" />
-              <span>5. Apresentação em Slides (PDF & PPTX)</span>
-            </TabsTrigger>
-          </TabsList>
+          {/* BARRA DE NAVEGAÇÃO ENTRE AS ABAS E LINK PARA O ESTÚDIO DE CRIAÇÃO */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 print:hidden">
+            <TabsList className="bg-muted/60 p-1 border border-border/80 rounded-xl flex-wrap h-auto gap-1">
+              <TabsTrigger value="visao-geral" className="text-xs py-2 px-3.5 flex items-center gap-2">
+                <LayoutDashboard className="h-3.5 w-3.5 text-blue-500" />
+                <span>1. Visão Geral & Matriz</span>
+              </TabsTrigger>
+              <TabsTrigger value="relatorio" className="text-xs py-2 px-3.5 flex items-center gap-2">
+                <FileText className="h-3.5 w-3.5 text-amber-500" />
+                <span>2. Diagnóstico & Relatório</span>
+              </TabsTrigger>
+              <TabsTrigger value="dossier" className="text-xs py-2 px-3.5 flex items-center gap-2">
+                <MessageSquareText className="h-3.5 w-3.5 text-indigo-500" />
+                <span>3. Dossiê 360 & Abordagens</span>
+              </TabsTrigger>
+              <TabsTrigger value="slides" className="text-xs py-2 px-3.5 flex items-center gap-2">
+                <Presentation className="h-3.5 w-3.5 text-purple-500" />
+                <span>4. Apresentação em Slides (PDF & PPTX)</span>
+              </TabsTrigger>
+            </TabsList>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate({ to: "/estudio-criacao" as never, search: { empresa: empresa.id } as never })}
+              className="text-xs gap-1.5 border-primary/40 text-primary hover:bg-primary/10 self-start sm:self-auto shadow-xs"
+            >
+              <Palette className="h-3.5 w-3.5 text-primary" />
+              <span>Abrir Estúdio de Criação</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
 
           {/* =====================================================================
               ABA 1: VISÃO GERAL & MATRIZ DE RESPONSABILIDADES (SOLICITADA)
@@ -1727,208 +1737,31 @@ function AnaliseClientePage() {
           </TabsContent>
 
           {/* =====================================================================
-              ABA 4: ESTÚDIO DE SITES (GSAP + IMAGENS) & PROMPTS IA
+              REDIRECIONAMENTO: O ESTÚDIO DE SITES AGORA É O ESTÚDIO DE CRIAÇÃO
              ===================================================================== */}
           <TabsContent value="site" className="space-y-6 mt-0">
-            <div className="flex flex-wrap items-center gap-2 border-b pb-3">
-              <Button
-                variant={subModoSite === "site" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSubModoSite("site")}
-                className="text-xs gap-1.5"
-              >
-                <Globe className="h-3.5 w-3.5" />
-                Gerador de Site (Demo ao Vivo + GSAP)
-              </Button>
-              <Button
-                variant={subModoSite === "paleta" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSubModoSite("paleta")}
-                className="text-xs gap-1.5"
-              >
-                <Palette className="h-3.5 w-3.5 text-pink-500" />
-                Identidade Visual & Paleta Cromática (The Color API)
-              </Button>
-              <Button
-                variant={subModoSite === "prompts" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSubModoSite("prompts")}
-                className="text-xs gap-1.5"
-              >
-                <FileText className="h-3.5 w-3.5" />
-                Prompts & Briefings Textuais
-              </Button>
-            </div>
-
-            {subModoSite === "site" ? (
-              <div className="space-y-6">
-                {/* CONTROLES DO GERADOR DE SITES */}
-                <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl border border-border/80 bg-card">
-                  <div className="space-y-0.5">
-                    <h3 className="text-sm font-bold flex items-center gap-1.5">
-                      <Sparkles className="h-4 w-4 text-emerald-500" />
-                      Landing Page Interativa com Animações GSAP & Imagens Reais
-                    </h3>
-                    <p className="text-xs text-muted-foreground">
-                      Site completo com animações GSAP, ScrollTrigger, fotos contextuais do segmento e botão de WhatsApp.
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      onClick={handleGerarSite}
-                      disabled={gerandoSite}
-                      size="sm"
-                      className="text-xs gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-90 shadow-sm"
-                    >
-                      {gerandoSite ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Globe className="h-3.5 w-3.5" />}
-                      {gerandoSite ? "Pesquisando & Gerando..." : "Gerar Site com GSAP"}
-                    </Button>
-
-                    {siteHtml && (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSiteFullscreenOpen(true)}
-                          className="text-xs gap-1"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" /> Tela Cheia
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            const blob = new Blob([siteHtml], { type: "text/html" });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement("a");
-                            a.href = url;
-                            a.download = `site-${empresa.nome.toLowerCase().replace(/\s+/g, "-")}.html`;
-                            a.click();
-                            URL.revokeObjectURL(url);
-                          }}
-                          className="text-xs gap-1"
-                        >
-                          <Download className="h-3.5 w-3.5" /> Baixar HTML
-                        </Button>
-                      </>
-                    )}
-                  </div>
+            <Card className="border-border/80 bg-card/60">
+              <CardContent className="p-8 text-center space-y-4">
+                <div className="size-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto">
+                  <Palette className="h-7 w-7" />
                 </div>
-
-                {/* PREVIEW DO SITE NO IFRAME */}
-                {siteHtml ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between px-2">
-                      <span className="text-xs text-muted-foreground font-semibold">Visualização Interativa do Site</span>
-                      <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
-                        <Button
-                          size="sm"
-                          variant={devicePreview === "desktop" ? "default" : "ghost"}
-                          onClick={() => setDevicePreview("desktop")}
-                          className="h-7 px-2.5 text-xs"
-                        >
-                          Desktop
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={devicePreview === "tablet" ? "default" : "ghost"}
-                          onClick={() => setDevicePreview("tablet")}
-                          className="h-7 px-2.5 text-xs"
-                        >
-                          Tablet
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={devicePreview === "mobile" ? "default" : "ghost"}
-                          onClick={() => setDevicePreview("mobile")}
-                          className="h-7 px-2.5 text-xs"
-                        >
-                          Mobile
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-center bg-slate-950 p-4 rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
-                      <div
-                        style={{
-                          width: devicePreview === "desktop" ? "100%" : devicePreview === "tablet" ? "768px" : "375px",
-                          height: "620px",
-                          transition: "width 0.3s ease",
-                        }}
-                        className="rounded-xl overflow-hidden border border-slate-800 bg-background"
-                      >
-                        <iframe
-                          title="Site Preview GSAP"
-                          srcDoc={siteHtml}
-                          className="w-full h-full border-0"
-                          sandbox="allow-scripts allow-same-origin allow-popups"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <Card>
-                    <CardContent className="p-8 text-center space-y-3">
-                      <Globe className="h-10 w-10 text-muted-foreground mx-auto" />
-                      <p className="text-sm font-semibold">Nenhum site foi gerado para esta empresa ainda.</p>
-                      <Button onClick={handleGerarSite} disabled={gerandoSite} size="sm">
-                        {gerandoSite ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Globe className="h-3.5 w-3.5 mr-1" />}
-                        Gerar Site com Animações GSAP
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            ) : subModoSite === "paleta" ? (
-              /* IDENTIDADE VISUAL & PALETA CROMÁTICA COM THE COLOR API */
-              <div className="space-y-4">
-                <PaletaCoresCard
-                  nomeEmpresa={empresa.nome}
-                  segmento={empresa.segmento}
-                />
-              </div>
-            ) : (
-              /* PROMPTS TEXTUAIS DE BRIEFING */
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  {TIPOS_PROMPTS.map((tp) => (
-                    <Button
-                      key={tp.value}
-                      variant={tipoPrompt === tp.value ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setTipoPrompt(tp.value)}
-                      className="text-xs"
-                    >
-                      {tp.label}
-                    </Button>
-                  ))}
+                <div className="space-y-1">
+                  <h3 className="text-base font-bold">O Estúdio de Sites agora é o Estúdio de Criação!</h3>
+                  <p className="text-xs text-muted-foreground max-w-lg mx-auto leading-relaxed">
+                    A criação de landing pages com animações GSAP, identidade visual, paleta cromática e briefings de copy agora está disponível diretamente no <strong>Menu Principal Lateral</strong>, com suporte a múltiplos agentes de IA, histórico de versões para comparação lado a lado e exportação para GitHub e ZIP.
+                  </p>
                 </div>
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs font-bold uppercase">
-                      Briefing de {TIPOS_PROMPTS.find((t) => t.value === tipoPrompt)?.label}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-4 pt-1 space-y-3">
-                    <Textarea
-                      rows={10}
-                      readOnly
-                      value={gerarPrompt(empresa, tipoPrompt)}
-                      className="text-xs font-mono leading-relaxed"
-                    />
-                    <Button
-                      size="sm"
-                      onClick={() => copy(gerarPrompt(empresa, tipoPrompt))}
-                      className="text-xs gap-1"
-                    >
-                      <Copy className="h-3 w-3" /> Copiar Briefing
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
+                <div className="pt-2">
+                  <Button
+                    onClick={() => navigate({ to: "/estudio-criacao" as never, search: { empresa: empresa.id } as never })}
+                    className="gap-2 text-xs"
+                  >
+                    <span>Abrir no Estúdio de Criação</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* =====================================================================

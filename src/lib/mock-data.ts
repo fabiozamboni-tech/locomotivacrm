@@ -67,6 +67,19 @@ export interface ApresentacaoSlidesData {
   atualizadoEm: string;
 }
 
+export interface SiteVersaoGerada {
+  id: string;
+  data: string;
+  provedor: string;
+  modelo: string;
+  html: string;
+  titulo?: string;
+  promptUtilizado?: string;
+  pesquisaWeb?: any;
+  githubRepoUrl?: string;
+  ativa?: boolean;
+}
+
 export interface Empresa {
   id: string;
   nome: string;
@@ -99,9 +112,10 @@ export interface Empresa {
   buscasPartida?: string;
   termosEncontrados?: string;
   buscaGoogleMaps?: string;
-  // Site gerado com IA e pesquisa web (padrão 21st.dev + GSAP)
+  // Site gerado com IA e pesquisa web (padrão GSAP Anti-IA)
   siteGeradoHtml?: string;
   siteGeradoData?: string;
+  siteVersoes?: SiteVersaoGerada[];
   // Análise Unificada do Cliente (Persistida no banco de dados)
   dossier360?: any;
   relatorioLead?: any;

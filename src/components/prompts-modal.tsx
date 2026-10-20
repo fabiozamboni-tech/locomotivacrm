@@ -166,10 +166,10 @@ export function PromptsModal({ empresa, open, onOpenChange }: PromptsModalProps)
               className="h-auto p-0 text-xs text-blue-600 dark:text-blue-400 gap-1 font-semibold"
               onClick={() => {
                 onOpenChange(false);
-                navigate({ to: "/analise-cliente", search: { empresa: empresa.id, tab: "site" } });
+                navigate({ to: "/estudio-criacao" as never, search: { empresa: empresa.id } as never });
               }}
             >
-              Abrir no Estúdio Completo <ExternalLink className="size-3" />
+              Abrir no Estúdio de Criação <ExternalLink className="size-3" />
             </Button>
           </div>
 

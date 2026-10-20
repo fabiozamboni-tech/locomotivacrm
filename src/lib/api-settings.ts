@@ -30,6 +30,10 @@ export interface ApiSettingsMap {
   cerebras: ApiConfig;
   ollama: ApiConfig;
   provedorIaAtivo: ProvedorIaTipo;
+  github?: {
+    token: string;
+    defaultOwner?: string;
+  };
 }
 
 const STORAGE_KEY = "locomotiva_api_keys_v2";
@@ -80,6 +84,10 @@ const DEFAULT_SETTINGS: ApiSettingsMap = {
     model: "llama3.3",
   },
   provedorIaAtivo: "auto",
+  github: {
+    token: "",
+    defaultOwner: "",
+  },
 };
 
 export function getApiSettings(): ApiSettingsMap {
@@ -143,10 +151,35 @@ export function getApiSettings(): ApiSettingsMap {
         ...DEFAULT_SETTINGS.ollama,
         ...(parsed.ollama || {}),
       },
+      github: {
+        token: parsed.github?.token || DEFAULT_SETTINGS.github?.token || "",
+        defaultOwner: parsed.github?.defaultOwner || DEFAULT_SETTINGS.github?.defaultOwner || "fabiozamboni-tech",
+      },
     };
   } catch {
     return DEFAULT_SETTINGS;
   }
+}
+
+export function saveGithubConfig(config: { token?: string; defaultOwner?: string }): ApiSettingsMap {
+  const current = getApiSettings();
+  const updated: ApiSettingsMap = {
+    ...current,
+    github: {
+      token: config.token ?? current.github?.token ?? "",
+      defaultOwner: config.defaultOwner ?? current.github?.defaultOwner ?? "fabiozamboni-tech",
+    },
+  };
+
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    } catch (err) {
+      console.error("Erro ao salvar configuracao do GitHub no localStorage:", err);
+    }
+  }
+
+  return updated;
 }
 
 export function saveApiSetting(

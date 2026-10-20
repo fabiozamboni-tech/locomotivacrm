@@ -320,11 +320,11 @@ function EmpresaDetalhe() {
                 <Button className="w-full" size="sm">Análise e Abordagem 360</Button>
               </Link>
               <Link
-                to={"/analise-cliente" as never}
-                search={{ empresa: empresa.id, tab: "site" } as never}
+                to={"/estudio-criacao" as never}
+                search={{ empresa: empresa.id } as never}
                 className="block w-full"
               >
-                <Button className="w-full" size="sm" variant="outline">Estúdio de Sites & Prompts</Button>
+                <Button className="w-full" size="sm" variant="outline">Estúdio de Criação</Button>
               </Link>
               <Separator />
               <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Análise real com IA</div>

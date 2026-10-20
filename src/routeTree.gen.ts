@@ -16,6 +16,7 @@ import { Route as ComplianceRouteImport } from './routes/compliance'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as CrmRouteImport } from './routes/crm'
 import { Route as EmpresasRouteImport } from './routes/empresas'
+import { Route as EstudioCriacaoRouteImport } from './routes/estudio-criacao'
 import { Route as ImportarRouteImport } from './routes/importar'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as McpRouteImport } from './routes/mcp'
@@ -61,6 +62,11 @@ const CrmRoute = CrmRouteImport.update({
 const EmpresasRoute = EmpresasRouteImport.update({
   id: '/empresas',
   path: '/empresas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EstudioCriacaoRoute = EstudioCriacaoRouteImport.update({
+  id: '/estudio-criacao',
+  path: '/estudio-criacao',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ImportarRoute = ImportarRouteImport.update({
@@ -130,6 +136,7 @@ export interface FileRoutesByFullPath {
   '/configuracoes': typeof ConfiguracoesRoute
   '/crm': typeof CrmRoute
   '/empresas': typeof EmpresasRouteWithChildren
+  '/estudio-criacao': typeof EstudioCriacaoRoute
   '/importar': typeof ImportarRoute
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
@@ -150,6 +157,7 @@ export interface FileRoutesByTo {
   '/configuracoes': typeof ConfiguracoesRoute
   '/crm': typeof CrmRoute
   '/empresas': typeof EmpresasRouteWithChildren
+  '/estudio-criacao': typeof EstudioCriacaoRoute
   '/importar': typeof ImportarRoute
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
@@ -171,6 +179,7 @@ export interface FileRoutesById {
   '/configuracoes': typeof ConfiguracoesRoute
   '/crm': typeof CrmRoute
   '/empresas': typeof EmpresasRouteWithChildren
+  '/estudio-criacao': typeof EstudioCriacaoRoute
   '/importar': typeof ImportarRoute
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
@@ -193,6 +202,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/crm'
     | '/empresas'
+    | '/estudio-criacao'
     | '/importar'
     | '/login'
     | '/mcp'
@@ -213,6 +223,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/crm'
     | '/empresas'
+    | '/estudio-criacao'
     | '/importar'
     | '/login'
     | '/mcp'
@@ -233,6 +244,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/crm'
     | '/empresas'
+    | '/estudio-criacao'
     | '/importar'
     | '/login'
     | '/mcp'
@@ -254,6 +266,7 @@ export interface RootRouteChildren {
   ConfiguracoesRoute: typeof ConfiguracoesRoute
   CrmRoute: typeof CrmRoute
   EmpresasRoute: typeof EmpresasRouteWithChildren
+  EstudioCriacaoRoute: typeof EstudioCriacaoRoute
   ImportarRoute: typeof ImportarRoute
   LoginRoute: typeof LoginRoute
   McpRoute: typeof McpRoute
@@ -315,6 +328,13 @@ declare module '@tanstack/react-router' {
       path: '/empresas'
       fullPath: '/empresas'
       preLoaderRoute: typeof EmpresasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/estudio-criacao': {
+      id: '/estudio-criacao'
+      path: '/estudio-criacao'
+      fullPath: '/estudio-criacao'
+      preLoaderRoute: typeof EstudioCriacaoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/importar': {
@@ -417,6 +437,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConfiguracoesRoute: ConfiguracoesRoute,
   CrmRoute: CrmRoute,
   EmpresasRoute: EmpresasRouteWithChildren,
+  EstudioCriacaoRoute: EstudioCriacaoRoute,
   ImportarRoute: ImportarRoute,
   LoginRoute: LoginRoute,
   McpRoute: McpRoute,

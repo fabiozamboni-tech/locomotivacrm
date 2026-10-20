@@ -5,11 +5,11 @@ export const Route = createFileRoute("/prompts")({
   validateSearch: z.object({ empresa: z.string().optional() }),
   beforeLoad: ({ search }) => {
     throw redirect({
-      to: "/analise-cliente",
+      to: "/estudio-criacao" as never,
       search: {
         empresa: search.empresa,
-        tab: "site",
-      },
+        tab: "prompts",
+      } as never,
     });
   },
   component: () => null,
