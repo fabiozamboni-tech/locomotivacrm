@@ -64,7 +64,14 @@ export interface DatabaseInfo {
   fileSizeBytes: number;
 }
 
-const DATA_DIR = path.join(process.cwd(), ".data");
+const isServerless = Boolean(
+  process.env.VERCEL ||
+  process.env.AWS_LAMBDA_FUNCTION_NAME ||
+  process.env.NETLIFY ||
+  process.env.DENO_DEPLOYMENT_ID
+);
+
+const DATA_DIR = isServerless ? path.join("/tmp", ".data") : path.join(process.cwd(), ".data");
 const DB_FILE = path.join(DATA_DIR, "crm-database.json");
 const DB_TMP_FILE = path.join(DATA_DIR, "crm-database.json.tmp");
 
@@ -93,7 +100,9 @@ async function ensureDataDir(): Promise<void> {
   try {
     await fs.mkdir(DATA_DIR, { recursive: true });
   } catch (err: any) {
-    if (err.code !== "EEXIST") throw err;
+    if (err.code !== "EEXIST") {
+      console.warn("[ServerDB] Aviso ao criar diretório de dados:", err.message);
+    }
   }
 }
 
@@ -133,10 +142,14 @@ async function readFromDisk(): Promise<CrmDatabaseState> {
 }
 
 async function writeToDisk(state: CrmDatabaseState): Promise<void> {
-  await ensureDataDir();
-  const serialized = JSON.stringify(state, null, 2);
-  await fs.writeFile(DB_TMP_FILE, serialized, "utf-8");
-  await fs.rename(DB_TMP_FILE, DB_FILE);
+  try {
+    await ensureDataDir();
+    const serialized = JSON.stringify(state, null, 2);
+    await fs.writeFile(DB_TMP_FILE, serialized, "utf-8");
+    await fs.rename(DB_TMP_FILE, DB_FILE);
+  } catch (err: any) {
+    console.warn("[ServerDB] Aviso ao gravar em disco (ambiente serverless efêmero):", err.message);
+  }
   memoryStateCache = state;
 }
 
