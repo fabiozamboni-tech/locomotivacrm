@@ -123,6 +123,18 @@ export interface Empresa {
   relatorioGeradoEm?: string;
   apresentacaoSlides?: ApresentacaoSlidesData;
   analiseAtualizadaEm?: string;
+  // Anexos do Estúdio de Criação (Logo e Instruções de Design em MD)
+  estudioLogoAnexo?: {
+    nome: string;
+    dataUrl: string;
+    tipo?: string;
+    tamanho?: number;
+  };
+  estudioDesignMdAnexo?: {
+    nome: string;
+    conteudo: string;
+    tamanho?: number;
+  };
   // Diagnóstico
   diagnostico: {
     site: {
