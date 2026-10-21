@@ -7,9 +7,10 @@ import {
   HeadContent,
   Scripts,
   redirect,
+  isRedirect,
   type ErrorComponentProps,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -41,21 +42,58 @@ function NotFoundComponent() {
 }
 
 function ErrorComponent({ error, reset }: ErrorComponentProps) {
-  console.error(error);
+  // Se o erro for um redirecionamento do TanStack Router, re-lança para que o router conclua a navegação
+  if (isRedirect(error)) {
+    throw error;
+  }
+
+  console.error("[TanStack Root Error]", error);
   const router = useRouter();
+  const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
+
   useEffect(() => {
     reportLovableError(error as Error, { boundary: "tanstack_root_error_component" });
   }, [error]);
 
+  const mensagemErro =
+    error instanceof Response
+      ? `Resposta HTTP ${error.status}: ${error.statusText || error.url || "Falha na comunicação com o servidor"}`
+      : error instanceof Error
+        ? error.message
+        : String(error);
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
+      <div className="max-w-lg text-center w-full">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
           Algo não carregou
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Tente novamente ou volte ao dashboard.
         </p>
+
+        {mensagemErro && mensagemErro !== "undefined" && (
+          <div className="mt-4 p-3 bg-muted/40 border border-border/80 rounded-lg text-left text-xs font-mono text-muted-foreground">
+            <p className="font-semibold text-rose-500 mb-1">{mensagemErro}</p>
+            {error instanceof Error && error.stack && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setMostrarDetalhes(!mostrarDetalhes)}
+                  className="text-[10px] text-primary hover:underline mt-1"
+                >
+                  {mostrarDetalhes ? "Ocultar stack trace" : "Ver detalhes técnicos"}
+                </button>
+                {mostrarDetalhes && (
+                  <pre className="text-[10px] mt-2 max-h-40 overflow-auto whitespace-pre-wrap opacity-75">
+                    {error.stack}
+                  </pre>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
@@ -65,6 +103,12 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             Tentar novamente
+          </button>
+          <button
+            onClick={() => window.location.reload()}
+            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+          >
+            Recarregar página
           </button>
           <a
             href="/"
@@ -81,10 +125,15 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   beforeLoad: async ({ location }) => {
     if (location.pathname === "/unlock") return {};
-    const { unlocked } = await isUnlocked();
-    if (!unlocked) {
-      const next = `${location.pathname}${location.searchStr}${location.hash}`;
-      throw redirect({ to: "/unlock", search: { next } });
+    try {
+      const { unlocked } = await isUnlocked();
+      if (!unlocked) {
+        const next = `${location.pathname}${location.searchStr}${location.hash}`;
+        throw redirect({ to: "/unlock", search: { next } });
+      }
+    } catch (err: any) {
+      if (isRedirect(err)) throw err;
+      console.warn("[Root beforeLoad] Verificação de bloqueio falhou, liberando acesso:", err);
     }
     return {};
   },

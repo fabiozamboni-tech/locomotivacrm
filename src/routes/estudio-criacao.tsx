@@ -85,8 +85,8 @@ import { PROMPT_BLOCO_SKILLS_CLAUDE } from "@/lib/skills-claude-prompt";
 
 export const Route = createFileRoute("/estudio-criacao")({
   validateSearch: z.object({
-    empresa: z.string().optional(),
-    tab: z.enum(["site", "paleta", "prompts"]).optional(),
+    empresa: z.string().optional().catch(undefined),
+    tab: z.enum(["site", "paleta", "prompts"]).optional().catch(undefined),
   }),
   component: EstudioCriacaoPage,
 });

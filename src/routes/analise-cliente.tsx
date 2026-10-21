@@ -114,8 +114,8 @@ import type { Empresa, ApresentacaoSlidesData } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/analise-cliente")({
   validateSearch: z.object({
-    empresa: z.string().optional(),
-    tab: z.enum(["visao-geral", "relatorio", "dossier", "site", "slides"]).optional(),
+    empresa: z.string().optional().catch(undefined),
+    tab: z.enum(["visao-geral", "relatorio", "dossier", "site", "slides"]).optional().catch(undefined),
   }),
   head: () => ({
     meta: [

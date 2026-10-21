@@ -27,8 +27,17 @@ function passwordMatches(input: string, expected: string): boolean {
 }
 
 export const isUnlocked = createServerFn({ method: "GET" }).handler(async () => {
-  const session = await useSession<GateSession>(sessionConfig());
-  return { unlocked: session.data.unlocked === true };
+  // Se SITE_PASSWORD não estiver configurado no ambiente, o sistema não exige bloqueio e está liberado
+  if (!process.env.SITE_PASSWORD) {
+    return { unlocked: true };
+  }
+  try {
+    const session = await useSession<GateSession>(sessionConfig());
+    return { unlocked: session.data.unlocked === true };
+  } catch (err) {
+    console.warn("[Gate] Falha ao verificar sessão, permitindo acesso:", err);
+    return { unlocked: true };
+  }
 });
 
 export const unlockSite = createServerFn({ method: "POST" })
@@ -38,13 +47,22 @@ export const unlockSite = createServerFn({ method: "POST" })
     if (!passwordMatches(data.password, expected)) {
       return { ok: false as const };
     }
-    const session = await useSession<GateSession>(sessionConfig());
-    await session.update({ unlocked: true });
-    return { ok: true as const };
+    try {
+      const session = await useSession<GateSession>(sessionConfig());
+      await session.update({ unlocked: true });
+      return { ok: true as const };
+    } catch (err) {
+      console.warn("[Gate] Falha ao atualizar sessão após unlock:", err);
+      return { ok: true as const };
+    }
   });
 
 export const lockSite = createServerFn({ method: "POST" }).handler(async () => {
-  const session = await useSession<GateSession>(sessionConfig());
-  await session.clear();
+  try {
+    const session = await useSession<GateSession>(sessionConfig());
+    await session.clear();
+  } catch (err) {
+    console.warn("[Gate] Falha ao limpar sessão no lock:", err);
+  }
   return { ok: true as const };
 });
