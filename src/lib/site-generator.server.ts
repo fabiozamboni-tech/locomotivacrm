@@ -7,6 +7,7 @@ import { createServerFn } from "@tanstack/react-start";
 import type { EmpresaCtx } from "./ai.functions";
 import { chamarLlmUniversal } from "./llm-provider.server";
 import { PROMPT_BLOCO_SKILLS_CLAUDE } from "./skills-claude-prompt";
+import { gerarUrlPollinationsFlux } from "./image-generator.server";
 
 export interface PesquisaWebSiteResult {
   query: string;
@@ -177,20 +178,22 @@ export async function pesquisarContextoParaSite(empresa: EmpresaCtx): Promise<Pe
 }
 
 /**
- * Retorna imagens fotográficas reais de alta resolução (Unsplash) mapeadas pelo nicho da empresa
+ * Retorna imagens fotográficas em alta resolução geradas por IA (FLUX.1) contextualmente
+ * mapeadas pelo nicho da empresa e cidade, garantindo links ativos e estética cinematográfica.
  */
-export function getImagensPorSegmento(segmento?: string) {
+export function getImagensPorSegmento(segmento?: string, cidade?: string, empresaNome?: string) {
   const s = (segmento || "").toLowerCase();
+  const cid = cidade || "Serra Gaúcha";
 
   // Vidraçaria, vidros temperados, esquadrias e fachadas
   if (s.includes("vidr") || s.includes("esquadr") || s.includes("fachad") || s.includes("box") || s.includes("espelho")) {
     return {
-      hero: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1600&q=80",
-      destaque: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80",
+      hero: gerarUrlPollinationsFlux(`modern architectural glass facade and minimalist frameless tempered glass balustrade in ${cid} brazil architectural photography 8k cinematic lighting`, 1600, 900),
+      destaque: gerarUrlPollinationsFlux(`artisan glazier workshop precision glass craftsmanship and custom aluminum frames in ${cid}`, 1200, 800),
       servicos: [
-        "https://images.unsplash.com/photo-1600565193348-f74bd3c7ccdf?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1600573472591-ee6b68d14c68?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80",
+        gerarUrlPollinationsFlux(`crystal clear tempered glass shower enclosure bathroom luxury interior design`, 800, 600),
+        gerarUrlPollinationsFlux(`minimalist glass and aluminum sliding doors modern living room terrace`, 800, 600),
+        gerarUrlPollinationsFlux(`commercial building glass curtain wall facade architecture reflection`, 800, 600),
       ],
     };
   }
@@ -198,12 +201,25 @@ export function getImagensPorSegmento(segmento?: string) {
   // Vinícolas, vinhos e enoturismo
   if (s.includes("vin") || s.includes("enot") || s.includes("uva")) {
     return {
-      hero: "https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?auto=format&fit=crop&w=1600&q=80",
-      destaque: "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1200&q=80",
+      hero: gerarUrlPollinationsFlux(`scenic rolling vineyard hills with grapevines in ${cid} serra gaucha brazil sunset cinematic lighting 8k`, 1600, 900),
+      destaque: gerarUrlPollinationsFlux(`rustic modern wine cellar with oak aging barrels and sommelier tasting table in ${cid}`, 1200, 800),
       servicos: [
-        "https://images.unsplash.com/photo-1474722883778-792e7990302f?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1528823872057-9c018a7a7553?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1560493676-04071c5f467b?auto=format&fit=crop&w=800&q=80",
+        gerarUrlPollinationsFlux(`fine wine bottle and crystal glass on rustic stone table vineyard background`, 800, 600),
+        gerarUrlPollinationsFlux(`guided vineyard tour and enotourism experience serra gaucha`, 800, 600),
+        gerarUrlPollinationsFlux(`harvesting premium grapes vineyard agricultural craftsmanship`, 800, 600),
+      ],
+    };
+  }
+
+  // Marmoraria e pedras decorativas
+  if (s.includes("marm") || s.includes("granit") || s.includes("pedra") || s.includes("quartzo")) {
+    return {
+      hero: gerarUrlPollinationsFlux(`luxurious modern kitchen with exotic brazilian granite waterfall island countertop in ${cid} architectural photography 8k cinematic lighting`, 1600, 900),
+      destaque: gerarUrlPollinationsFlux(`artisan stone cutter precision polishing natural marble slab in workshop atmospheric lighting`, 1200, 800),
+      servicos: [
+        gerarUrlPollinationsFlux(`custom luxury calacatta marble bathroom vanity countertop interior design`, 800, 600),
+        gerarUrlPollinationsFlux(`exterior granite facade cladding modern commercial building architectural detail`, 800, 600),
+        gerarUrlPollinationsFlux(`quartzite tabletop architectural macro texture natural stone veins`, 800, 600),
       ],
     };
   }
@@ -211,12 +227,12 @@ export function getImagensPorSegmento(segmento?: string) {
   // Móveis planejados, marcenaria e design de interiores
   if (s.includes("móvel") || s.includes("movel") || s.includes("decor") || s.includes("planej") || s.includes("marcen")) {
     return {
-      hero: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1600&q=80",
-      destaque: "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=1200&q=80",
+      hero: gerarUrlPollinationsFlux(`bespoke luxury custom furniture cabinetry modern open concept apartment interior design ${cid} architectural photography 8k`, 1600, 900),
+      destaque: gerarUrlPollinationsFlux(`master woodworker artisan workshop precision custom joinery woodworking tools`, 1200, 800),
       servicos: [
-        "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1538688525198-9b88f6f53126?auto=format&fit=crop&w=800&q=80",
+        gerarUrlPollinationsFlux(`custom gourmet kitchen cabinets with integrated warm led lighting`, 800, 600),
+        gerarUrlPollinationsFlux(`luxury master bedroom suite walk in closet custom joinery`, 800, 600),
+        gerarUrlPollinationsFlux(`executive home office library woodwork solid timber desk`, 800, 600),
       ],
     };
   }
@@ -224,12 +240,12 @@ export function getImagensPorSegmento(segmento?: string) {
   // Gastronomia, restaurantes, cafés e bares
   if (s.includes("rest") || s.includes("gastro") || s.includes("café") || s.includes("pizz") || s.includes("bar")) {
     return {
-      hero: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1600&q=80",
-      destaque: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1200&q=80",
+      hero: gerarUrlPollinationsFlux(`ambient gourmet fine dining restaurant dining room moody warm lighting modern rustic aesthetic ${cid}`, 1600, 900),
+      destaque: gerarUrlPollinationsFlux(`chef plating culinary dish in restaurant kitchen artisanal presentation`, 1200, 800),
       servicos: [
-        "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&w=800&q=80",
+        gerarUrlPollinationsFlux(`exquisite culinary dish fine dining presentation fresh local ingredients`, 800, 600),
+        gerarUrlPollinationsFlux(`handcrafted artisanal pizza wood fired oven golden crust`, 800, 600),
+        gerarUrlPollinationsFlux(`specialty coffee espresso brewing latte art cozy cafe bar`, 800, 600),
       ],
     };
   }
@@ -237,12 +253,12 @@ export function getImagensPorSegmento(segmento?: string) {
   // Saúde, clínicas médicas e odontologia
   if (s.includes("saúde") || s.includes("saude") || s.includes("clínic") || s.includes("clinic") || s.includes("médic") || s.includes("medic") || s.includes("odonto")) {
     return {
-      hero: "https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=1600&q=80",
-      destaque: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1200&q=80",
+      hero: gerarUrlPollinationsFlux(`state of the art medical clinic interior bright minimalist reception gentle natural daylight ${cid}`, 1600, 900),
+      destaque: gerarUrlPollinationsFlux(`friendly doctor physician consulting with patient in modern consultation room`, 1200, 800),
       servicos: [
-        "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1629909615184-74f495363b67?auto=format&fit=crop&w=800&q=80",
+        gerarUrlPollinationsFlux(`modern dental examination treatment suite high tech equipment`, 800, 600),
+        gerarUrlPollinationsFlux(`wellness and rehabilitation private therapy room peaceful ambience`, 800, 600),
+        gerarUrlPollinationsFlux(`advanced medical diagnostic tools precision healthcare`, 800, 600),
       ],
     };
   }
@@ -250,12 +266,12 @@ export function getImagensPorSegmento(segmento?: string) {
   // Hotelaria, pousadas e turismo
   if (s.includes("hotel") || s.includes("pousad") || s.includes("turism") || s.includes("chalé")) {
     return {
-      hero: "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1600&q=80",
-      destaque: "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1200&q=80",
+      hero: gerarUrlPollinationsFlux(`luxury boutique hotel chalet panoramic mountain view terrace serra gaucha brazil morning mist 8k`, 1600, 900),
+      destaque: gerarUrlPollinationsFlux(`cozy hotel fireplace lounge rustic stone and wood warm atmosphere`, 1200, 800),
       servicos: [
-        "https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80",
+        gerarUrlPollinationsFlux(`deluxe hotel bedroom suite king bed crisp white linens scenic view`, 800, 600),
+        gerarUrlPollinationsFlux(`gourmet breakfast buffet spread fresh bread fruit cheeses`, 800, 600),
+        gerarUrlPollinationsFlux(`outdoor spa hot tub overlooking serene nature forest`, 800, 600),
       ],
     };
   }
@@ -263,24 +279,24 @@ export function getImagensPorSegmento(segmento?: string) {
   // Advocacia e consultoria jurídica
   if (s.includes("advoc") || s.includes("juríd") || s.includes("jurid") || s.includes("lei")) {
     return {
-      hero: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1600&q=80",
-      destaque: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80",
+      hero: gerarUrlPollinationsFlux(`prestigious modern law firm boardroom solid oak table panoramic window warm lighting ${cid} 8k`, 1600, 900),
+      destaque: gerarUrlPollinationsFlux(`lawyer attorney consulting with client across executive wooden desk`, 1200, 800),
       servicos: [
-        "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1450133064473-71024230f91b?auto=format&fit=crop&w=800&q=80",
+        gerarUrlPollinationsFlux(`legal documents and leather bound law books on mahogany desk`, 800, 600),
+        gerarUrlPollinationsFlux(`corporate contract negotiation professional conference room`, 800, 600),
+        gerarUrlPollinationsFlux(`private law library classic and contemporary architecture`, 800, 600),
       ],
     };
   }
 
   // Padrão Premium Corporativo / Serviços
   return {
-    hero: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1600&q=80",
-    destaque: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80",
+    hero: gerarUrlPollinationsFlux(`modern prestigious commercial headquarters architecture glass facade in ${cid} brazil 8k cinematic lighting`, 1600, 900),
+    destaque: gerarUrlPollinationsFlux(`dedicated professional team collaboration in modern sunlit office space`, 1200, 800),
     servicos: [
-      "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=800&q=80",
+      gerarUrlPollinationsFlux(`strategic consulting and project execution presentation board`, 800, 600),
+      gerarUrlPollinationsFlux(`client service and consultation welcoming reception area`, 800, 600),
+      gerarUrlPollinationsFlux(`high quality commercial delivery and customer satisfaction`, 800, 600),
     ],
   };
 }
@@ -312,7 +328,7 @@ export function construirSiteEditorialAntiIa(
   const city = empresa.cidade || "Serra Gaúcha";
   const segmento = empresa.segmento || "Serviços Especializados";
   const area = empresa.areaAtuacao || segmento;
-  const imagens = getImagensPorSegmento(empresa.segmento);
+  const imagens = getImagensPorSegmento(empresa.segmento, empresa.cidade, empresa.nome);
 
   return `<!DOCTYPE html>
 <html lang="pt-BR" class="scroll-smooth">
@@ -1036,7 +1052,15 @@ REGRAS DE RETORNO TÉCNICO:
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 - Carregue Lucide Icons via CDN: <script src="https://unpkg.com/lucide@latest"></script>
 - Use Google Fonts com fontes contrastantes (ex: Outfit ou Cinzel para títulos, Plus Jakarta Sans para o corpo).
-- Use fotografias reais em alta resolução do Unsplash (https://images.unsplash.com/photo-...) adequadas ao nicho.
+- DIRETRIZES DE IMAGENS FOTOGRÁFICAS GERADAS POR IA (IMAGENS 100% REAIS, ATIVAS E SEM LINKS QUEBRADOS):
+  * NUNCA utilize IDs ou links aleatórios do Unsplash (ex: photo-1517...) porque eles não existem e causam erros 404 de imagem quebrada.
+  * Todas as imagens fotográficas do site (Hero/Capa, Destaque/Sobre Nós, Cards de Serviços e Portfólio) DEVEM utilizar o gerador de imagens por IA (FLUX.1) no formato:
+    https://image.pollinations.ai/prompt/{PROMPT_EM_INGLES_DESCRITIVO_DO_NICHO}?width={LARGURA}&height={ALTURA}&model=flux&nologo=true
+  * O {PROMPT_EM_INGLES_DESCRITIVO_DO_NICHO} DEVE ser escrito em inglês fotográfico rico e cinematográfico especificando o nicho (${data.empresa.segmento}), a cidade (${data.empresa.cidade} Serra Gaúcha Brazil) e estilo de iluminação natural/arquitetônica (ex: 'luxurious modern showroom in ${data.empresa.cidade} brazil, architectural photography 8k, cinematic lighting').
+  * Para a Hero/Capa: width=1600&height=900.
+  * Para a seção Sobre/Destaque: width=1200&height=800.
+  * Para cada Card de Serviço/Produto: width=800&height=600 com foco na especialidade descrita.
+  * Em todas as tags <img>, adicione loading="lazy", a classe "w-full h-full object-cover" e atributo alt em português descrevendo com precisão o que a imagem retrata.
 - Inclua botão de WhatsApp funcional com link wa.me/55...`;
 
     const promptUser = `[Especificação do Nicho]Agora, aplique todas as regras acima para criar o site completo do seguinte nicho:
@@ -1174,6 +1198,11 @@ ${
     ? `\n[DIRETRIZES ADICIONAIS DE DESIGN (.MD)]:\n${data.instrucoesDesignMd}`
     : ""
 }
+
+[DIRETRIZES DE IMAGENS FOTOGRÁFICAS GERADAS POR IA]:
+- Se adicionar ou alterar blocos com imagens fotográficas, utilize sempre o formato generativo por IA (FLUX.1):
+  https://image.pollinations.ai/prompt/{PROMPT_EM_INGLES_DESCRITIVO_DO_NICHO}?width={LARGURA}&height={ALTURA}&model=flux&nologo=true
+- Nunca invente links ou IDs fictícios do Unsplash que resultam em erros 404.
 
 FORMATO DE RESPOSTA OBRIGATÓRIO:
 Inicie sua resposta com uma linha resumindo a alteração feita em português no formato:

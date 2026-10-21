@@ -81,6 +81,7 @@ import {
 import { ModalComparadorVersoes } from "@/components/estudio-criacao/modal-comparador-versoes";
 import { ExportarGithubModal } from "@/components/estudio-criacao/exportar-github-modal";
 import { PaletaCoresCard } from "@/components/paleta-cores-card";
+import { PainelImagensSite } from "@/components/estudio-criacao/painel-imagens-site";
 import { PROMPT_BLOCO_SKILLS_CLAUDE } from "@/lib/skills-claude-prompt";
 
 export const Route = createFileRoute("/estudio-criacao")({
@@ -125,8 +126,8 @@ function EstudioCriacaoPage() {
   // Barra lateral retrátil (duas colunas)
   const [painelEsquerdoAberto, setPainelEsquerdoAberto] = useState(true);
 
-  // Sub-aba dentro do painel esquerdo: Chat de Refinamento ou Histórico
-  const [abaPainelEsquerdo, setAbaPainelEsquerdo] = useState<"chat" | "historico">("chat");
+  // Sub-aba dentro do painel esquerdo: Chat, Imagens por IA ou Histórico
+  const [abaPainelEsquerdo, setAbaPainelEsquerdo] = useState<"chat" | "imagens" | "historico">("chat");
 
   // Diretrizes Anti-IA Bespoke (combo-box global para todas as APIs)
   const [usarAntiIaBespoke, setUsarAntiIaBespoke] = useState<boolean>(
@@ -569,6 +570,39 @@ function EstudioCriacaoPage() {
     });
 
     toast.success("Histórico de sites gerados limpo com sucesso!");
+  };
+
+  // 4.1 ATUALIZAR HTML VIA GALERIA DE IMAGENS POR IA
+  const handleAtualizarHtmlComImagem = (novoHtml: string, descricao: string) => {
+    if (!empresa) return;
+
+    setSiteHtml(novoHtml);
+
+    const novaVersaoId = `versao_${Date.now()}`;
+    const novaVersao: SiteVersaoGerada = {
+      id: novaVersaoId,
+      data: new Date().toISOString(),
+      provedor: "Galeria de Imagens IA",
+      modelo: "FLUX.1 / Imagen 3",
+      html: novoHtml,
+      ativa: true,
+    };
+
+    const novasVersoes = [novaVersao, ...(versoes || []).map((v) => ({ ...v, ativa: false }))];
+    setVersoes(novasVersoes);
+
+    updateEmpresa(empresa.id, {
+      siteGeradoHtml: novoHtml,
+      siteGeradoData: new Date().toISOString(),
+      siteVersoes: novasVersoes,
+      analiseAtualizadaEm: new Date().toISOString(),
+    });
+
+    addHistorico(empresa.id, {
+      data: new Date().toISOString(),
+      tipo: "nota",
+      texto: `Imagem do site atualizada: ${descricao}`,
+    });
   };
 
   // 5. ATIVAR VERSÃO ESPECÍFICA COMO OFICIAL
@@ -1070,20 +1104,24 @@ Pilares de Conteúdo:
                 </Button>
               </div>
 
-              {/* ABAS DO PAINEL ESQUERDO: CHAT VS HISTÓRICO */}
+              {/* ABAS DO PAINEL ESQUERDO: CHAT VS IMAGENS IA VS HISTÓRICO */}
               <Tabs
                 value={abaPainelEsquerdo}
-                onValueChange={(v) => setAbaPainelEsquerdo(v as "chat" | "historico")}
+                onValueChange={(v) => setAbaPainelEsquerdo(v as "chat" | "imagens" | "historico")}
                 className="flex-1 flex flex-col min-h-0"
               >
-                <TabsList className="grid grid-cols-2 h-8 p-0.5 bg-muted/60 shrink-0">
-                  <TabsTrigger value="chat" className="text-xs gap-1.5 h-7">
-                    <MessageSquare className="h-3.5 w-3.5 text-primary" />
-                    <span>Chat de Refinamento</span>
+                <TabsList className="grid grid-cols-3 h-8 p-0.5 bg-muted/60 shrink-0">
+                  <TabsTrigger value="chat" className="text-xs gap-1 h-7 px-1">
+                    <MessageSquare className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <span className="truncate">Chat IA</span>
                   </TabsTrigger>
-                  <TabsTrigger value="historico" className="text-xs gap-1.5 h-7">
-                    <History className="h-3.5 w-3.5 text-blue-500" />
-                    <span>Versões ({versoes.length})</span>
+                  <TabsTrigger value="imagens" className="text-xs gap-1 h-7 px-1">
+                    <ImageIcon className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                    <span className="truncate">Imagens IA</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="historico" className="text-xs gap-1 h-7 px-1">
+                    <History className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                    <span className="truncate">Versões ({versoes.length})</span>
                   </TabsTrigger>
                 </TabsList>
 
@@ -1188,7 +1226,18 @@ Pilares de Conteúdo:
                 </TabsContent>
 
                 {/* ================================= */}
-                {/* ABA 2: HISTÓRICO & EXCLUSÃO DE VERSÕES */}
+                {/* ABA 2: GALERIA DE IMAGENS POR IA  */}
+                {/* ================================= */}
+                <TabsContent value="imagens" className="flex-1 flex flex-col min-h-0 pt-2 space-y-2 mt-0">
+                  <PainelImagensSite
+                    siteHtml={siteHtml}
+                    onAtualizarHtml={handleAtualizarHtmlComImagem}
+                    empresa={empresa}
+                  />
+                </TabsContent>
+
+                {/* ================================= */}
+                {/* ABA 3: HISTÓRICO & EXCLUSÃO DE VERSÕES */}
                 {/* ================================= */}
                 <TabsContent value="historico" className="flex-1 flex flex-col min-h-0 pt-2 space-y-2.5 mt-0">
                   <div className="flex items-center justify-between gap-2 shrink-0">
