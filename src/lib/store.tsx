@@ -450,10 +450,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const uniqueNovos: InstagramProfile[] = [];
 
     setInstagramProfilesDb((prev) => {
-      const existingHandles = new Set(prev.map((p) => p.handle.toLowerCase().replace(/^@/, "")));
+      const existingHandles = new Set(prev.map((p) => String(p.handle || "").toLowerCase().replace(/^@/, "")));
 
       for (const p of novos) {
-        const cleanHandle = p.handle.toLowerCase().replace(/^@/, "");
+        const cleanHandle = String(p.handle || "").toLowerCase().replace(/^@/, "");
         if (existingHandles.has(cleanHandle)) {
           duplicados++;
         } else {

@@ -71,7 +71,7 @@ export function QrCodeCard({
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = blobUrl;
-      a.download = `qrcode-${(nomeEmpresa || "lead").toLowerCase().replace(/\s+/g, "-")}.png`;
+      a.download = `qrcode-${String(nomeEmpresa || "lead").toLowerCase().replace(/\s+/g, "-")}.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

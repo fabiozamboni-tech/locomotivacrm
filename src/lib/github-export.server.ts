@@ -60,13 +60,13 @@ export const criarRepositorioGithub_ServerFn = createServerFn({ method: "POST" }
       const owner = userData.login;
 
       // Sanitiza o nome do repositório
-      const repoSlug = data.repoName
+      const repoSlug = String(data.repoName || "")
         .toLowerCase()
         .replace(/[^a-z0-9-_]/g, "-")
         .replace(/-+/g, "-")
         .replace(/^-|-$/g, "");
 
-      const cleanRepoName = repoSlug || `site-${data.empresaNome.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
+      const cleanRepoName = repoSlug || `site-${String(data.empresaNome || "empresa").toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
 
       // 2. Verifica se o repositório já existe ou cria novo
       let repoUrl = `https://github.com/${owner}/${cleanRepoName}`;

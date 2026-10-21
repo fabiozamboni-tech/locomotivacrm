@@ -737,7 +737,7 @@ export function construirSiteEditorialAntiIa(
             <div class="flex items-start gap-3">
               <i data-lucide="mail" class="size-5 text-stone-800 shrink-0 mt-0.5"></i>
               <div>
-                <p class="font-semibold text-ink">${empresa.email || `contato@${empresa.nome.toLowerCase().replace(/\s+/g, "")}.com.br`}</p>
+                <p class="font-semibold text-ink">${empresa.email || `contato@${String(empresa.nome || "empresa").toLowerCase().replace(/\s+/g, "")}.com.br`}</p>
                 <p class="text-xs text-stone-500">Envio de plantas e especificações</p>
               </div>
             </div>

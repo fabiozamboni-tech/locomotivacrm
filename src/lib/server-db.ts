@@ -281,12 +281,12 @@ export async function saveInstagramProfiles(novos: InstagramProfile[]): Promise<
 
   await queueWrite((state) => {
     const existingHandles = new Set(
-      state.instagramProfilesDb.map((p) => p.handle.toLowerCase().replace(/^@/, "")),
+      state.instagramProfilesDb.map((p) => String(p.handle || "").toLowerCase().replace(/^@/, "")),
     );
     const uniqueNovos: InstagramProfile[] = [];
 
     for (const p of novos) {
-      const clean = p.handle.toLowerCase().replace(/^@/, "");
+      const clean = String(p.handle || "").toLowerCase().replace(/^@/, "");
       if (existingHandles.has(clean)) {
         duplicados++;
       } else {

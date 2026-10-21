@@ -615,12 +615,12 @@ function ImportarPage() {
     const q = buscaExcluidos.toLowerCase().trim();
     return empresasExcluidas.filter(
       (e) =>
-        e.nome.toLowerCase().includes(q) ||
-        (e.razaoSocial && e.razaoSocial.toLowerCase().includes(q)) ||
+        String(e.nome || "").toLowerCase().includes(q) ||
+        (e.razaoSocial && String(e.razaoSocial).toLowerCase().includes(q)) ||
         (e.cnpj && e.cnpj.includes(q)) ||
-        (e.cidade && e.cidade.toLowerCase().includes(q)) ||
-        (e.segmento && e.segmento.toLowerCase().includes(q)) ||
-        (e.site && e.site.toLowerCase().includes(q)),
+        (e.cidade && String(e.cidade).toLowerCase().includes(q)) ||
+        (e.segmento && String(e.segmento).toLowerCase().includes(q)) ||
+        (e.site && String(e.site).toLowerCase().includes(q)),
     );
   }, [empresasExcluidas, buscaExcluidos]);
 
@@ -1034,7 +1034,7 @@ function ImportarPage() {
 
       // Deduplicação contra a base de dados já salva
       const handleSetDb = new Set(
-        instagramProfilesDb.map((p) => p.handle.toLowerCase().replace(/^@/, "").trim())
+        instagramProfilesDb.map((p) => String(p.handle || "").toLowerCase().replace(/^@/, "").trim())
       );
 
       const novosPerfis: InstagramProfile[] = [];
@@ -1354,11 +1354,11 @@ function ImportarPage() {
         if (instagramTermoLivre.trim()) {
           const q = instagramTermoLivre.toLowerCase().trim();
           const match =
-            p.nome.toLowerCase().includes(q) ||
-            p.handle.toLowerCase().includes(q) ||
-            (p.bio && p.bio.toLowerCase().includes(q)) ||
-            (p.site && p.site.toLowerCase().includes(q)) ||
-            (p.email && p.email.toLowerCase().includes(q)) ||
+            String(p.nome || "").toLowerCase().includes(q) ||
+            String(p.handle || "").toLowerCase().includes(q) ||
+            (p.bio && String(p.bio).toLowerCase().includes(q)) ||
+            (p.site && String(p.site).toLowerCase().includes(q)) ||
+            (p.email && String(p.email).toLowerCase().includes(q)) ||
             (p.telefone && p.telefone.includes(q)) ||
             (p.whatsapp && p.whatsapp.includes(q));
           if (!match) return false;

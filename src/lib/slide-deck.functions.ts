@@ -316,8 +316,8 @@ export const DIAGNOSTICO_PILARES_INFO: Record<DiagnosticoPilarKey, DiagnosticoPi
  * Identifica o pilar correspondente a uma seção do relatório
  */
 export function mapearPilarSecao(secao: SecaoRelatorio): DiagnosticoPilarKey | null {
-  const p = (secao.pilar || "").toLowerCase();
-  const t = (secao.titulo || "").toLowerCase();
+  const p = String(secao?.pilar || "").toLowerCase();
+  const t = String(secao?.titulo || "").toLowerCase();
   if (p === "site" || t.includes("site") || t.includes("web") || t.includes("google")) return "site";
   if (p === "comunicacao" || t.includes("comunicação") || t.includes("comunicacao") || t.includes("atendimento") || t.includes("whatsapp")) return "comunicacao";
   if (p === "redes" || t.includes("rede") || t.includes("instagram") || t.includes("social")) return "redes";

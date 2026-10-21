@@ -214,7 +214,7 @@ export function PaletaCoresCard({
                   carregarPaleta(p.hex);
                 }}
                 className={`text-[11px] px-2.5 py-1 rounded-md border flex items-center gap-1.5 transition-all ${
-                  hexInput.toLowerCase() === p.hex.toLowerCase()
+                  String(hexInput || "").toLowerCase() === String(p.hex || "").toLowerCase()
                     ? "border-primary bg-primary/10 font-semibold"
                     : "border-border/70 hover:border-border hover:bg-muted/50"
                 }`}

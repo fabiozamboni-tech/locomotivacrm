@@ -599,7 +599,7 @@ function EstudioCriacaoPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `site-${empresa.nome.toLowerCase().replace(/[^a-z0-9]/g, "-")}.html`;
+    a.download = `site-${String(empresa.nome || "empresa").toLowerCase().replace(/[^a-z0-9]/g, "-")}.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

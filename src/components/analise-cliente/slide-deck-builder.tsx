@@ -99,8 +99,8 @@ export function SlideDeckBuilder({
 
   const handleAdicionarSlideDiagnostico = (pilar: DiagnosticoPilarKey) => {
     const secao = relatorio?.secoes?.find((s) => {
-      const p = (s.pilar || "").toLowerCase();
-      const t = (s.titulo || "").toLowerCase();
+      const p = String(s.pilar || "").toLowerCase();
+      const t = String(s.titulo || "").toLowerCase();
       if (pilar === "site") return p === "site" || t.includes("site") || t.includes("web");
       if (pilar === "comunicacao") return p === "comunicacao" || t.includes("comunicação") || t.includes("comunicacao") || t.includes("atendimento");
       if (pilar === "redes") return p === "redes" || t.includes("rede") || t.includes("instagram");

@@ -42,13 +42,14 @@ export interface AjustesBusca {
   publicoAlvo?: string;
 }
 
-export function sementesPadrao(segmento: string, cidade: string, areaAtuacao?: string) {
-  const seg = segmento.toLowerCase();
-  const list = [`${seg} ${cidade}`, `${seg} em ${cidade}`, `melhor ${seg} ${cidade}`, `${seg} perto de mim`];
+export function sementesPadrao(segmento?: string, cidade?: string, areaAtuacao?: string): string[] {
+  const seg = String(segmento || "serviços").trim().toLowerCase();
+  const cid = String(cidade || "Serra Gaúcha").trim();
+  const list = [`${seg} ${cid}`, `${seg} em ${cid}`, `melhor ${seg} ${cid}`, `${seg} perto de mim`];
   if (areaAtuacao) {
-    const limpo = areaAtuacao.split(/[,\-–\.]/)[0].trim().toLowerCase();
+    const limpo = String(areaAtuacao).split(/[,\-–\.]/)[0].trim().toLowerCase();
     if (limpo && limpo.length > 3 && limpo !== seg) {
-      list.unshift(`${limpo} em ${cidade}`);
+      list.unshift(`${limpo} em ${cid}`);
     }
   }
   return list;
@@ -66,20 +67,25 @@ async function autocomplete(q: string): Promise<string[]> {
   }
 }
 
-function norm(s: string) {
-  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+function norm(s?: string) {
+  return String(s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
 }
 
 async function coletarSeo(e: z.infer<typeof EmpresaInput>, aj: AjustesBusca = {}): Promise<DadosSeo> {
   const avisos: string[] = [];
-  const limpa = (a?: string[]) => (a ?? []).map((x) => x.trim()).filter(Boolean);
+  const limpa = (a?: string[]) => (a ?? []).map((x) => String(x || "").trim()).filter(Boolean);
   const sementes = limpa(aj.sementes).length ? limpa(aj.sementes) : sementesPadrao(e.segmento, e.cidade);
   const manuais = limpa(aj.termos);
   const listas = manuais.length ? [manuais] : await Promise.all(sementes.map(autocomplete));
   const vistos = new Set<string>();
   const termos: SeoTermo[] = [];
   for (const l of listas) for (const t of l) {
-    const k = t.toLowerCase();
+    if (!t) continue;
+    const k = String(t).toLowerCase();
     if (!vistos.has(k)) { vistos.add(k); termos.push({ termo: t, fonte: "google_autocomplete" }); }
   }
   if (!termos.length) avisos.push("Google Autocomplete não retornou sugestões para este segmento/cidade.");
@@ -88,7 +94,7 @@ async function coletarSeo(e: z.infer<typeof EmpresaInput>, aj: AjustesBusca = {}
   let presenca: PresencaBusca | null = null;
   const LK = process.env.LOVABLE_API_KEY;
   const GK = process.env.GOOGLE_MAPS_API_KEY;
-  const consulta = aj.consulta?.trim() || `${e.segmento} em ${e.cidade}`;
+  const consulta = aj.consulta?.trim() || `${e.segmento || "Serviços"} em ${e.cidade || "Serra Gaúcha"}`;
   if (LK && GK) {
     try {
       const r = await fetch("https://connector-gateway.lovable.dev/google_maps/places/v1/places:searchText", {

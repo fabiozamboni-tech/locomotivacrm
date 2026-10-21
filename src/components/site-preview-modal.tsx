@@ -64,7 +64,7 @@ export function SitePreviewModal({
   };
 
   const handleDownloadHtml = () => {
-    const filename = `${empresa.nome.toLowerCase().replace(/[^a-z0-9]/g, "_")}_site_locomotiva.html`;
+    const filename = `${String(empresa.nome || "empresa").toLowerCase().replace(/[^a-z0-9]/g, "_")}_site_locomotiva.html`;
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");

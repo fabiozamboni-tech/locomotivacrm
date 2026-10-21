@@ -279,13 +279,13 @@ function AnaliseClientePage() {
 
     setSementesTxt(
       empresa.buscasPartida?.trim() ||
-        sementesPadrao(empresa.segmento, empresa.cidade, empresa.areaAtuacao).join("\n"),
+        sementesPadrao(empresa.segmento || "Serviços", empresa.cidade || "Serra Gaúcha", empresa.areaAtuacao).join("\n"),
     );
     setConsultaGoogle(
       empresa.buscaGoogleMaps?.trim() ||
         (empresa.areaAtuacao
-          ? `${empresa.areaAtuacao.split(/[,\-–\.]/)[0].trim()} em ${empresa.cidade}`
-          : `${empresa.segmento} em ${empresa.cidade}`),
+          ? `${String(empresa.areaAtuacao).split(/[,\-–\.]/)[0].trim()} em ${empresa.cidade || "Serra Gaúcha"}`
+          : `${empresa.segmento || "Serviços"} em ${empresa.cidade || "Serra Gaúcha"}`),
     );
     setTermosTxt(empresa.termosEncontrados?.trim() || "");
     setPublicoAlvoTxt(empresa.publicoAlvo?.trim() || "");
@@ -411,7 +411,7 @@ function AnaliseClientePage() {
       });
 
       setTextoAbordagemEditado(formatarTextoAbordagem(canal, res));
-      const ehFallback = res.provedorUtilizado.toLowerCase().includes("pronto");
+      const ehFallback = Boolean(res.provedorUtilizado && String(res.provedorUtilizado).toLowerCase().includes("pronto"));
       setMetaAbordagem({
         provedor: res.provedorUtilizado,
         modelo: res.modeloUtilizado,
@@ -680,8 +680,8 @@ function AnaliseClientePage() {
         : gerarApresentacaoPadrao(empresa, dossier, resRelatorio?.relatorio);
 
     const secao = resRelatorio?.relatorio?.secoes?.find((s) => {
-      const p = (s.pilar || "").toLowerCase();
-      const t = (s.titulo || "").toLowerCase();
+      const p = String(s.pilar || "").toLowerCase();
+      const t = String(s.titulo || "").toLowerCase();
       if (pilar === "site") return p === "site" || t.includes("site") || t.includes("web") || t.includes("google");
       if (pilar === "comunicacao") return p === "comunicacao" || t.includes("comunicação") || t.includes("comunicacao") || t.includes("atendimento") || t.includes("whatsapp");
       if (pilar === "redes") return p === "redes" || t.includes("rede") || t.includes("instagram") || t.includes("social");
@@ -729,8 +729,8 @@ function AnaliseClientePage() {
 
     for (const pilar of pilaresChaves) {
       const secao = resRelatorio?.relatorio?.secoes?.find((s) => {
-        const p = (s.pilar || "").toLowerCase();
-        const t = (s.titulo || "").toLowerCase();
+        const p = String(s.pilar || "").toLowerCase();
+        const t = String(s.titulo || "").toLowerCase();
         if (pilar === "site") return p === "site" || t.includes("site") || t.includes("web") || t.includes("google");
         if (pilar === "comunicacao") return p === "comunicacao" || t.includes("comunicação") || t.includes("comunicacao") || t.includes("atendimento") || t.includes("whatsapp");
         if (pilar === "redes") return p === "redes" || t.includes("rede") || t.includes("instagram") || t.includes("social");

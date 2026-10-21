@@ -63,8 +63,8 @@ export function gerarInsights(e: Empresa): InsightBlock {
 
   const cls = classificarScore(e.score);
   const resumo =
-    `${e.nome}, do segmento ${e.segmento} em ${e.cidade}, apresenta ` +
-    `${cls.label.toLowerCase()} (score ${e.score}). ` +
+    `${e.nome || "Empresa"}, do segmento ${e.segmento || "Serviços"} em ${e.cidade || "Serra Gaúcha"}, apresenta ` +
+    `${String(cls?.label || "pontuação média").toLowerCase()} (score ${e.score}). ` +
     (falhas.length
       ? `Principais gaps identificados: ${falhas.slice(0, 2).join(" ")}`
       : "Presença digital consistente, com poucos gaps evidentes.");
@@ -244,7 +244,7 @@ export function gerarPrompt(e: Empresa, tipo: TipoPrompt): string {
       base,
       "",
       "## Posicionamento",
-      `Marca ${e.segmento.toLowerCase()} da Serra Gaúcha com foco em audiência local + turistas.`,
+      `Marca ${String(e.segmento || "Serviços").toLowerCase()} da Serra Gaúcha com foco em audiência local + turistas.`,
       "",
       "## Pilares editoriais (4)",
       "1. Bastidores e processo",
