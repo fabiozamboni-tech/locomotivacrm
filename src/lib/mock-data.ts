@@ -146,6 +146,7 @@ export interface Empresa {
   };
   estudioChatMensagens?: EstudioChatMessage[];
   estudioUsarAntiIaBespoke?: boolean;
+  estudioUsarSkillsClaude?: boolean;
   // Diagnóstico
   diagnostico: {
     site: {

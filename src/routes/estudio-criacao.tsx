@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -80,6 +81,7 @@ import {
 import { ModalComparadorVersoes } from "@/components/estudio-criacao/modal-comparador-versoes";
 import { ExportarGithubModal } from "@/components/estudio-criacao/exportar-github-modal";
 import { PaletaCoresCard } from "@/components/paleta-cores-card";
+import { PROMPT_BLOCO_SKILLS_CLAUDE } from "@/lib/skills-claude-prompt";
 
 export const Route = createFileRoute("/estudio-criacao")({
   validateSearch: z.object({
@@ -129,6 +131,11 @@ function EstudioCriacaoPage() {
   // Diretrizes Anti-IA Bespoke (combo-box global para todas as APIs)
   const [usarAntiIaBespoke, setUsarAntiIaBespoke] = useState<boolean>(
     empresa?.estudioUsarAntiIaBespoke ?? true,
+  );
+
+  // Skills Claude (Anthropic Frontend Design)
+  const [usarSkillsClaude, setUsarSkillsClaude] = useState<boolean>(
+    empresa?.estudioUsarSkillsClaude ?? true,
   );
 
   // Agente de IA selecionado
@@ -183,6 +190,7 @@ function EstudioCriacaoPage() {
       setDesignMdAnexo(empresa.estudioDesignMdAnexo || null);
       setChatMensagens(empresa.estudioChatMensagens || []);
       setUsarAntiIaBespoke(empresa.estudioUsarAntiIaBespoke ?? true);
+      setUsarSkillsClaude(empresa.estudioUsarSkillsClaude ?? true);
     }
   }, [
     empresa?.id,
@@ -192,6 +200,7 @@ function EstudioCriacaoPage() {
     empresa?.estudioDesignMdAnexo,
     empresa?.estudioChatMensagens,
     empresa?.estudioUsarAntiIaBespoke,
+    empresa?.estudioUsarSkillsClaude,
   ]);
 
   // Auto-scroll do chat ao receber nova mensagem
@@ -312,6 +321,7 @@ function EstudioCriacaoPage() {
           provedorPreferencial: agenteSelecionado.provider,
           modeloPreferencial: agenteSelecionado.modelo,
           usarAntiIaBespoke,
+          usarSkillsClaude,
           customKeys,
           diagnostico: empresa.diagnostico,
           dossier360: empresa.dossier360,
@@ -347,6 +357,8 @@ function EstudioCriacaoPage() {
         role: "assistant",
         texto: `Site completo gerado com sucesso por ${agenteSelecionado.nome} (${agenteSelecionado.modelo})${
           usarAntiIaBespoke ? " seguindo as diretrizes Anti-IA Bespoke" : ""
+        }${
+          usarSkillsClaude ? " e Skills Claude da Anthropic" : ""
         }. Você pode agora me enviar instruções neste chat para alterar cores, textos, seções ou animações!`,
         modelo: agenteSelecionado.nome,
         versaoGeradaId: novaVersaoId,
@@ -362,6 +374,7 @@ function EstudioCriacaoPage() {
         siteVersoes: novasVersoes,
         estudioChatMensagens: novoChat,
         estudioUsarAntiIaBespoke: usarAntiIaBespoke,
+        estudioUsarSkillsClaude: usarSkillsClaude,
         analiseAtualizadaEm: new Date().toISOString(),
       });
 
@@ -429,6 +442,7 @@ function EstudioCriacaoPage() {
           provedorPreferencial: agenteSelecionado.provider,
           modeloPreferencial: agenteSelecionado.modelo,
           usarAntiIaBespoke,
+          usarSkillsClaude,
           logoBase64: logoAnexo?.dataUrl,
           logoNomeArquivo: logoAnexo?.nome,
           instrucoesDesignMd: designMdAnexo?.conteudo,
@@ -469,6 +483,7 @@ function EstudioCriacaoPage() {
         siteVersoes: novasVersoes,
         estudioChatMensagens: chatAtualizado,
         estudioUsarAntiIaBespoke: usarAntiIaBespoke,
+        estudioUsarSkillsClaude: usarSkillsClaude,
         analiseAtualizadaEm: new Date().toISOString(),
       });
 
@@ -622,6 +637,123 @@ function EstudioCriacaoPage() {
   const copyCode = () => {
     navigator.clipboard.writeText(siteHtml);
     toast.success("Código HTML copiado para a área de transferência!");
+  };
+
+  const gerarPromptTexto = (tipo: string): string => {
+    if (!empresa) return "";
+
+    const diagnosticoSite = empresa.diagnostico?.site || {};
+    const relatorioLead = empresa.relatorioLead || {};
+    const dossierPersonas = empresa.dossier360?.personas || [];
+    const dossierObjecoes = empresa.dossier360?.objecoes || [];
+
+    if (tipo === "anti_ia_master") {
+      return `[Contexto do Sistema]
+Atue como um Desenvolvedor Frontend Sênior e UI/UX Designer de Elite. Sua missão é criar a estrutura, o layout e o código de um site profissional completo para o nicho que será especificado.
+${
+  usarSkillsClaude
+    ? PROMPT_BLOCO_SKILLS_CLAUDE
+    : ""
+}
+${
+  usarAntiIaBespoke
+    ? `[Regras de Design - Anti-IA Bespoke Obrigatórias]
+Proibições Absolutas:
+- Não utilize fundos pretos ou roxos com luzes neon artificiais.
+- Não utilize gradientes genéricos em botões.
+- Não utilize grids repetitivos em loop (como o padrão de 3 cards idênticos lado a lado).
+- Evite ilustrações 3D genéricas ou ícones flutuantes sem propósito funcional.
+- PROIBIÇÃO ABSOLUTA DE MARQUEE: É terminantemente proibido utilizar qualquer efeito de marquee.
+Arquitetura Visual: Priorize minimalismo premium e design editorial com whitespace generoso.
+Paleta de Cores e Tipografia: Combinação contida de no máximo 3 cores e hierarquia tipográfica marcante.`
+    : `[Regras de Design Moderno]
+Crie um design moderno com Tailwind CSS, 100% responsivo e elegante.`
+}
+
+[Estrutura e Elementos Obrigatórios - Site Completo Multi-Páginas]
+1. Home / Início (Hero de alto impacto, Proposta de Valor e CTA direto).
+2. Quem Somos / Sobre a Empresa (História, fundação e autoridade local).
+3. Serviços & Especialidades (Catálogo detalhado de soluções e benefícios).
+4. Portfólio / Projetos Realizados (Galeria de casos de sucesso).
+5. Diferenciais, Normas Técnicas & Garantias.
+6. Contato, Localização & Orçamento (Formulário e link de WhatsApp).
+
+[Animações e Interatividade]
+GSAP Integrado: Toda a camada de animação deve ser controlada via GSAP e ScrollTrigger.
+Parallax suave nas imagens de transição de seção.
+
+[Texto e Conteúdo]
+Tom de voz humano, direto e focado em benefícios reais. Sem jargões de IA.
+
+[Especificação do Nicho]
+- Empresa: ${empresa.nome}
+- Segmento: ${empresa.segmento}
+- Área de Atuação: ${empresa.areaAtuacao || empresa.segmento}
+- Cidade: ${empresa.cidade}/RS (Serra Gaúcha)
+- Telefone / WhatsApp: ${empresa.whatsapp || empresa.telefone || ""}
+- E-mail: ${empresa.email || ""}
+
+[Dados do Diagnóstico do Cliente]
+- Velocidade anterior: ${diagnosticoSite.velocidade || "não avaliada"}
+- Responsivo: ${diagnosticoSite.responsivo ? "Sim" : "Não"}
+- Resumo do Lead: ${relatorioLead.resumo || "Presença digital necessita de autoridade e acabamento nobre."}
+
+Gere o código HTML5 completo do site multi-páginas pronto para produção.`;
+    }
+
+    if (tipo === "site_geral") {
+      return `[Briefing de Arquitetura & UX Frontend]
+Empresa: ${empresa.nome} (${empresa.cidade}/RS)
+Setor: ${empresa.segmento}
+
+Objetivo: Estruturar a árvore de páginas e fluxo do usuário (UX) para um site institucional de alto padrão.
+1. Mapeamento de Personas e Dores:
+${dossierPersonas.map((p: any) => `- ${p.nome || "Persona"}: ${p.perfil || p.dorPrincipal || ""}`).join("\n") || "- Clientes que buscam pontualidade, acabamento impecável e segurança contratual."}
+2. Soluções e Portfólio a Evidenciar:
+- Destaque para projetos executados na Serra Gaúcha.
+- Detalhamento de materiais nobres e garantias técnicas.
+3. Fluxo de Conversão:
+- CTAs em pontos estratégicos para contato direto via WhatsApp comercial.`;
+    }
+
+    if (tipo === "copy_vendas") {
+      return `[Copywriting de Conversão e Vendas - Anti-Clichês]
+Empresa: ${empresa.nome} (${empresa.cidade}/RS) · Nicho: ${empresa.segmento}
+
+Diretrizes:
+- Escreva copies persuasivas e autênticas em português brasileiro.
+- PROIBIDO: Usar jargões como "revolucionário", "a solução definitiva", "no mundo dinâmico de hoje", "empresa líder" sem prova documental.
+- FOCO: Redigir benefícios tangíveis, materiais utilizados, prazos cumpridos e tranquilidade pós-venda.
+- Objeções a contornar:
+${dossierObjecoes.map((o: any) => `- ${o.objecao || o.titulo || ""}`).join("\n") || "- Preço vs. valor entregue, cumprimento de prazos de entrega e procedência de matérias-primas."}`;
+    }
+
+    if (tipo === "google_ads") {
+      return `[Campanha Google Ads - Rede de Pesquisa Local]
+Empresa: ${empresa.nome} · Cidade: ${empresa.cidade}/RS
+Segmento: ${empresa.segmento}
+
+Palavras-chave prioritárias:
+${empresa.termosEncontrados || `${empresa.segmento} em ${empresa.cidade}, projetos ${empresa.segmento}, orçamento ${empresa.segmento}`}
+
+Estrutura de Anúncios Responsivos de Busca (RSA):
+- 15 Títulos com foco local, diferenciais de acabamento e pontualidade.
+- 4 Descrições ressaltando atendimento presencial em ${empresa.cidade} e Serra Gaúcha.
+- Extensões recomendadas: Chamada telefônica, Sitelinks para Portfólio e Especialidades, e Localização física.`;
+    }
+
+    if (tipo === "redes_sociais") {
+      return `[Linha Editorial para Redes Sociais - Instagram & LinkedIn]
+Marca: ${empresa.nome} (${empresa.segmento} em ${empresa.cidade}/RS)
+
+Pilares de Conteúdo:
+1. Autoridade Técnica: Bastidores da produção, seleção de materiais e rigor nas normas.
+2. Prova Social: Obras e projetos entregues na região com depoimento do cliente.
+3. Educação de Valor: Dicas de manutenção, planejamento e tendências estéticas contemporâneas.
+4. Conexão Local: Valorização da cultura e raízes da Serra Gaúcha.`;
+    }
+
+    return siteHtml;
   };
 
   if (!empresa) {
@@ -800,6 +932,39 @@ function EstudioCriacaoPage() {
                       </SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                {/* 2.1 CHECKBOX: UTILIZAR SKILLS CLAUDE (ANTHROPIC FRONTEND DESIGN) */}
+                <div className="flex items-start space-x-2 rounded-md border border-border/70 bg-background/80 p-2">
+                  <Checkbox
+                    id="usarSkillsClaude"
+                    checked={usarSkillsClaude}
+                    onCheckedChange={(checked) => {
+                      const ativo = checked === true;
+                      setUsarSkillsClaude(ativo);
+                      if (empresa) updateEmpresa(empresa.id, { estudioUsarSkillsClaude: ativo });
+                      toast.info(
+                        ativo
+                          ? "Skills Claude da Anthropic ativadas (grounding no nicho, sem vícios de IA)."
+                          : "Skills Claude desativadas.",
+                      );
+                    }}
+                    className="mt-0.5"
+                  />
+                  <div className="grid gap-0.5 leading-none">
+                    <label
+                      htmlFor="usarSkillsClaude"
+                      className="text-xs font-semibold text-foreground cursor-pointer flex items-center gap-1.5"
+                    >
+                      <span>Utilizar Skills Claude</span>
+                      <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5 font-normal text-muted-foreground">
+                        Anthropic
+                      </Badge>
+                    </label>
+                    <p className="text-[10px] text-muted-foreground leading-snug">
+                      Diretrizes oficiais de design autoral e anti-clichês da Anthropic no prompt base.
+                    </p>
+                  </div>
                 </div>
 
                 {/* 3. UPLOADS COMPACTOS (LOGO & DIRETRIZES .MD) */}
@@ -1378,18 +1543,21 @@ function EstudioCriacaoPage() {
             <CardContent className="pt-4">
               <div className="relative">
                 <Textarea
-                  value={siteHtml}
+                  value={gerarPromptTexto(tipoPrompt)}
                   readOnly
-                  rows={14}
+                  rows={16}
                   className="font-mono text-xs leading-relaxed bg-muted/20"
                 />
                 <Button
                   size="sm"
-                  onClick={copyCode}
+                  onClick={() => {
+                    navigator.clipboard.writeText(gerarPromptTexto(tipoPrompt));
+                    toast.success("Briefing copiado para a área de transferência!");
+                  }}
                   className="absolute top-3 right-3 text-xs gap-1 shadow-xs"
                 >
                   <Copy className="h-3.5 w-3.5" />
-                  Copiar Código
+                  Copiar Briefing
                 </Button>
               </div>
             </CardContent>

@@ -6,6 +6,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { EmpresaCtx } from "./ai.functions";
 import { chamarLlmUniversal } from "./llm-provider.server";
+import { PROMPT_BLOCO_SKILLS_CLAUDE } from "./skills-claude-prompt";
 
 export interface PesquisaWebSiteResult {
   query: string;
@@ -29,6 +30,7 @@ export interface GerarSiteInput {
   provedorPreferencial?: "auto" | "groq" | "gemini" | "openrouter" | "cerebras" | "lovable" | "ollama" | "bespoke";
   modeloPreferencial?: string;
   usarAntiIaBespoke?: boolean;
+  usarSkillsClaude?: boolean;
   diagnostico?: any;
   dossier360?: any;
   relatorio?: any;
@@ -62,6 +64,7 @@ export interface RefinarSiteInput {
   provedorPreferencial?: "auto" | "groq" | "gemini" | "openrouter" | "cerebras" | "lovable" | "ollama" | "bespoke";
   modeloPreferencial?: string;
   usarAntiIaBespoke?: boolean;
+  usarSkillsClaude?: boolean;
   logoBase64?: string;
   logoNomeArquivo?: string;
   instrucoesDesignMd?: string;
@@ -960,7 +963,13 @@ export const gerarSiteCompletoIA_ServerFn = createServerFn({ method: "POST" })
 
     // 3. Monta o Prompt Base Obrigatório com Diretrizes Anti-IA e Multi-Páginas
     const usarAntiIa = data.usarAntiIaBespoke !== false;
+    const usarSkillsClaude = data.usarSkillsClaude !== false;
     const promptSystem = `[Contexto do Sistema]Atue como um Desenvolvedor Frontend Sênior e UI/UX Designer de Elite. Sua missão é criar a estrutura, o layout e o código de um site profissional completo para o nicho que será especificado.
+${
+  usarSkillsClaude
+    ? PROMPT_BLOCO_SKILLS_CLAUDE
+    : ""
+}
 ${
   usarAntiIa
     ? `Você deve ignorar completamente os vieses automáticos de geração por IA e seguir rigorosamente as diretrizes humanas abaixo:
@@ -1125,6 +1134,7 @@ export const refinarSiteComIa_ServerFn = createServerFn({ method: "POST" })
   .validator((d: RefinarSiteInput) => d)
   .handler(async ({ data }): Promise<RefinarSiteOutput> => {
     const usarAntiIa = data.usarAntiIaBespoke !== false;
+    const usarSkillsClaude = data.usarSkillsClaude !== false;
 
     const promptSystem = `[Contexto do Sistema]Atue como um Desenvolvedor Frontend Sênior e UI/UX Designer de Elite.
 Sua missão é atualizar e refinar o código HTML5 de um site profissional completo existente com base nas instruções pontuais enviadas pelo usuário no chat.
@@ -1134,6 +1144,11 @@ DIRETRIZES FUNDAMENTAIS DE EDIÇÃO:
 2. Mantenha toda a estrutura restante do site intacta (todas as páginas/seções, navbar com links, rodapé, imagens, botões de WhatsApp e formulários).
 3. Mantenha os scripts essenciais no <head>: Tailwind CSS via CDN, GSAP e ScrollTrigger, React (se houver) e Lucide Icons.
 4. Mantenha as animações GSAP existentes funcionando perfeitamente sem quebrar referências de classe ou IDs.
+${
+  usarSkillsClaude
+    ? PROMPT_BLOCO_SKILLS_CLAUDE
+    : ""
+}
 ${
   usarAntiIa
     ? `
