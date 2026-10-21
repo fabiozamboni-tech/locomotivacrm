@@ -80,6 +80,15 @@ export interface SiteVersaoGerada {
   ativa?: boolean;
 }
 
+export interface EstudioChatMessage {
+  id: string;
+  data: string;
+  role: "user" | "assistant" | "system";
+  texto: string;
+  modelo?: string;
+  versaoGeradaId?: string;
+}
+
 export interface Empresa {
   id: string;
   nome: string;
@@ -135,6 +144,8 @@ export interface Empresa {
     conteudo: string;
     tamanho?: number;
   };
+  estudioChatMensagens?: EstudioChatMessage[];
+  estudioUsarAntiIaBespoke?: boolean;
   // Diagnóstico
   diagnostico: {
     site: {

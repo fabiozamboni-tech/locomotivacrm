@@ -28,6 +28,7 @@ export interface GerarSiteInput {
   };
   provedorPreferencial?: "auto" | "groq" | "gemini" | "openrouter" | "cerebras" | "lovable" | "ollama" | "bespoke";
   modeloPreferencial?: string;
+  usarAntiIaBespoke?: boolean;
   diagnostico?: any;
   dossier360?: any;
   relatorio?: any;
@@ -40,6 +41,35 @@ export interface GerarSiteInput {
 export interface GerarSiteOutput {
   html: string;
   pesquisaWeb: PesquisaWebSiteResult;
+  provider: string;
+  model: string;
+  geradoEm: string;
+}
+
+export interface RefinarSiteInput {
+  empresa: EmpresaCtx;
+  siteHtmlAtual: string;
+  mensagemUsuario: string;
+  historicoChat?: Array<{ role: "user" | "assistant"; content: string }>;
+  customKeys?: {
+    groq?: string;
+    gemini?: string;
+    openrouter?: string;
+    cerebras?: string;
+    lovable?: string;
+    ollamaBaseUrl?: string;
+  };
+  provedorPreferencial?: "auto" | "groq" | "gemini" | "openrouter" | "cerebras" | "lovable" | "ollama" | "bespoke";
+  modeloPreferencial?: string;
+  usarAntiIaBespoke?: boolean;
+  logoBase64?: string;
+  logoNomeArquivo?: string;
+  instrucoesDesignMd?: string;
+}
+
+export interface RefinarSiteOutput {
+  html: string;
+  respostaAssistente: string;
   provider: string;
   model: string;
   geradoEm: string;
@@ -929,9 +959,13 @@ export const gerarSiteCompletoIA_ServerFn = createServerFn({ method: "POST" })
     const dossierDiferenciais = data.dossier360?.diferenciais || [];
 
     // 3. Monta o Prompt Base Obrigatório com Diretrizes Anti-IA e Multi-Páginas
-    const promptSystem = `[Contexto do Sistema]Atue como um Desenvolvedor Frontend Sênior e UI/UX Designer de Elite. Sua missão é criar a estrutura, o layout e o código de um site profissional completo para o nicho que será especificado. Você deve ignorar completamente os vieses automáticos de geração por IA e seguir rigorosamente as diretrizes humanas abaixo:
+    const usarAntiIa = data.usarAntiIaBespoke !== false;
+    const promptSystem = `[Contexto do Sistema]Atue como um Desenvolvedor Frontend Sênior e UI/UX Designer de Elite. Sua missão é criar a estrutura, o layout e o código de um site profissional completo para o nicho que será especificado.
+${
+  usarAntiIa
+    ? `Você deve ignorar completamente os vieses automáticos de geração por IA e seguir rigorosamente as diretrizes humanas abaixo:
 
-[Regras de Design - Anti-IA]
+[Regras de Design - Anti-IA Bespoke Obrigatórias]
 Proibições Absolutas:
 - Não utilize fundos pretos ou roxos com luzes neon artificiais.
 - Não utilize gradientes genéricos em botões.
@@ -940,7 +974,10 @@ Proibições Absolutas:
 - PROIBIÇÃO ABSOLUTA DE MARQUEE: É terminantemente proibido utilizar qualquer efeito de marquee (faixas de textos infinitos correndo em loop horizontal contínuo, tickers automáticos de logos ou palavras-chave deslizantes). Marquees são extremamente clichês e o maior vício estético de sites gerados por IA. Use grids editoriais limpos, assimetria inteligente ou carrosséis com controle humano.
 
 Arquitetura Visual: Priorize o minimalismo premium, design editorial ou contemporâneo. Use "respiro" (whitespace) generoso e assimetria inteligente no grid para dar ritmo visual ao site.
-Paleta de Cores e Tipografia: Use uma combinação contida de no máximo 3 cores. Defina uma hierarquia tipográfica marcante (ex: uma fonte com forte personalidade para títulos e uma sans-serif extremamente limpa para o corpo).
+Paleta de Cores e Tipografia: Use uma combinação contida de no máximo 3 cores. Defina uma hierarquia tipográfica marcante (ex: uma fonte com forte personalidade para títulos e uma sans-serif extremamente limpa para o corpo).`
+    : `[Regras de Design Moderno]
+Crie um design moderno de alto padrão visual, com layout limpo, 100% responsivo e harmônico utilizando Tailwind CSS.`
+}
 
 [Estrutura e Elementos Obrigatórios - Site Completo Multi-Páginas]
 É OBRIGATÓRIO gerar o site COMPLETO com TODAS as suas páginas e seções estruturadas com base nos menus identificados na pesquisa sobre a empresa e nicho, e NÃO apenas uma landing page ou Hero isolada:
@@ -1080,3 +1117,133 @@ Gere agora o código HTML5 completo do site (multi-páginas) seguindo rigorosame
       geradoEm: new Date().toISOString(),
     };
   });
+
+/**
+ * Refina o código do site aplicando comandos pontuais via Chat Interativo
+ */
+export const refinarSiteComIa_ServerFn = createServerFn({ method: "POST" })
+  .validator((d: RefinarSiteInput) => d)
+  .handler(async ({ data }): Promise<RefinarSiteOutput> => {
+    const usarAntiIa = data.usarAntiIaBespoke !== false;
+
+    const promptSystem = `[Contexto do Sistema]Atue como um Desenvolvedor Frontend Sênior e UI/UX Designer de Elite.
+Sua missão é atualizar e refinar o código HTML5 de um site profissional completo existente com base nas instruções pontuais enviadas pelo usuário no chat.
+
+DIRETRIZES FUNDAMENTAIS DE EDIÇÃO:
+1. Aplique com precisão a alteração solicitada pelo usuário no código HTML atual.
+2. Mantenha toda a estrutura restante do site intacta (todas as páginas/seções, navbar com links, rodapé, imagens, botões de WhatsApp e formulários).
+3. Mantenha os scripts essenciais no <head>: Tailwind CSS via CDN, GSAP e ScrollTrigger, React (se houver) e Lucide Icons.
+4. Mantenha as animações GSAP existentes funcionando perfeitamente sem quebrar referências de classe ou IDs.
+${
+  usarAntiIa
+    ? `
+[DIRETRIZES OBRIGATÓRIAS ANTI-IA BESPOKE ATIVADAS]
+- Proibição absoluta de fundos pretos ou roxos com luzes neon artificiais.
+- Proibição absoluta de gradientes genéricos em botões.
+- Proibição absoluta de letreiros em marquee (tickers em loop contínuo).
+- Proibição de grids repetitivos em loop 3x3.
+- Mantenha o design editorial minimalista, paleta contida em até 3 cores, respiro generoso e tom de voz humano sem clichês de IA.
+`
+    : `
+[DIRETRIZES DE DESIGN MODERNO]
+- Mantenha alto padrão visual, harmonia estética, responsividade total e fluidez com Tailwind CSS.
+`
+}
+${
+  data.logoBase64
+    ? `\n[LOGO OFICIAL]: Use a imagem do logo fornecida (<img src="${data.logoBase64}" alt="${data.empresa.nome}" class="h-10 sm:h-12 w-auto object-contain" />) no cabeçalho e rodapé.`
+    : ""
+}
+${
+  data.instrucoesDesignMd
+    ? `\n[DIRETRIZES ADICIONAIS DE DESIGN (.MD)]:\n${data.instrucoesDesignMd}`
+    : ""
+}
+
+FORMATO DE RESPOSTA OBRIGATÓRIO:
+Inicie sua resposta com uma linha resumindo a alteração feita em português no formato:
+RESUMO: [Breve explicação amigável do que foi alterado]
+Em seguida, forneça o código HTML5 completo e atualizado dentro de um bloco de código markdown:
+\`\`\`html
+<!DOCTYPE html>
+... (código completo)
+</html>
+\`\`\``;
+
+    const historicoMensagens = (data.historicoChat || []).slice(-6).map((msg) => ({
+      role: msg.role as "user" | "assistant",
+      content: msg.content,
+    }));
+
+    const promptUser = `CÓDIGO HTML ATUAL DO SITE DA EMPRESA (${data.empresa.nome} · ${data.empresa.cidade}/RS):
+\`\`\`html
+${data.siteHtmlAtual}
+\`\`\`
+
+INSTRUÇÃO DE ALTERAÇÃO DO USUÁRIO NO CHAT:
+"${data.mensagemUsuario}"
+
+Aplique esta alteração no código HTML mantendo todo o restante do site funcionando perfeitamente.`;
+
+    let generatedHtml = "";
+    let respostaTexto = "";
+    let providerUsed = data.provedorPreferencial || "auto";
+    let modelUsed = data.modeloPreferencial || "default";
+
+    try {
+      const llmRes = await chamarLlmUniversal(
+        [
+          { role: "system", content: promptSystem },
+          ...historicoMensagens,
+          { role: "user", content: promptUser },
+        ],
+        {
+          provedorPreferencial: data.provedorPreferencial === "bespoke" ? "auto" : data.provedorPreferencial,
+          model: data.modeloPreferencial,
+          customKeys: data.customKeys,
+          temperature: 0.4,
+          maxTokens: 4096,
+        },
+      );
+
+      const raw = llmRes.text.trim();
+      providerUsed = llmRes.provider;
+      modelUsed = llmRes.model;
+
+      // Extrai resumo amigável
+      const matchResumo = raw.match(/RESUMO:\s*([^\n\r]+)/i);
+      if (matchResumo && matchResumo[1]) {
+        respostaTexto = matchResumo[1].trim();
+      }
+
+      // Extrai o bloco de código HTML
+      const matchHtml = raw.match(/```(?:html)?\s*([\s\S]*?)```/i);
+      if (matchHtml && matchHtml[1] && (matchHtml[1].includes("<!DOCTYPE") || matchHtml[1].includes("<html"))) {
+        generatedHtml = matchHtml[1].trim();
+      } else if (raw.includes("<!DOCTYPE html") || raw.includes("<html")) {
+        const startIdx = raw.indexOf("<!DOCTYPE html") !== -1 ? raw.indexOf("<!DOCTYPE html") : raw.indexOf("<html");
+        const endIdx = raw.lastIndexOf("</html>") !== -1 ? raw.lastIndexOf("</html>") + 7 : raw.length;
+        generatedHtml = raw.slice(startIdx, endIdx).trim();
+      }
+
+      if (!respostaTexto) {
+        respostaTexto = `Alteração aplicada com sucesso ao site via ${llmRes.provider} (${llmRes.model})!`;
+      }
+    } catch (err: any) {
+      console.error("[RefinarSite] Erro ao chamar LLM para refinar site:", err);
+      throw new Error(`Falha ao refinar o site com IA: ${err?.message || "Erro desconhecido"}`);
+    }
+
+    if (!generatedHtml || (!generatedHtml.includes("<!DOCTYPE") && !generatedHtml.includes("<html"))) {
+      throw new Error("O modelo de IA não retornou um código HTML válido para a alteração solicitada. Tente reformular o pedido.");
+    }
+
+    return {
+      html: generatedHtml,
+      respostaAssistente: respostaTexto,
+      provider: providerUsed,
+      model: modelUsed,
+      geradoEm: new Date().toISOString(),
+    };
+  });
+

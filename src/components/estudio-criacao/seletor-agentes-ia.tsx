@@ -3,6 +3,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Sparkles,
   Zap,
   Globe,
@@ -305,6 +312,113 @@ export function SeletorAgentesIa({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+interface SeletorAgentesIaSelectProps {
+  agenteSelecionadoId: string;
+  onSelecionarAgente: (agente: AgenteIaOption) => void;
+  className?: string;
+}
+
+export function SeletorAgentesIaSelect({
+  agenteSelecionadoId,
+  onSelecionarAgente,
+  className,
+}: SeletorAgentesIaSelectProps) {
+  const agenteAtual =
+    AGENTES_IA_CATALOGO.find((ag) => ag.id === agenteSelecionadoId) ||
+    AGENTES_IA_CATALOGO[0];
+
+  const handleValueChange = (id: string) => {
+    const ag = AGENTES_IA_CATALOGO.find((a) => a.id === id);
+    if (ag) onSelecionarAgente(ag);
+  };
+
+  const IconAtual = agenteAtual.icone;
+
+  return (
+    <div className={`space-y-1.5 ${className || ""}`}>
+      <div className="flex items-center justify-between">
+        <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+          <Bot className="h-3.5 w-3.5 text-primary" />
+          <span>Modelo de IA</span>
+        </label>
+        <span className="text-[10px] text-muted-foreground font-mono">
+          {agenteAtual.modelo}
+        </span>
+      </div>
+
+      <Select value={agenteSelecionadoId} onValueChange={handleValueChange}>
+        <SelectTrigger className="w-full text-xs h-9 bg-background font-medium">
+          <div className="flex items-center gap-2 truncate">
+            <IconAtual className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span className="truncate">{agenteAtual.nome}</span>
+          </div>
+        </SelectTrigger>
+        <SelectContent className="max-h-80">
+          <div className="p-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-b">
+            Hub OpenRouter (1 Chave para Todos)
+          </div>
+          {AGENTES_IA_CATALOGO.filter((ag) => ag.categoria === "openrouter").map((ag) => {
+            const Icon = ag.icone;
+            return (
+              <SelectItem key={ag.id} value={ag.id} className="text-xs py-2">
+                <div className="flex items-center justify-between gap-2 w-full">
+                  <div className="flex items-center gap-2">
+                    <Icon className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <span className="font-medium">{ag.nome}</span>
+                  </div>
+                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5 font-normal">
+                    {ag.badge.replace("OpenRouter · ", "")}
+                  </Badge>
+                </div>
+              </SelectItem>
+            );
+          })}
+
+          <div className="p-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-b mt-1">
+            Gratuitos & Rápidos (Groq, Cerebras, Gemini)
+          </div>
+          {AGENTES_IA_CATALOGO.filter((ag) => ag.categoria === "rapidos").map((ag) => {
+            const Icon = ag.icone;
+            return (
+              <SelectItem key={ag.id} value={ag.id} className="text-xs py-2">
+                <div className="flex items-center justify-between gap-2 w-full">
+                  <div className="flex items-center gap-2">
+                    <Icon className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                    <span className="font-medium">{ag.nome}</span>
+                  </div>
+                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5 font-normal">
+                    {ag.badge}
+                  </Badge>
+                </div>
+              </SelectItem>
+            );
+          })}
+
+          <div className="p-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-b mt-1">
+            Motor Editorial Nativo
+          </div>
+          {AGENTES_IA_CATALOGO.filter((ag) => ag.categoria === "editorial").map((ag) => {
+            const Icon = ag.icone;
+            return (
+              <SelectItem key={ag.id} value={ag.id} className="text-xs py-2">
+                <div className="flex items-center justify-between gap-2 w-full">
+                  <div className="flex items-center gap-2">
+                    <Icon className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                    <span className="font-medium">{ag.nome}</span>
+                  </div>
+                  <Badge variant="default" className="text-[9px] px-1 py-0 h-3.5 font-normal">
+                    {ag.badge}
+                  </Badge>
+                </div>
+              </SelectItem>
+            );
+          })}
+        </SelectContent>
+      </Select>
     </div>
   );
 }
