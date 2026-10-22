@@ -11,14 +11,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   ScoreBadge,
   SiteBadge,
   InstagramBadge,
-  CRM_STAGE_LABEL,
   CRM_STAGES_ORDER,
   getCrmStageLabel,
 } from "@/components/badges";
@@ -29,10 +27,13 @@ import {
   MapPin,
   MessageCircle,
   Phone,
-  Sparkles,
-  Wand2,
   Zap,
   ArrowUpRight,
+  GripVertical,
+  Edit3,
+  Building2,
+  Trash2,
+  RotateCcw,
 } from "lucide-react";
 import {
   siteUrl,
@@ -41,14 +42,30 @@ import {
   telUrl,
   mailUrl,
   googleMapsUrl,
-  origemLink,
 } from "@/lib/links";
-import { PromptsModal } from "@/components/prompts-modal";
 import { EmpresaCadastroModal } from "@/components/empresa-cadastro-modal";
 import { EmpresaLogo } from "@/components/empresa-logo";
 import { toast } from "sonner";
-import { Edit3, Building2, Trash2, RotateCcw } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
+import { getKanbanColorPreset, type KanbanColumnConfig } from "@/lib/kanban-config";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 export const Route = createFileRoute("/empresas")({
   component: EmpresasPage,
@@ -101,6 +118,301 @@ function filtrar(list: Empresa[], f: Filtros): Empresa[] {
   });
 }
 
+interface SortableRowProps {
+  empresa: Empresa;
+  aba: "ativas" | "excluidas";
+  kanbanColumns: KanbanColumnConfig[];
+  onChangeStage: (empresaId: string, novoStage: CrmStage) => void;
+  onEditCadastro: (empresa: Empresa) => void;
+  onMoverExcluidos: (id: string, nome: string) => void;
+  onRestaurar: (id: string, nome: string) => void;
+  onExcluirDefinitivo: (id: string, nome: string) => void;
+  isDragDisabled?: boolean;
+}
+
+function SortableEmpresaRow({
+  empresa: e,
+  aba,
+  kanbanColumns,
+  onChangeStage,
+  onEditCadastro,
+  onMoverExcluidos,
+  onRestaurar,
+  onExcluirDefinitivo,
+  isDragDisabled,
+}: SortableRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: e.id,
+    disabled: isDragDisabled,
+  });
+
+  const style: React.CSSProperties = {
+    transform: transform ? CSS.Transform.toString(transform) : undefined,
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+    position: isDragging ? "relative" : undefined,
+    opacity: isDragging ? 0.6 : 1,
+  };
+
+  const colAtual = kanbanColumns.find((c) => c.id === e.crmStage);
+  const preset = getKanbanColorPreset(colAtual?.cor);
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "border-t border-border/50 hover:bg-accent/30 transition group",
+        isDragging && "bg-accent/50 shadow-md"
+      )}
+    >
+      {/* Nome da Empresa - Fixo na rolagem horizontal */}
+      <td className="py-3 px-3 sticky left-0 z-10 bg-card group-hover:bg-accent/40 transition-colors border-r border-border/60 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] min-w-[280px]">
+        <div className="flex items-center gap-2">
+          {!isDragDisabled && (
+            <button
+              type="button"
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-muted-foreground/40 hover:text-foreground hover:bg-muted rounded transition-colors touch-none"
+              title="Arraste para reordenar"
+              aria-label="Reordenar empresa"
+            >
+              <GripVertical className="h-4 w-4" />
+            </button>
+          )}
+          <EmpresaLogo site={e.site} nome={e.nome} size="sm" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => onEditCadastro(e)}
+                className="font-medium text-left hover:text-primary transition-colors flex items-center gap-1 group/btn cursor-pointer truncate"
+                title="Clique para abrir e editar o cadastro da empresa"
+              >
+                <span className="group-hover/btn:underline truncate">{e.nome}</span>
+                <Edit3 className="h-3 w-3 text-muted-foreground opacity-60 group-hover/btn:opacity-100 shrink-0" />
+              </button>
+              <Link
+                to={"/empresas/$id" as never}
+                params={{ id: e.id } as never}
+                className="text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-muted shrink-0"
+                title="Abrir página completa com auditoria"
+              >
+                <ArrowUpRight className="h-3 w-3" />
+              </Link>
+            </div>
+            <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+              <span className="truncate">{e.segmento}</span>
+              {e.areaAtuacao && (
+                <span
+                  className="text-[11px] text-primary/80 font-normal truncate max-w-[180px]"
+                  title={e.areaAtuacao}
+                >
+                  · {e.areaAtuacao}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </td>
+
+      {/* Cidade */}
+      <td className="py-3 px-2">
+        <div className="flex items-center gap-1 text-muted-foreground text-xs whitespace-nowrap">
+          <MapPin className="h-3 w-3" /> {e.cidade}
+        </div>
+      </td>
+
+      {/* COMBO DA ETAPA KANBAN COM CORES */}
+      <td className="py-3 px-2">
+        <Select
+          value={e.crmStage}
+          onValueChange={(v) => onChangeStage(e.id, v as CrmStage)}
+        >
+          <SelectTrigger
+            className={cn(
+              "h-7 text-xs w-[170px] font-medium border transition-colors shadow-2xs gap-1.5",
+              preset.badgeClass
+            )}
+          >
+            <span className={cn("h-2 w-2 rounded-full shrink-0", preset.bgClass)} />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(kanbanColumns && kanbanColumns.length > 0
+              ? kanbanColumns
+              : CRM_STAGES_ORDER.map((stage) => ({
+                  id: stage,
+                  titulo: getCrmStageLabel(stage),
+                  cor: "slate",
+                }))
+            ).map((col) => {
+              const colPreset = getKanbanColorPreset(col.cor);
+              return (
+                <SelectItem key={col.id} value={col.id} className="text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className={cn("h-2 w-2 rounded-full shrink-0", colPreset.bgClass)} />
+                    <span className={cn("font-medium", colPreset.textClass)}>
+                      {col.titulo}
+                    </span>
+                  </div>
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+      </td>
+
+      {/* Contatos */}
+      <td className="py-3 px-2">
+        <div className="flex gap-1.5 text-muted-foreground">
+          {e.telefone && (
+            <a
+              href={telUrl(e.telefone)}
+              title={`Ligar para ${e.telefone}`}
+              className="hover:text-primary p-1 rounded hover:bg-muted"
+            >
+              <Phone className="h-3.5 w-3.5" aria-label="telefone" />
+            </a>
+          )}
+          {e.whatsapp && (
+            <a
+              href={whatsappUrl(e.whatsapp)}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`WhatsApp ${e.whatsapp}`}
+              className="text-emerald-500 hover:opacity-80 p-1 rounded hover:bg-muted"
+            >
+              <MessageCircle className="h-3.5 w-3.5" aria-label="whatsapp" />
+            </a>
+          )}
+          {e.email && (
+            <a
+              href={mailUrl(e.email)}
+              title={e.email}
+              className="hover:text-primary p-1 rounded hover:bg-muted"
+            >
+              <Mail className="h-3.5 w-3.5" aria-label="email" />
+            </a>
+          )}
+          {e.site && (
+            <a
+              href={siteUrl(e.site)}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={e.site}
+              className="hover:text-primary p-1 rounded hover:bg-muted"
+            >
+              <Globe className="h-3.5 w-3.5" aria-label="site" />
+            </a>
+          )}
+          {e.instagram && (
+            <a
+              href={instagramUrl(e.instagram)}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={e.instagram}
+              className="hover:text-primary p-1 rounded hover:bg-muted"
+            >
+              <Instagram className="h-3.5 w-3.5" aria-label="instagram" />
+            </a>
+          )}
+          <a
+            href={googleMapsUrl(`${e.nome} ${e.cidade}`)}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Ver no Google Maps"
+            className="hover:text-primary p-1 rounded hover:bg-muted"
+          >
+            <MapPin className="h-3.5 w-3.5" aria-label="google maps" />
+          </a>
+        </div>
+      </td>
+
+      {/* Badges de Site e Instagram */}
+      <td className="py-3 px-2"><SiteBadge status={e.statusSite} /></td>
+      <td className="py-3 px-2"><InstagramBadge status={e.statusInstagram} /></td>
+
+      {/* Score */}
+      <td className="py-3 px-2"><ScoreBadge score={e.score} size="sm" /></td>
+
+      {/* AÇÕES ESTRATÉGICAS: CADASTRO, ABORDAGEM & EXCLUIR */}
+      <td className="py-3 px-4 text-right">
+        <div className="flex items-center justify-end gap-1.5">
+          {aba === "ativas" ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onEditCadastro(e)}
+                className="h-7 text-xs px-2 gap-1 text-blue-600 border-blue-500/30 hover:bg-blue-500/10"
+                title="Abrir e Editar Cadastro da Empresa"
+              >
+                <Building2 className="h-3 w-3 text-blue-500" />
+                Cadastro
+              </Button>
+
+              <Button
+                asChild
+                size="sm"
+                className="h-7 text-xs px-2.5 gap-1 bg-gradient-to-r from-emerald-600 to-primary text-white"
+                title="Abrir Central de Abordagens e Dossiê 360"
+              >
+                <Link to="/analise-cliente" search={{ empresa: e.id, tab: "dossier" }}>
+                  <Zap className="h-3 w-3" />
+                  Analisar
+                </Link>
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onMoverExcluidos(e.id, e.nome)}
+                className="h-7 text-xs px-2 gap-1 text-rose-600 border-rose-500/30 hover:bg-rose-500/10 hover:text-rose-600"
+                title="Excluir da lista ativa e mover para a coluna Excluídos do Kanban"
+              >
+                <Trash2 className="h-3 w-3 text-rose-500" />
+                Excluir
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onRestaurar(e.id, e.nome)}
+                className="h-7 text-xs px-2.5 gap-1 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10"
+                title="Restaurar para a lista de empresas ativas"
+              >
+                <RotateCcw className="h-3 w-3 text-emerald-500" />
+                Restaurar
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => onExcluirDefinitivo(e.id, e.nome)}
+                className="h-7 text-xs px-2 gap-1 bg-rose-600 hover:bg-rose-700 text-white"
+                title="Excluir permanentemente do banco de dados"
+              >
+                <Trash2 className="h-3 w-3" />
+                Excluir Definitivo
+              </Button>
+            </>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 function EmpresasPage() {
   const {
     empresas,
@@ -109,11 +421,22 @@ function EmpresasPage() {
     moverEmpresaParaExcluidos,
     restaurarEmpresaDeExcluidos,
     excluirEmpresaDefinitivamente,
+    reordenarEmpresas,
   } = useStore();
   const [f, setF] = useState<Filtros>(INITIAL);
   const [aba, setAba] = useState<"ativas" | "excluidas">("ativas");
-  const [promptEmpresa, setPromptEmpresa] = useState<Empresa | null>(null);
   const [empresaCadastro, setEmpresaCadastro] = useState<Empresa | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const empresasAtivas = useMemo(
     () => empresas.filter((e) => e.crmStage !== "excluidos"),
@@ -131,6 +454,20 @@ function EmpresasPage() {
   const handleChangeStage = (empresaId: string, novoStage: CrmStage) => {
     setStage(empresaId, novoStage);
     toast.success(`Etapa alterada para "${getCrmStageLabel(novoStage)}"`);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = empresas.findIndex((e) => e.id === active.id);
+    const newIndex = empresas.findIndex((e) => e.id === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const novaOrdem = arrayMove(empresas, oldIndex, newIndex);
+      reordenarEmpresas(novaOrdem);
+      toast.success("Ordem dos clientes atualizada e salva com sucesso!");
+    }
   };
 
   return (
@@ -231,236 +568,78 @@ function EmpresasPage() {
       </Card>
 
       <Card className="border-border/60 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40">
-              <tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-                <th className="py-2.5 px-4 font-medium">Empresa</th>
-                <th className="py-2.5 px-2 font-medium">Cidade</th>
-                <th className="py-2.5 px-2 font-medium">Etapa Kanban</th>
-                <th className="py-2.5 px-2 font-medium">Contatos</th>
-                <th className="py-2.5 px-2 font-medium">Site</th>
-                <th className="py-2.5 px-2 font-medium">Instagram</th>
-                <th className="py-2.5 px-2 font-medium">Score</th>
-                <th className="py-2.5 px-4 font-medium text-right">Ações Estratégicas</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtradas.map((e) => (
-                <tr key={e.id} className="border-t border-border/50 hover:bg-accent/30 transition">
-                  {/* Nome da Empresa */}
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-2.5">
-                      <EmpresaLogo site={e.site} nome={e.nome} size="sm" />
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => setEmpresaCadastro(e)}
-                            className="font-medium text-left hover:text-primary transition-colors flex items-center gap-1 group cursor-pointer truncate"
-                            title="Clique para abrir e editar o cadastro da empresa"
-                          >
-                            <span className="group-hover:underline truncate">{e.nome}</span>
-                            <Edit3 className="h-3 w-3 text-muted-foreground opacity-60 group-hover:opacity-100 shrink-0" />
-                          </button>
-                          <Link
-                            to={"/empresas/$id" as never}
-                            params={{ id: e.id } as never}
-                            className="text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-muted shrink-0"
-                            title="Abrir página completa com auditoria"
-                          >
-                            <ArrowUpRight className="h-3 w-3" />
-                          </Link>
-                        </div>
-                        <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                          <span className="truncate">{e.segmento}</span>
-                          {e.areaAtuacao && (
-                            <span className="text-[11px] text-primary/80 font-normal truncate max-w-[200px]" title={e.areaAtuacao}>
-                              · {e.areaAtuacao}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Cidade */}
-                  <td className="py-3 px-2">
-                    <div className="flex items-center gap-1 text-muted-foreground text-xs">
-                      <MapPin className="h-3 w-3" /> {e.cidade}
-                    </div>
-                  </td>
-
-                  {/* COMBO DA ETAPA KANBAN */}
-                  <td className="py-3 px-2">
-                    <Select
-                      value={e.crmStage}
-                      onValueChange={(v) => handleChangeStage(e.id, v as CrmStage)}
-                    >
-                      <SelectTrigger className="h-7 text-xs w-[160px] bg-card">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(kanbanColumns && kanbanColumns.length > 0
-                          ? kanbanColumns
-                          : CRM_STAGES_ORDER.map((stage) => ({ id: stage, titulo: getCrmStageLabel(stage) }))
-                        ).map((col) => (
-                          <SelectItem key={col.id} value={col.id} className="text-xs">
-                            {col.titulo}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </td>
-
-                  {/* Contatos */}
-                  <td className="py-3 px-2">
-                    <div className="flex gap-1.5 text-muted-foreground">
-                      {e.telefone && (
-                        <a href={telUrl(e.telefone)} title={`Ligar para ${e.telefone}`} className="hover:text-primary p-1 rounded hover:bg-muted">
-                          <Phone className="h-3.5 w-3.5" aria-label="telefone" />
-                        </a>
-                      )}
-                      {e.whatsapp && (
-                        <a href={whatsappUrl(e.whatsapp)} target="_blank" rel="noopener noreferrer" title={`WhatsApp ${e.whatsapp}`} className="text-emerald-500 hover:opacity-80 p-1 rounded hover:bg-muted">
-                          <MessageCircle className="h-3.5 w-3.5" aria-label="whatsapp" />
-                        </a>
-                      )}
-                      {e.email && (
-                        <a href={mailUrl(e.email)} title={e.email} className="hover:text-primary p-1 rounded hover:bg-muted">
-                          <Mail className="h-3.5 w-3.5" aria-label="email" />
-                        </a>
-                      )}
-                      {e.site && (
-                        <a href={siteUrl(e.site)} target="_blank" rel="noopener noreferrer" title={e.site} className="hover:text-primary p-1 rounded hover:bg-muted">
-                          <Globe className="h-3.5 w-3.5" aria-label="site" />
-                        </a>
-                      )}
-                      {e.instagram && (
-                        <a href={instagramUrl(e.instagram)} target="_blank" rel="noopener noreferrer" title={e.instagram} className="hover:text-primary p-1 rounded hover:bg-muted">
-                          <Instagram className="h-3.5 w-3.5" aria-label="instagram" />
-                        </a>
-                      )}
-                      <a
-                        href={googleMapsUrl(`${e.nome} ${e.cidade}`)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Ver no Google Maps"
-                        className="hover:text-primary p-1 rounded hover:bg-muted"
-                      >
-                        <MapPin className="h-3.5 w-3.5" aria-label="google maps" />
-                      </a>
-                    </div>
-                  </td>
-
-                  {/* Badges de Site e Instagram */}
-                  <td className="py-3 px-2"><SiteBadge status={e.statusSite} /></td>
-                  <td className="py-3 px-2"><InstagramBadge status={e.statusInstagram} /></td>
-
-                  {/* Score */}
-                  <td className="py-3 px-2"><ScoreBadge score={e.score} size="sm" /></td>
-
-                  {/* AÇÕES ESTRATÉGICAS: CADASTRO, ABORDAGEM & PROMPTS IA */}
-                  <td className="py-3 px-4 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      {aba === "ativas" ? (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setEmpresaCadastro(e)}
-                            className="h-7 text-xs px-2 gap-1 text-blue-600 border-blue-500/30 hover:bg-blue-500/10"
-                            title="Abrir e Editar Cadastro da Empresa"
-                          >
-                            <Building2 className="h-3 w-3 text-blue-500" />
-                            Cadastro
-                          </Button>
-
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setPromptEmpresa(e)}
-                            className="h-7 text-xs px-2 gap-1"
-                            title="Gerar Prompts e Briefings com IA"
-                          >
-                            <Wand2 className="h-3 w-3 text-primary" />
-                            Prompts
-                          </Button>
-
-                          <Button
-                            asChild
-                            size="sm"
-                            className="h-7 text-xs px-2.5 gap-1 bg-gradient-to-r from-emerald-600 to-primary text-white"
-                            title="Abrir Central de Abordagens e Dossiê 360"
-                          >
-                            <Link to="/analise-cliente" search={{ empresa: e.id, tab: "dossier" }}>
-                              <Zap className="h-3 w-3" />
-                              Analisar
-                            </Link>
-                          </Button>
-
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              moverEmpresaParaExcluidos(e.id);
-                              toast.success(`"${e.nome}" movida para a lista de excluídos e coluna Excluídos do Kanban.`);
-                            }}
-                            className="h-7 text-xs px-2 gap-1 text-rose-600 border-rose-500/30 hover:bg-rose-500/10 hover:text-rose-600"
-                            title="Excluir da lista ativa e mover para a coluna Excluídos do Kanban"
-                          >
-                            <Trash2 className="h-3 w-3 text-rose-500" />
-                            Excluir
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              restaurarEmpresaDeExcluidos(e.id, "identificado");
-                              toast.success(`"${e.nome}" restaurada para empresas ativas!`);
-                            }}
-                            className="h-7 text-xs px-2.5 gap-1 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10"
-                            title="Restaurar para a lista de empresas ativas"
-                          >
-                            <RotateCcw className="h-3 w-3 text-emerald-500" />
-                            Restaurar
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => {
-                              if (confirm(`Atenção: Excluir definitivamente removerá "${e.nome}" permanentemente. Confirmar?`)) {
-                                excluirEmpresaDefinitivamente(e.id);
-                                toast.success(`"${e.nome}" excluída definitivamente.`);
-                              }
-                            }}
-                            className="h-7 text-xs px-2 gap-1 bg-rose-600 hover:bg-rose-700 text-white"
-                            title="Excluir permanentemente do banco de dados"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                            Excluir Definitivo
-                          </Button>
-                        </>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40">
+                <tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <th className="py-2.5 px-4 font-medium sticky left-0 z-20 bg-muted/95 backdrop-blur-xs border-r border-border/60 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)] min-w-[280px]">
+                    <div className="flex items-center gap-1.5">
+                      <span>Empresa</span>
+                      {aba === "ativas" && (
+                        <span className="text-[10px] text-muted-foreground font-normal normal-case">
+                          (arraste para ordenar)
+                        </span>
                       )}
                     </div>
-                  </td>
+                  </th>
+                  <th className="py-2.5 px-2 font-medium">Cidade</th>
+                  <th className="py-2.5 px-2 font-medium">Etapa Kanban</th>
+                  <th className="py-2.5 px-2 font-medium">Contatos</th>
+                  <th className="py-2.5 px-2 font-medium">Site</th>
+                  <th className="py-2.5 px-2 font-medium">Instagram</th>
+                  <th className="py-2.5 px-2 font-medium">Score</th>
+                  <th className="py-2.5 px-4 font-medium text-right">Ações Estratégicas</th>
                 </tr>
-              ))}
-              {filtradas.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="py-16 text-center text-muted-foreground text-sm">
-                    {aba === "excluidas"
-                      ? "Nenhuma empresa na lista de excluídas."
-                      : "Nenhuma empresa corresponde aos filtros aplicados."}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <SortableContext
+                items={filtradas.map((e) => e.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <tbody>
+                  {filtradas.map((e) => (
+                    <SortableEmpresaRow
+                      key={e.id}
+                      empresa={e}
+                      aba={aba}
+                      kanbanColumns={kanbanColumns}
+                      onChangeStage={handleChangeStage}
+                      onEditCadastro={setEmpresaCadastro}
+                      onMoverExcluidos={(id, nome) => {
+                        moverEmpresaParaExcluidos(id);
+                        toast.success(`"${nome}" movida para a lista de excluídos e coluna Excluídos do Kanban.`);
+                      }}
+                      onRestaurar={(id, nome) => {
+                        restaurarEmpresaDeExcluidos(id, "identificado");
+                        toast.success(`"${nome}" restaurada para empresas ativas!`);
+                      }}
+                      onExcluirDefinitivo={(id, nome) => {
+                        if (confirm(`Atenção: Excluir definitivamente removerá "${nome}" permanentemente. Confirmar?`)) {
+                          excluirEmpresaDefinitivamente(id);
+                          toast.success(`"${nome}" excluída definitivamente.`);
+                        }
+                      }}
+                      isDragDisabled={aba === "excluidas"}
+                    />
+                  ))}
+                  {filtradas.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="py-16 text-center text-muted-foreground text-sm">
+                        {aba === "excluidas"
+                          ? "Nenhuma empresa na lista de excluídas."
+                          : "Nenhuma empresa corresponde aos filtros aplicados."}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </SortableContext>
+            </table>
+          </div>
+        </DndContext>
       </Card>
 
       {/* Modal de Cadastro Completo & Inteligência de Busca */}
@@ -468,13 +647,6 @@ function EmpresasPage() {
         empresa={empresaCadastro}
         open={Boolean(empresaCadastro)}
         onOpenChange={(o) => !o && setEmpresaCadastro(null)}
-      />
-
-      {/* Modal de Prompts transferido para a tela de empresas */}
-      <PromptsModal
-        empresa={promptEmpresa}
-        open={!!promptEmpresa}
-        onOpenChange={(o) => !o && setPromptEmpresa(null)}
       />
     </div>
   );

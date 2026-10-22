@@ -112,6 +112,7 @@ interface StoreValue {
   moverEmpresaParaExcluidos: (id: string) => void;
   restaurarEmpresaDeExcluidos: (id: string, stageDestino?: CrmStage) => void;
   excluirEmpresaDefinitivamente: (id: string) => void;
+  reordenarEmpresas: (novasEmpresas: Empresa[]) => void;
   // Sincronização com o Banco de Dados
   dbSyncStatus: DbSyncStatus;
   lastSyncTime: Date | null;
@@ -829,6 +830,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       });
   }, []);
 
+  const reordenarEmpresas = useCallback((novasEmpresas: Empresa[]) => {
+    setEmpresas(novasEmpresas);
+    try {
+      window.localStorage.setItem(LS_KEY, JSON.stringify(novasEmpresas));
+    } catch {
+      /* noop */
+    }
+    setDbSyncStatus("syncing");
+    saveAllEmpresas_ServerFn({ data: { empresas: novasEmpresas, merge: false } })
+      .then(() => {
+        setDbSyncStatus("synced");
+        setLastSyncTime(new Date());
+      })
+      .catch((err) => {
+        console.error("Erro ao persistir nova ordem de empresas no banco:", err);
+        setDbSyncStatus("error");
+      });
+  }, []);
+
   const value = useMemo<StoreValue>(
     () => ({
       empresas,
@@ -861,6 +881,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       moverEmpresaParaExcluidos,
       restaurarEmpresaDeExcluidos,
       excluirEmpresaDefinitivamente,
+      reordenarEmpresas,
       dbSyncStatus,
       lastSyncTime,
       databaseInfo,
@@ -900,6 +921,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       moverEmpresaParaExcluidos,
       restaurarEmpresaDeExcluidos,
       excluirEmpresaDefinitivamente,
+      reordenarEmpresas,
     ],
   );
 
