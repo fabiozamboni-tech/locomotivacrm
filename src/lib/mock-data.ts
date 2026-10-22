@@ -89,6 +89,17 @@ export interface EstudioChatMessage {
   versaoGeradaId?: string;
 }
 
+export interface MensagemAbordagemSalva {
+  id: string;
+  canal: string;
+  tomId?: string;
+  tomNome?: string;
+  titulo: string;
+  texto: string;
+  assunto?: string;
+  salvoEm: string;
+}
+
 export interface Empresa {
   id: string;
   nome: string;
@@ -127,6 +138,7 @@ export interface Empresa {
   siteVersoes?: SiteVersaoGerada[];
   // Análise Unificada do Cliente (Persistida no banco de dados)
   dossier360?: any;
+  mensagensAbordagemSalvas?: MensagemAbordagemSalva[];
   relatorioLead?: any;
   relatorioSeo?: any;
   relatorioGeradoEm?: string;

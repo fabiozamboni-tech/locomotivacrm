@@ -1,6 +1,8 @@
 import type { EmpresaCtx } from "./ai.functions";
+import { resolverVariaveisTemplate, TEMPLATE_PADRAO_FABIO, obterSaudacaoHora } from "./abordagem-templates";
 
 export type TomAbordagemId =
+  | "padrao"
   | "primeiro_contato_pdf"
   | "amigavel_elogio"
   | "consultivo_parceiro"
@@ -25,6 +27,16 @@ export interface TomAbordagemItem {
 }
 
 export const TONS_ABORDAGEM: TomAbordagemItem[] = [
+  {
+    id: "padrao",
+    nome: "⭐ Padrão (Fábio · Locomotiva Caxias do Sul)",
+    subtitulo: "Abordagem oficial consultiva, sóbria, sem bajulação com levantamento técnico",
+    descricao: "Oi, [bom dia/tarde]! Apresenta o Fábio da Locomotiva Comunicação, cita o mercado da região, cidade, termos levantados e propõe enviar o PDF.",
+    icone: "BadgeCheck",
+    tagline: "Tom Padrão Oficial",
+    canalRecomendado: "WhatsApp & E-mail",
+    badgeCls: "bg-primary/10 text-primary border-primary/30",
+  },
   {
     id: "primeiro_contato_pdf",
     nome: "1. Primeiro Contato (Levantamento em PDF)",
@@ -164,6 +176,54 @@ export function gerarTextoProntoPorTom(
     .filter(Boolean);
   const termo1 = termosArray[0] || `${seg} em ${cid}`;
   const termo2 = termosArray[1] || `${seg} na região`;
+
+  // =========================================================================
+  // 0. TOM: PADRÃO (CONSULTOR FÁBIO · CAXIAS DO SUL) - MODELO OFICIAL LOCOMOTIVA
+  // =========================================================================
+  if (tom === "padrao") {
+    const textoResolvido = resolverVariaveisTemplate(TEMPLATE_PADRAO_FABIO.conteudo, empresa);
+    const saudacao = obterSaudacaoHora();
+    switch (canal) {
+      case "whatsapp":
+        return {
+          ganchoAbertura: `Levantamento técnico de busca em ${cid}`,
+          dicaEnvio: "Tom padrão oficial da Locomotiva (Fábio Caxias do Sul). Envie no WhatsApp em horário comercial.",
+          texto: textoResolvido,
+        };
+
+      case "instagram":
+        return {
+          ganchoAbertura: `Levantamento técnico de busca em ${cid}`,
+          dicaEnvio: "Direct objetivo propondo envio do arquivo pelo WhatsApp.",
+          texto: `Oi, [boa tarde/bom dia/boa noite], tudo bem?\n\nMeu nome é Fábio, sou consultor na Locomotiva Comunicação, aqui de Caxias do Sul.\n\nRealizamos um levantamento técnico sobre como o público de ${cid} e região busca por serviços de ${seg} na internet e reunimos dados práticos em um PDF resumido.\n\nQual o melhor WhatsApp de vocês para eu enviar esse material para darem uma olhada?\n\nAbraços!`.replace(
+            /\[boa tarde\/bom dia\/boa noite\]/gi,
+            saudacao,
+          ),
+        };
+
+      case "email":
+        return {
+          assunto: `Levantamento técnico sobre a busca por ${termo1} e presença digital em ${cid} — ${nome}`,
+          ganchoAbertura: `Levantamento técnico sobre a procura em ${cid}`,
+          dicaEnvio: "E-mail de apresentação consultiva propondo o envio do PDF.",
+          texto: textoResolvido,
+        };
+
+      case "ligacaoReuniao":
+        return {
+          ganchoAbertura: `Oi, tudo bem? Meu nome é Fábio, sou consultor na Locomotiva Comunicação aqui de Caxias do Sul.`,
+          dicaEnvio: "Fale com clareza, mencione a análise técnica de busca da região e peça permissão para enviar o PDF.",
+          texto: `Oi, tudo bem? Meu nome é Fábio, sou consultor na Locomotiva Comunicação, aqui de Caxias do Sul. Realizamos um levantamento técnico sobre como o público de ${cid} busca por serviços no seu setor na internet e notamos termos com volume relevante de buscas mensais que a sua empresa ainda não captura. Reunimos esses dados em um documento resumido em PDF. Gostaria de confirmar seu WhatsApp para eu te enviar esse material sem compromisso.`,
+        };
+
+      case "propostaValor360":
+        return {
+          ganchoAbertura: `Levantamento de presença digital e posicionamento da ${nome}`,
+          dicaEnvio: "Apresentação consultiva para envio junto ao PDF oficial.",
+          texto: textoResolvido,
+        };
+    }
+  }
 
   // =========================================================================
   // 1. TOM: PRIMEIRO CONTATO (LEVANTAMENTO EM PDF) - RECOMENDADO BASE

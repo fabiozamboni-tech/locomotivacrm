@@ -64,6 +64,13 @@ import { FeriadosCampanhasCard } from "@/components/feriados-campanhas-card";
 import { whatsappUrl } from "@/lib/links";
 import { SeletorRapidoAgenteIa, useAgenteIaAtivo } from "@/components/seletor-rapido-agente-ia";
 import { getAgenteById, type AgenteIaOption } from "@/components/estudio-criacao/seletor-agentes-ia";
+import { ModalGerenciarTemplates } from "@/components/analise-cliente/modal-gerenciar-templates";
+import { ListaMensagensSalvasCliente } from "@/components/analise-cliente/lista-mensagens-salvas-cliente";
+import {
+  loadAbordagemTemplates,
+  resolverVariaveisTemplate,
+  type AbordagemTemplate,
+} from "@/lib/abordagem-templates";
 import {
   Sparkles,
   LayoutDashboard,
@@ -112,7 +119,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Empresa, ApresentacaoSlidesData } from "@/lib/mock-data";
+import type { Empresa, ApresentacaoSlidesData, MensagemAbordagemSalva } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/analise-cliente")({
   validateSearch: z.object({
@@ -212,11 +219,20 @@ function AnaliseClientePage() {
   // Estados de Tons de Abordagem Amigáveis & IA (awesome-free-llm-apis & OpenRouter Hub)
   const { agente: agenteIaAtivo, selecionarAgente: setAgenteIaAtivo } = useAgenteIaAtivo();
   const gerarAbordagemIAFn = useServerFn(gerarAbordagemAmigavelIA_ServerFn);
-  const [tomAbordagem, setTomAbordagem] = useState<TomAbordagemId>("primeiro_contato_pdf");
+  const [tomAbordagem, setTomAbordagem] = useState<TomAbordagemId>("padrao");
+  const tomAtualObj = TONS_ABORDAGEM.find((t) => t.id === tomAbordagem) || TONS_ABORDAGEM[0];
   const [provedorIaAbordagem, setProvedorIaAbordagem] = useState<ProvedorIaTipo>("auto");
   const [instrucaoIaAbordagem, setInstrucaoIaAbordagem] = useState("");
   const [gerandoAbordagemIA, setGerandoAbordagemIA] = useState(false);
   const [metaAbordagem, setMetaAbordagem] = useState<{ provedor: string; modelo: string; fallback?: boolean } | null>(null);
+
+  // Templates de Textos Padrão com Colchetes
+  const [openModalTemplates, setOpenModalTemplates] = useState(false);
+  const [templatesCustomizados, setTemplatesCustomizados] = useState<AbordagemTemplate[]>([]);
+
+  useEffect(() => {
+    setTemplatesCustomizados(loadAbordagemTemplates());
+  }, [openModalTemplates]);
 
   // Modais de apoio
   const [openCopilotoObjecoes, setOpenCopilotoObjecoes] = useState(false);
@@ -307,6 +323,19 @@ function AnaliseClientePage() {
   useEffect(() => {
     if (!empresa) return;
 
+    // 1. Prioriza a mensagem mais recente salva pelo usuário para este canal específico
+    const msgsSalvas = empresa.mensagensAbordagemSalvas?.filter((m) => m.canal === canal) || [];
+    if (msgsSalvas.length > 0 && msgsSalvas[0].texto) {
+      setTextoAbordagemEditado(msgsSalvas[0].texto);
+      setMetaAbordagem({
+        provedor: "Mensagem Salva",
+        modelo: msgsSalvas[0].tomNome || "Salva pelo Usuário",
+        fallback: false,
+      });
+      return;
+    }
+
+    // 2. Se houver no Dossiê 360 persistido
     if (dossier?.abordagensPorCanal) {
       const item = dossier.abordagensPorCanal[canal];
       if (item) {
@@ -330,11 +359,11 @@ function AnaliseClientePage() {
       }
     }
 
-    // Se ainda não tiver texto no dossiê, preenche com texto pronto humanizado do tom selecionado
+    // 3. Fallback: preenche com texto pronto humanizado do tom selecionado (inicia no Padrão)
     const pronto = gerarTextoProntoPorTom(toCtx(empresa), canal, tomAbordagem, "Locomotiva Comunicação");
     setTextoAbordagemEditado(formatarTextoAbordagem(canal, pronto));
     setMetaAbordagem({ provedor: "Estratégia Pronta", modelo: "Texto Humanizado de Alta Conversão", fallback: false });
-  }, [canal, dossier, empresa?.id]);
+  }, [canal, dossier, empresa?.id, empresa?.mensagensAbordagemSalvas]);
 
   // ---------------------------------------------------------------------------
   // HANDLERS DE EXECUÇÃO E GRAVAÇÃO
@@ -559,19 +588,59 @@ function AnaliseClientePage() {
       },
     };
 
+    const novaMensagemSalva: MensagemAbordagemSalva = {
+      id: `msg_${Date.now()}`,
+      canal,
+      tomId: tomAbordagem,
+      tomNome: tomAtualObj?.nome || "Personalizado",
+      titulo: `Mensagem ${canalAtualObj?.label} (${tomAtualObj?.nome || "Personalizado"})`,
+      texto: textoLimpo,
+      salvoEm: new Date().toISOString(),
+    };
+
+    const mensagensAnteriores = empresa.mensagensAbordagemSalvas || [];
+    const novasMensagens = [
+      novaMensagemSalva,
+      ...mensagensAnteriores.filter((m) => m.texto.trim() !== textoLimpo || m.canal !== canal),
+    ];
+
     setDossier(novoDossier);
     updateEmpresa(empresa.id, {
       dossier360: novoDossier,
+      mensagensAbordagemSalvas: novasMensagens,
       analiseAtualizadaEm: new Date().toISOString(),
     });
 
     addHistorico(empresa.id, {
       data: new Date().toISOString(),
       tipo: "nota",
-      texto: `Roteiro de abordagem para ${canalAtualObj?.label} salvo no dossiê (${tomAtualObj?.nome}).`,
+      texto: `Mensagem de abordagem para ${canalAtualObj?.label} salva e arquivada (${tomAtualObj?.nome}).`,
     });
 
-    toast.success(`Abordagem para ${canalAtualObj?.label} salva no Dossiê com sucesso!`);
+    toast.success(`Mensagem salva e arquivada para ${empresa.nome} com sucesso!`);
+  };
+
+  const handleRestaurarMensagemSalva = (msg: MensagemAbordagemSalva) => {
+    setTextoAbordagemEditado(msg.texto);
+    if (msg.tomId && TONS_ABORDAGEM.some((t) => t.id === msg.tomId)) {
+      setTomAbordagem(msg.tomId as TomAbordagemId);
+    }
+    setMetaAbordagem({
+      provedor: "Mensagem Salva",
+      modelo: msg.tomNome || "Personalizada",
+      fallback: false,
+    });
+    toast.info("Mensagem restaurada no editor!");
+  };
+
+  const handleExcluirMensagemSalva = (msgId: string) => {
+    if (!empresa) return;
+    const novas = (empresa.mensagensAbordagemSalvas || []).filter((m) => m.id !== msgId);
+    updateEmpresa(empresa.id, {
+      mensagensAbordagemSalvas: novas,
+      analiseAtualizadaEm: new Date().toISOString(),
+    });
+    toast.success("Mensagem removida do histórico deste cliente.");
   };
 
   // 2. Gera Relatório SEO e Salva no Banco de Dados
@@ -1471,65 +1540,126 @@ function AnaliseClientePage() {
               </CardHeader>
 
               <CardContent className="p-5 space-y-6">
-                {/* 1. SELETOR DE TOM DE ABORDAGEM (ANTI-FRIEZA & HUMANIZADO) */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <Smile className="h-4 w-4 text-emerald-600" />
-                      Escolha o Tom da Abordagem (1º Contato Amigável)
-                    </label>
-                    <span className="text-[11px] text-muted-foreground">
-                      Evite abordagens frias apontando defeitos; crie conexão genuína.
-                    </span>
+                {/* 1. SELETOR DE TOM DE ABORDAGEM & TEXTOS PADRÃO (COMBO BOX) */}
+                <div className="space-y-2.5 p-3.5 rounded-xl border border-border/80 bg-muted/20">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <label className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                        <Smile className="h-4 w-4 text-emerald-600" />
+                        Escolha o Tom da Abordagem & Textos Padrão (1º Contato Amigável)
+                      </label>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        Escolha um tom pré-definido ou selecione seus textos padrão com variáveis preenchidas automaticamente.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setOpenModalTemplates(true)}
+                        className="h-8 text-xs gap-1.5 border-primary/40 text-primary hover:bg-primary/10 shadow-xs"
+                      >
+                        <SlidersHorizontal className="h-3.5 w-3.5" /> Gerenciar Textos Padrão
+                      </Button>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
-                    {TONS_ABORDAGEM.map((t) => {
-                      const ativo = tomAbordagem === t.id;
-                      return (
-                        <button
-                          key={t.id}
-                          type="button"
-                          onClick={() => handleSelecionarTom(t.id)}
-                          className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between gap-1.5 ${
-                            ativo
-                              ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40"
-                              : "border-border/80 hover:bg-muted/40 hover:border-border"
-                          }`}
-                        >
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-between gap-1">
-                              <span className="text-xs font-bold leading-tight flex items-center gap-1.5">
-                                {t.id === "primeiro_contato_pdf" && <FileText className="h-3.5 w-3.5 text-emerald-500 shrink-0" />}
-                                {t.id === "amigavel_elogio" && <HeartHandshake className="h-3.5 w-3.5 text-rose-500 shrink-0" />}
-                                {t.id === "consultivo_parceiro" && <Users className="h-3.5 w-3.5 text-blue-500 shrink-0" />}
-                                {t.id === "descontraido_curioso" && <Coffee className="h-3.5 w-3.5 text-amber-500 shrink-0" />}
-                                {t.id === "valorizacao_marca" && <Award className="h-3.5 w-3.5 text-purple-500 shrink-0" />}
-                                {t.id === "direto_gentil" && <Zap className="h-3.5 w-3.5 text-emerald-500 shrink-0" />}
-                                {t.id === "ajuda_desinteressada" && <Gift className="h-3.5 w-3.5 text-teal-500 shrink-0" />}
-                                {t.id === "indicacao_comunidade" && <MapPin className="h-3.5 w-3.5 text-rose-500 shrink-0" />}
-                                {t.id === "demanda_aquecida" && <TrendingUp className="h-3.5 w-3.5 text-indigo-500 shrink-0" />}
-                                {t.id === "diagnostico_amigo" && <CheckCircle className="h-3.5 w-3.5 text-cyan-500 shrink-0" />}
-                                {t.id === "humanizado_historias" && <Heart className="h-3.5 w-3.5 text-pink-500 shrink-0" />}
-                                {t.nome}
-                              </span>
-                            </div>
-                            <Badge
-                              variant="secondary"
-                              className={`text-[10px] font-semibold px-1.5 py-0 ${
-                                ativo ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                              }`}
-                            >
-                              {t.tagline}
-                            </Badge>
-                            <p className="text-[11px] text-muted-foreground line-clamp-2 leading-snug">
-                              {t.descricao}
-                            </p>
+                  {/* COMBO BOX DE TONS */}
+                  <div className="pt-0.5">
+                    <Select
+                      value={tomAbordagem}
+                      onValueChange={(val) => {
+                        if (val.startsWith("tpl_")) {
+                          const tplId = val.replace("tpl_", "");
+                          const tpl = templatesCustomizados.find((t) => t.id === tplId);
+                          if (tpl && empresa) {
+                            const resolvido = resolverVariaveisTemplate(tpl.conteudo, toCtx(empresa));
+                            setTextoAbordagemEditado(resolvido);
+                            setMetaAbordagem({
+                              provedor: "Texto Padrão Customizado",
+                              modelo: tpl.titulo,
+                              fallback: false,
+                            });
+                            toast.success(`Texto padrão "${tpl.titulo}" aplicado com dados reais!`);
+                          }
+                        } else {
+                          handleSelecionarTom(val as TomAbordagemId);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-full h-10 text-xs font-semibold bg-background border-border/80 shadow-xs">
+                        <div className="flex items-center justify-between w-full gap-2 truncate">
+                          <div className="flex items-center gap-2 truncate">
+                            <span className="p-1 rounded-md bg-primary/10 text-primary shrink-0">
+                              <FileText className="h-3.5 w-3.5" />
+                            </span>
+                            <span className="truncate">
+                              {tomAtualObj?.nome || "Selecione o tom de abordagem..."}
+                            </span>
                           </div>
-                        </button>
-                      );
-                    })}
+                          {tomAtualObj && (
+                            <Badge variant="outline" className="text-[10px] px-2 py-0.5 shrink-0 hidden sm:inline-flex">
+                              {tomAtualObj.tagline}
+                            </Badge>
+                          )}
+                        </div>
+                      </SelectTrigger>
+
+                      <SelectContent className="max-h-[380px]">
+                        <div className="p-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider border-b">
+                          ⭐ Tons Estratégicos Oficiais (Locomotiva)
+                        </div>
+                        {TONS_ABORDAGEM.map((t) => (
+                          <SelectItem key={t.id} value={t.id} className="text-xs py-2">
+                            <div className="flex items-center justify-between gap-3 w-full">
+                              <div>
+                                <div className="font-bold">{t.nome}</div>
+                                <div className="text-[10px] text-muted-foreground font-normal line-clamp-1">{t.subtitulo}</div>
+                              </div>
+                              <Badge variant="secondary" className="text-[9px] px-1.5 py-0 shrink-0 font-normal">
+                                {t.tagline}
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                        ))}
+
+                        {templatesCustomizados.filter((t) => !t.isPadrao).length > 0 && (
+                          <>
+                            <div className="p-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider border-b mt-1.5">
+                              📝 Seus Textos Padrão & Templates com Colchetes
+                            </div>
+                            {templatesCustomizados.filter((t) => !t.isPadrao).map((tpl) => (
+                              <SelectItem key={tpl.id} value={`tpl_${tpl.id}`} className="text-xs py-2">
+                                <div className="flex items-center justify-between gap-3 w-full">
+                                  <div>
+                                    <div className="font-bold flex items-center gap-1.5">
+                                      <Sparkles className="h-3 w-3 text-purple-500" />
+                                      {tpl.titulo}
+                                    </div>
+                                    <div className="text-[10px] text-muted-foreground font-normal line-clamp-1">
+                                      {tpl.descricao || tpl.conteudo.slice(0, 60)}
+                                    </div>
+                                  </div>
+                                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 shrink-0 uppercase">
+                                    {tpl.canal}
+                                  </Badge>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
+
+                  {tomAtualObj && (
+                    <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 pt-0.5">
+                      <Info className="h-3.5 w-3.5 text-primary shrink-0" />
+                      <span>{tomAtualObj.descricao}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. SELETOR DE CANAIS DE ABORDAGEM */}
@@ -1643,9 +1773,10 @@ function AnaliseClientePage() {
                         variant="default"
                         size="sm"
                         onClick={handleSalvarAbordagemNoDossier}
-                        className="h-7 text-xs gap-1 bg-indigo-600 hover:bg-indigo-500 text-white"
+                        className="h-7 text-xs gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-xs"
+                        title="Salva as alterações no banco de dados e adiciona à lista de mensagens salvas deste cliente"
                       >
-                        <Save className="h-3 w-3" /> Salvar no Dossiê
+                        <Save className="h-3 w-3" /> Salvar Mensagem
                       </Button>
 
                       <Button
@@ -1717,6 +1848,17 @@ function AnaliseClientePage() {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* 4.1 MENSAGENS SALVAS DESTE CLIENTE (HISTÓRICO INDIVIDUAL) */}
+                {empresa && (
+                  <ListaMensagensSalvasCliente
+                    mensagens={empresa.mensagensAbordagemSalvas || []}
+                    canalAtivo={canal}
+                    onRestaurarMensagem={handleRestaurarMensagemSalva}
+                    onExcluirMensagem={handleExcluirMensagemSalva}
+                    empresaNome={empresa.nome}
+                  />
+                )}
 
                 {/* 5. DIAGNÓSTICO 360 & SINTOMAS OPERACIONAIS (SE DISPONÍVEL) */}
                 {dossier?.prescricaoTratamentoLucro?.itensTratamento && dossier.prescricaoTratamentoLucro.itensTratamento.length > 0 ? (
@@ -1842,6 +1984,19 @@ function AnaliseClientePage() {
             onOpenChange={setOpenWhatsModal}
             empresa={empresa}
             mensagemPadrao={textoAbordagemEditado}
+          />
+          <ModalGerenciarTemplates
+            open={openModalTemplates}
+            onOpenChange={setOpenModalTemplates}
+            empresaCtx={toCtx(empresa)}
+            onAplicarTemplate={(textoResolvido, tpl) => {
+              setTextoAbordagemEditado(textoResolvido);
+              setMetaAbordagem({
+                provedor: "Texto Padrão Customizado",
+                modelo: tpl.titulo,
+                fallback: false,
+              });
+            }}
           />
           <SitePreviewModal
             open={siteFullscreenOpen}
