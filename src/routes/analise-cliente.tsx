@@ -62,6 +62,8 @@ import { PaletaCoresCard } from "@/components/paleta-cores-card";
 import { QrCodeCard } from "@/components/qr-code-card";
 import { FeriadosCampanhasCard } from "@/components/feriados-campanhas-card";
 import { whatsappUrl } from "@/lib/links";
+import { SeletorRapidoAgenteIa, useAgenteIaAtivo } from "@/components/seletor-rapido-agente-ia";
+import { getAgenteById, type AgenteIaOption } from "@/components/estudio-criacao/seletor-agentes-ia";
 import {
   Sparkles,
   LayoutDashboard,
@@ -207,7 +209,8 @@ function AnaliseClientePage() {
   const [loadingQSA, setLoadingQSA] = useState(false);
   const [cnpjInput, setCnpjInput] = useState(empresa?.cnpj ?? "");
 
-  // Estados de Tons de Abordagem Amigáveis & IA (awesome-free-llm-apis)
+  // Estados de Tons de Abordagem Amigáveis & IA (awesome-free-llm-apis & OpenRouter Hub)
+  const { agente: agenteIaAtivo, selecionarAgente: setAgenteIaAtivo } = useAgenteIaAtivo();
   const gerarAbordagemIAFn = useServerFn(gerarAbordagemAmigavelIA_ServerFn);
   const [tomAbordagem, setTomAbordagem] = useState<TomAbordagemId>("primeiro_contato_pdf");
   const [provedorIaAbordagem, setProvedorIaAbordagem] = useState<ProvedorIaTipo>("auto");
@@ -347,6 +350,8 @@ function AnaliseClientePage() {
           empresa: toCtx(empresa),
           canalPreferencial: canal === "propostaValor360" ? "email" : (canal as any),
           nomeAgencia: "Locomotiva Comunicação",
+          provedorPreferencial: agenteIaAtivo.provider === "bespoke" ? "auto" : agenteIaAtivo.provider,
+          modeloPreferencial: agenteIaAtivo.modelo,
         },
       });
 
@@ -417,12 +422,18 @@ function AnaliseClientePage() {
         termosDiag.push(...resRelatorio.seo.termos.map((t) => t.termo));
       }
 
+      const provedorEfetivo =
+        agenteIaAtivo.provider === "bespoke"
+          ? (provedorIaAbordagem !== "auto" ? provedorIaAbordagem : "auto")
+          : (agenteIaAtivo.provider as any);
+
       const res = await gerarAbordagemIAFn({
         data: {
           empresa: toCtx(empresa),
           canal,
           tom: tomAbordagem,
-          provedor: provedorIaAbordagem,
+          provedor: provedorEfetivo,
+          modelo: agenteIaAtivo.modelo,
           instrucaoCustomizada: instrucaoIaAbordagem,
           palavrasChave: termosDiag.map((t) => t.trim()).filter(Boolean),
           diagnosticoResumo: resRelatorio?.relatorio?.resumoExecutivo || undefined,
@@ -592,6 +603,8 @@ function AnaliseClientePage() {
             consulta: consultaGoogle,
             termos: linhas(termosTxt),
             publicoAlvo: publicoAlvoTxt || empresa.publicoAlvo,
+            provedorPreferencial: agenteIaAtivo.provider === "bespoke" ? "auto" : agenteIaAtivo.provider,
+            modeloPreferencial: agenteIaAtivo.modelo,
           },
         },
       });
@@ -848,9 +861,9 @@ function AnaliseClientePage() {
           </div>
         </div>
 
-        {/* SELETOR DE EMPRESA & AÇÃO MASTER */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="w-64 sm:w-72">
+        {/* SELETOR DE EMPRESA, SELETOR RÁPIDO DE IA & AÇÃO MASTER */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="w-56 sm:w-64">
             <Select value={selEmpresaId} onValueChange={handleTrocaEmpresa}>
               <SelectTrigger className="h-9 text-xs">
                 <SelectValue placeholder="Selecione a empresa..." />
@@ -864,6 +877,16 @@ function AnaliseClientePage() {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Seletor Rápido Discreto de Agente IA */}
+          <SeletorRapidoAgenteIa
+            agenteId={agenteIaAtivo.id}
+            onSelecionarAgente={(ag) => {
+              setAgenteIaAtivo(ag);
+              setProvedorIaAbordagem(ag.provider === "bespoke" ? "auto" : (ag.provider as any));
+              toast.info(`Agente ativo alterado para ${ag.nome} (${ag.modelo})`);
+            }}
+          />
 
           <Button
             onClick={handleAtualizarTudo}
@@ -1538,27 +1561,17 @@ function AnaliseClientePage() {
                 {/* 3. BARRA DE IA (awesome-free-llm-apis) & CONTROLES DE REGENERAÇÃO */}
                 <div className="p-3.5 rounded-xl border border-border/80 bg-muted/20 space-y-3">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Bot className="h-4 w-4 text-primary" />
-                      <span className="text-xs font-bold">Motor de Redação IA (Awesome Free LLMs):</span>
-                      <Select
-                        value={provedorIaAbordagem}
-                        onValueChange={(v) => setProvedorIaAbordagem(v as ProvedorIaTipo)}
-                      >
-                        <SelectTrigger className="h-8 text-xs w-[240px]">
-                          <SelectValue placeholder="Selecione o provedor de IA" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PROVEDORES_IA_ABORDAGEM.map((p) => (
-                            <SelectItem key={p.value} value={p.value} className="text-xs">
-                              <div className="flex items-center justify-between gap-2 w-full">
-                                <span>{p.label}</span>
-                                <Badge variant="outline" className="text-[9px] px-1 py-0">{p.badge}</Badge>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <span className="text-xs font-bold">Motor de Redação IA:</span>
+                      <SeletorRapidoAgenteIa
+                        agenteId={agenteIaAtivo.id}
+                        onSelecionarAgente={(ag) => {
+                          setAgenteIaAtivo(ag);
+                          setProvedorIaAbordagem(ag.provider === "bespoke" ? "auto" : (ag.provider as any));
+                          toast.info(`Motor de redação alterado para ${ag.nome}`);
+                        }}
+                      />
                     </div>
 
                     <div className="flex items-center gap-2">

@@ -288,6 +288,8 @@ export const gerarRelatorioLead = createServerFn({ method: "POST" })
             consulta: z.string().optional(),
             termos: z.array(z.string()).optional(),
             publicoAlvo: z.string().optional(),
+            provedorPreferencial: z.string().optional(),
+            modeloPreferencial: z.string().optional(),
           })
           .optional(),
       })
@@ -312,10 +314,13 @@ export const gerarRelatorioLead = createServerFn({ method: "POST" })
         : "",
     ].filter(Boolean).join("\n");
 
+    const provPref = (data.ajustes?.provedorPreferencial || "auto") as any;
     const rel = await openaiJSON<Relatorio>({
       schemaName: "relatorio_lead",
       schema: SCHEMA,
       reasoning: "medium",
+      provider: provPref === "bespoke" ? "auto" : provPref,
+      model: data.ajustes?.modeloPreferencial,
       input: [
         {
           role: "system",

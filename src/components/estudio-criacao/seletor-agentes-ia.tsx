@@ -127,7 +127,34 @@ export const AGENTES_IA_CATALOGO: AgenteIaOption[] = [
     categoria: "openrouter",
   },
 
-  // 7. GOOGLE GEMINI 1.5 PRO
+  // 7. OPENROUTER - QWEN 2.5 72B
+  {
+    id: "openrouter_qwen25",
+    provider: "openrouter",
+    nome: "OpenRouter · Qwen 2.5 72B",
+    modelo: "qwen/qwen-2.5-72b-instruct",
+    descricao: "Poderoso raciocínio e síntese com excepcional domínio do português do Brasil para propostas e copywriting.",
+    icone: Globe,
+    badge: "OpenRouter · Qwen 2.5",
+    badgeVariant: "secondary",
+    categoria: "openrouter",
+  },
+
+  // 8. GOOGLE GEMINI 2.0 FLASH (GRÁTIS)
+  {
+    id: "gemini_20_flash",
+    provider: "gemini",
+    nome: "Google Gemini 2.0 Flash",
+    modelo: "gemini-2.0-flash",
+    descricao: "Alta inteligência com latência veloz e cota gratuita permanente no Google AI Studio (até 15 RPM).",
+    icone: Sparkles,
+    badge: "Google AI Studio (Free)",
+    badgeVariant: "default",
+    destaque: true,
+    categoria: "rapidos",
+  },
+
+  // 9. GOOGLE GEMINI 1.5 PRO
   {
     id: "gemini_15_pro",
     provider: "gemini",
@@ -140,7 +167,7 @@ export const AGENTES_IA_CATALOGO: AgenteIaOption[] = [
     categoria: "rapidos",
   },
 
-  // 8. GROQ - LLAMA 3.3 70B
+  // 10. GROQ - LLAMA 3.3 70B
   {
     id: "groq_llama33",
     provider: "groq",
@@ -150,10 +177,24 @@ export const AGENTES_IA_CATALOGO: AgenteIaOption[] = [
     icone: Zap,
     badge: "Groq Cloud (Free)",
     badgeVariant: "secondary",
+    destaque: true,
     categoria: "rapidos",
   },
 
-  // 9. CEREBRAS - LLAMA 3.3 70B
+  // 11. GROQ - LLAMA 3.1 8B INSTANT
+  {
+    id: "groq_llama31_instant",
+    provider: "groq",
+    nome: "Groq · Llama 3.1 8B Instant",
+    modelo: "llama-3.1-8b-instant",
+    descricao: "Velocidade sub-segundo (~800 tokens/s). Excelente para mensagens instantâneas de WhatsApp e respostas imediatas.",
+    icone: Zap,
+    badge: "Groq Sub-Segundo",
+    badgeVariant: "outline",
+    categoria: "rapidos",
+  },
+
+  // 12. CEREBRAS - LLAMA 3.3 70B
   {
     id: "cerebras_llama33",
     provider: "cerebras",
@@ -166,7 +207,34 @@ export const AGENTES_IA_CATALOGO: AgenteIaOption[] = [
     categoria: "rapidos",
   },
 
-  // 10. LOVABLE AI GATEWAY
+  // 13. ANTHROPIC CLAUDE 3.5 SONNET (DIRETO)
+  {
+    id: "direct_claude_35",
+    provider: "anthropic",
+    nome: "Anthropic Claude 3.5 Sonnet (Nativo)",
+    modelo: "claude-3-5-sonnet-20241022",
+    descricao: "Conexão nativa direta via API oficial da Anthropic. Máxima excelência em UI/UX, código frontend e argumentação comercial.",
+    icone: Sparkles,
+    badge: "Anthropic API",
+    badgeVariant: "default",
+    destaque: true,
+    categoria: "direto",
+  },
+
+  // 14. OPENAI GPT-4o (DIRETO)
+  {
+    id: "direct_openai_gpt4o",
+    provider: "openai",
+    nome: "OpenAI GPT-4o (Nativo)",
+    modelo: "gpt-4o",
+    descricao: "Conexão nativa direta via API oficial da OpenAI. Precisão analítica, visão multimodal e estruturação de dados.",
+    icone: Bot,
+    badge: "OpenAI API",
+    badgeVariant: "secondary",
+    categoria: "direto",
+  },
+
+  // 15. LOVABLE AI GATEWAY
   {
     id: "lovable_gateway",
     provider: "lovable",
@@ -180,6 +248,11 @@ export const AGENTES_IA_CATALOGO: AgenteIaOption[] = [
   },
 ];
 
+export function getAgenteById(id?: string): AgenteIaOption {
+  if (!id) return AGENTES_IA_CATALOGO[0];
+  return AGENTES_IA_CATALOGO.find((ag) => ag.id === id) || AGENTES_IA_CATALOGO[0];
+}
+
 interface SeletorAgentesIaProps {
   agenteSelecionadoId: string;
   onSelecionarAgente: (agente: AgenteIaOption) => void;
@@ -191,7 +264,7 @@ export function SeletorAgentesIa({
   onSelecionarAgente,
   apiSettings,
 }: SeletorAgentesIaProps) {
-  const [categoriaAtiva, setCategoriaAtiva] = useState<"todos" | "openrouter" | "rapidos" | "editorial">("todos");
+  const [categoriaAtiva, setCategoriaAtiva] = useState<"todos" | "openrouter" | "rapidos" | "editorial" | "direto">("todos");
 
   const agentesFiltrados = AGENTES_IA_CATALOGO.filter((ag) => {
     if (categoriaAtiva === "todos") return true;
@@ -252,6 +325,16 @@ export function SeletorAgentesIa({
         >
           <Palette className="h-3 w-3 text-emerald-500" />
           Anti-IA Bespoke
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={categoriaAtiva === "direto" ? "default" : "outline"}
+          onClick={() => setCategoriaAtiva("direto")}
+          className="h-7 text-xs px-2.5 rounded-full flex items-center gap-1"
+        >
+          <Bot className="h-3 w-3 text-violet-500" />
+          APIs Diretas (Claude / OpenAI)
         </Button>
       </div>
 
@@ -420,6 +503,26 @@ export function SeletorAgentesIaSelect({
                     <span className="font-medium">{ag.nome}</span>
                   </div>
                   <Badge variant="default" className="text-[9px] px-1 py-0 h-3.5 font-normal">
+                    {ag.badge}
+                  </Badge>
+                </div>
+              </SelectItem>
+            );
+          })}
+
+          <div className="p-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-b mt-1">
+            APIs Diretas (Nativas)
+          </div>
+          {AGENTES_IA_CATALOGO.filter((ag) => ag.categoria === "direto").map((ag) => {
+            const Icon = ag.icone;
+            return (
+              <SelectItem key={ag.id} value={ag.id} className="text-xs py-2">
+                <div className="flex items-center justify-between gap-2 w-full">
+                  <div className="flex items-center gap-2">
+                    <Icon className="h-3.5 w-3.5 text-violet-500 shrink-0" />
+                    <span className="font-medium">{ag.nome}</span>
+                  </div>
+                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5 font-normal">
                     {ag.badge}
                   </Badge>
                 </div>

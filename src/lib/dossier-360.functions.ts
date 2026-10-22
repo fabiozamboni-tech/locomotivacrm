@@ -199,6 +199,8 @@ export const gerarDossierEAbordagens360_IA = createServerFn({ method: "POST" })
       canalPreferencial?: "whatsapp" | "email" | "instagram" | "ligacao" | "curta";
       nomeAgencia?: string;
       focoCustomizado?: string;
+      provedorPreferencial?: string;
+      modeloPreferencial?: string;
     }) => data,
   )
   .handler(async ({ data }): Promise<Dossier360Result> => {
@@ -530,10 +532,16 @@ Gere um dossiê JSON estruturado e completo com este formato EXATO:
 }`;
 
     try {
-      const parsed = await chatJSON<Dossier360Result>([
-        { role: "system", content: sys },
-        { role: "user", content: user },
-      ]);
+      const parsed = await chatJSON<Dossier360Result>(
+        [
+          { role: "system", content: sys },
+          { role: "user", content: user },
+        ],
+        {
+          provider: data.provedorPreferencial === "bespoke" ? "auto" : (data.provedorPreferencial as any),
+          model: data.modeloPreferencial,
+        },
+      );
       return parsed;
     } catch (err) {
       console.warn("Falha no LLM para Dossiê 360, usando gerador determinístico inteligente:", err);

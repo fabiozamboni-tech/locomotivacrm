@@ -1,60 +1,101 @@
-// Helpers para chamar o Lovable AI Gateway (OpenAI-compat) e o Firecrawl.
+// Helpers para chamar o Roteador Universal de LLMs e o Firecrawl.
 // Server-only: só é importado dentro de `.handler()` de server functions.
 
+import { chamarLlmUniversal, chamarLlmUniversalJSON, type ProvedorNome } from "./llm-provider.server";
+
 const AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const RESPONSES_URL = "https://ai.gateway.lovable.dev/v1/responses";
 const FIRECRAWL_URL = "https://connector-gateway.lovable.dev/firecrawl/v2/scrape";
 
 type ChatMsg = { role: "system" | "user" | "assistant"; content: string };
 
+export interface ChatOptions {
+  model?: string;
+  temperature?: number;
+  provider?: ProvedorNome | "auto" | "bespoke";
+  customKeys?: Record<string, string | undefined>;
+}
+
 export async function chatText(
   messages: ChatMsg[],
-  opts: { model?: string; temperature?: number } = {},
+  opts: ChatOptions = {},
 ): Promise<string> {
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) throw new Error("LOVABLE_API_KEY ausente");
-  const res = await fetch(AI_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
-    },
-    body: JSON.stringify({
-      model: opts.model ?? "google/gemini-3-flash-preview",
-      messages,
+  try {
+    const provPref = opts.provider === "bespoke" ? "auto" : opts.provider;
+    const res = await chamarLlmUniversal(messages, {
+      provedorPreferencial: (provPref as ProvedorNome | "auto") || "auto",
+      model: opts.model,
       temperature: opts.temperature ?? 0.7,
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    if (res.status === 429) throw new Error("Limite de uso da IA atingido. Tente novamente em alguns instantes.");
-    if (res.status === 402) throw new Error("Créditos de IA esgotados. Adicione créditos no workspace.");
-    throw new Error(`Falha na IA (${res.status}): ${body.slice(0, 300)}`);
+      customKeys: opts.customKeys,
+    });
+    return res.text;
+  } catch (universalErr: any) {
+    console.warn(
+      "[ai-gateway] Aviso no roteador universal, tentando contingência Lovable AI Gateway:",
+      universalErr.message,
+    );
+
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw universalErr;
+
+    const res = await fetch(AI_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model: opts.model ?? "google/gemini-3-flash-preview",
+        messages,
+        temperature: opts.temperature ?? 0.7,
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      if (res.status === 429) throw new Error("Limite de uso da IA atingido. Tente novamente em alguns instantes.");
+      if (res.status === 402) throw new Error("Créditos de IA esgotados. Adicione créditos no workspace.");
+      throw new Error(`Falha na IA (${res.status}): ${body.slice(0, 300)}`);
+    }
+
+    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    return json.choices?.[0]?.message?.content?.trim() ?? "";
   }
-  const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  return json.choices?.[0]?.message?.content?.trim() ?? "";
 }
 
 export async function chatJSON<T = unknown>(
   messages: ChatMsg[],
-  opts: { model?: string; temperature?: number } = {},
+  opts: ChatOptions = {},
 ): Promise<T> {
-  // Reforça JSON no prompt do sistema
-  const withJson = [
-    ...messages,
-    { role: "system" as const, content: "Responda APENAS um JSON válido, sem markdown, sem cercas de código." },
-  ];
-  const raw = await chatText(withJson, { temperature: 0.4, ...opts });
-  const cleaned = raw
-    .replace(/^```(?:json)?/i, "")
-    .replace(/```$/i, "")
-    .trim();
   try {
-    return JSON.parse(cleaned) as T;
-  } catch {
-    // tenta extrair primeiro bloco { ... }
-    const m = cleaned.match(/\{[\s\S]*\}/);
-    if (m) return JSON.parse(m[0]) as T;
-    throw new Error("Resposta da IA não pôde ser interpretada como JSON.");
+    const provPref = opts.provider === "bespoke" ? "auto" : opts.provider;
+    const res = await chamarLlmUniversalJSON<T>(messages, {
+      provedorPreferencial: (provPref as ProvedorNome | "auto") || "auto",
+      model: opts.model,
+      temperature: opts.temperature ?? 0.3,
+      customKeys: opts.customKeys,
+    });
+    return res.data;
+  } catch (universalErr: any) {
+    console.warn("[ai-gateway chatJSON] Fallback textual:", universalErr.message);
+
+    // Reforça JSON no prompt do sistema
+    const withJson: ChatMsg[] = [
+      ...messages,
+      { role: "system" as const, content: "Responda APENAS um JSON válido, sem markdown, sem cercas de código." },
+    ];
+    const raw = await chatText(withJson, { temperature: 0.3, ...opts });
+    const cleaned = raw
+      .replace(/^```(?:json)?/i, "")
+      .replace(/```$/i, "")
+      .trim();
+    try {
+      return JSON.parse(cleaned) as T;
+    } catch {
+      const m = cleaned.match(/\{[\s\S]*\}/);
+      if (m) return JSON.parse(m[0]) as T;
+      throw new Error("Resposta da IA não pôde ser interpretada como JSON.");
+    }
   }
 }
 
@@ -103,13 +144,9 @@ export async function firecrawlScrape(url: string): Promise<FirecrawlScrape> {
   };
 }
 
-// -------- ChatGPT (Responses API, streaming obrigatório) --------
-const RESPONSES_URL = "https://ai.gateway.lovable.dev/v1/responses";
-
 /**
- * Chama um modelo OpenAI via Responses API do gateway com structured output
- * estrito. O streaming é obrigatório (runs longos), mas consumimos o SSE aqui
- * no servidor e devolvemos apenas o JSON final.
+ * Executa modelo estruturado com JSON Schema, priorizando o roteador universal (Gemini, Groq, OpenRouter)
+ * e mantendo a Responses API do Lovable Gateway como contingência.
  */
 export async function openaiJSON<T = unknown>(
   args: {
@@ -117,11 +154,36 @@ export async function openaiJSON<T = unknown>(
     schemaName: string;
     schema: Record<string, unknown>;
     model?: string;
+    provider?: ProvedorNome | "auto" | "bespoke";
     reasoning?: "low" | "medium" | "high" | false;
+    customKeys?: Record<string, string | undefined>;
   },
 ): Promise<T> {
+  // 1. Tenta pelo Roteador Universal primeiro
+  try {
+    const schemaPrompt = `Sua resposta DEVE ser estritamente um JSON válido de acordo com o esquema "${args.schemaName}":
+${JSON.stringify(args.schema, null, 2)}
+Não inclua comentários, explicações ou blocos markdown. Retorne apenas o JSON puro.`;
+
+    const msgs: ChatMsg[] = [
+      { role: "system", content: schemaPrompt },
+      ...args.input.map((m) => ({ role: m.role as "system" | "user", content: m.content })),
+    ];
+
+    const res = await chamarLlmUniversalJSON<T>(msgs, {
+      provedorPreferencial: args.provider === "bespoke" ? "auto" : args.provider,
+      model: args.model,
+      temperature: 0.2,
+      customKeys: args.customKeys,
+    });
+    return res.data;
+  } catch (universalErr: any) {
+    console.warn("[openaiJSON] Tentando via Lovable Responses API:", universalErr.message);
+  }
+
+  // 2. Fallback para Lovable Responses API se houver chave configurada
   const key = process.env.LOVABLE_API_KEY;
-  if (!key) throw new Error("LOVABLE_API_KEY ausente");
+  if (!key) throw new Error("Falha na geração estruturada e nenhuma LOVABLE_API_KEY disponível para contingência.");
 
   const res = await fetch(RESPONSES_URL, {
     method: "POST",

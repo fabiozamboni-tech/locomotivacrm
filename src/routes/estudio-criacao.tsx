@@ -78,6 +78,7 @@ import {
   AGENTES_IA_CATALOGO,
   type AgenteIaOption,
 } from "@/components/estudio-criacao/seletor-agentes-ia";
+import { SeletorRapidoAgenteIa } from "@/components/seletor-rapido-agente-ia";
 import { ModalComparadorVersoes } from "@/components/estudio-criacao/modal-comparador-versoes";
 import { ExportarGithubModal } from "@/components/estudio-criacao/exportar-github-modal";
 import { PaletaCoresCard } from "@/components/paleta-cores-card";
@@ -981,24 +982,32 @@ Pilares de Conteúdo:
           </p>
         </div>
 
-        {/* SELETOR DE EMPRESA RÁPIDO (APENAS ATIVAS) */}
-        <div className="flex items-center gap-2 bg-card p-2 rounded-xl border shadow-xs min-w-[280px]">
-          <Building2 className="h-4 w-4 text-primary shrink-0 ml-1" />
-          <div className="flex-1 min-w-0">
-            <label className="text-[10px] font-semibold uppercase text-muted-foreground block leading-none">
-              Empresa Ativa
-            </label>
-            <select
-              value={empresa.id}
-              onChange={(e) => handleTrocarEmpresa(e.target.value)}
-              className="w-full bg-transparent text-xs font-bold text-foreground focus:outline-none truncate pt-0.5 cursor-pointer"
-            >
-              {empresasAtivas.map((e) => (
-                <option key={e.id} value={e.id} className="bg-popover text-popover-foreground">
-                  {e.nome} ({e.cidade} · {e.segmento})
-                </option>
-              ))}
-            </select>
+        {/* SELETOR DE EMPRESA RÁPIDO & AGENTE IA */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <SeletorRapidoAgenteIa
+            agenteId={agenteSelecionado.id}
+            onSelecionarAgente={setAgenteSelecionado}
+            labelPre="Agente Ativo:"
+          />
+
+          <div className="flex items-center gap-2 bg-card p-2 rounded-xl border shadow-xs min-w-[260px]">
+            <Building2 className="h-4 w-4 text-primary shrink-0 ml-1" />
+            <div className="flex-1 min-w-0">
+              <label className="text-[10px] font-semibold uppercase text-muted-foreground block leading-none">
+                Empresa Ativa
+              </label>
+              <select
+                value={empresa.id}
+                onChange={(e) => handleTrocarEmpresa(e.target.value)}
+                className="w-full bg-transparent text-xs font-bold text-foreground focus:outline-none truncate pt-0.5 cursor-pointer"
+              >
+                {empresasAtivas.map((e) => (
+                  <option key={e.id} value={e.id} className="bg-popover text-popover-foreground">
+                    {e.nome} ({e.cidade} · {e.segmento})
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
       </div>

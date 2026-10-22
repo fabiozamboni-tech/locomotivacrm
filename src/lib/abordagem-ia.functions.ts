@@ -14,6 +14,7 @@ export interface GerarAbordagemAmigavelInput {
   canal: CanalAbordagemTipo;
   tom: TomAbordagemId;
   provedor?: ProvedorIaTipo;
+  modelo?: string;
   instrucaoCustomizada?: string;
   palavrasChave?: string[];
   diagnosticoResumo?: string;
@@ -122,6 +123,7 @@ Escreva agora o texto de primeiro contato aplicando rigorosamente todas as regra
         ],
         {
           provedorPreferencial: provedor,
+          model: data.modelo,
           temperature: 0.6,
           customKeys,
         },
