@@ -154,6 +154,9 @@ export interface Empresa {
     estilo: string;
     prompt: string;
     criadoEm: string;
+    tipoFormato?: "svg_vetorial" | "imagem_flux";
+    svgCode?: string;
+    modeloUsado?: string;
   }>;
   estudioMaterialEscritorioGerados?: Array<{
     id: string;
@@ -162,6 +165,7 @@ export interface Empresa {
     titulo: string;
     prompt: string;
     criadoEm: string;
+    modeloUsado?: string;
   }>;
   // Diagnóstico
   diagnostico: {

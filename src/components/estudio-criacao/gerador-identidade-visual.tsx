@@ -1,8 +1,10 @@
 import React, { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -23,8 +25,17 @@ import {
   Briefcase,
   Award,
   PenTool,
+  Code2,
+  Layers,
+  Wand2,
+  ShieldCheck,
+  Check,
 } from "lucide-react";
-import { gerarUrlPollinationsFlux } from "@/lib/image-generator.server";
+import {
+  gerarUrlPollinationsFlux,
+  gerarLogoVetorialSvg_ServerFn,
+} from "@/lib/image-generator.server";
+import { getApiSettings } from "@/lib/api-settings";
 
 export interface LogoGeradoItem {
   id: string;
@@ -32,6 +43,9 @@ export interface LogoGeradoItem {
   estilo: string;
   prompt: string;
   criadoEm: string;
+  tipoFormato?: "svg_vetorial" | "imagem_flux";
+  svgCode?: string;
+  modeloUsado?: string;
 }
 
 export interface MaterialEscritorioItem {
@@ -41,6 +55,7 @@ export interface MaterialEscritorioItem {
   titulo: string;
   prompt: string;
   criadoEm: string;
+  modeloUsado?: string;
 }
 
 interface GeradorIdentidadeVisualProps {
@@ -57,7 +72,25 @@ interface GeradorIdentidadeVisualProps {
   onDefinirComoLogoOficial?: (logoUrl: string, nomeArquivo?: string) => void;
 }
 
-const ESTILOS_LOGO = [
+const ESTILOS_LOGO_SVG = [
+  {
+    id: "horizontal_navbar",
+    nome: "Horizontal para Navbar (Ícone + Nome)",
+    desc: "Composição proporcional (360x90px) com símbolo geométrico e tipografia balanceada",
+  },
+  {
+    id: "monograma_icone",
+    nome: "Monograma Quadrado / Avatar",
+    desc: "Símbolo centralizado (180x180px) com as iniciais estilizadas em proporção áurea",
+  },
+  {
+    id: "emblema_selo",
+    nome: "Emblema / Selo Circular",
+    desc: "Insígnia circular de autenticidade (200x200px) com detalhes artesanais",
+  },
+];
+
+const ESTILOS_LOGO_FLUX = [
   {
     id: "minimalista",
     nome: "Minimalista & Moderno",
@@ -88,6 +121,13 @@ const ESTILOS_LOGO = [
     desc: "Alusão direta à especialidade e precisão dos materiais",
     promptEn: "technical precision craft insignia logo, architectural blueprint lines, master artisan mark, refined industrial vector logo",
   },
+];
+
+const MODELOS_POLLINATIONS = [
+  { id: "flux", nome: "FLUX.1 Padrão (Alta Fidelidade)" },
+  { id: "flux-realism", nome: "FLUX Realism (Fotografia Ultra Realista)" },
+  { id: "flux-3d", nome: "FLUX 3D (Render 3D & Mockups)" },
+  { id: "turbo", nome: "SDXL Turbo (Instantâneo < 1s)" },
 ];
 
 const TIPOS_MATERIAL_ESCRITORIO = [
@@ -150,19 +190,34 @@ export function GeradorIdentidadeVisual({
 }: GeradorIdentidadeVisualProps) {
   const [subAba, setSubAba] = useState<"logos" | "papelaria">("logos");
 
-  // Estado para Logos
-  const [estiloLogoSelecionado, setEstiloLogoSelecionado] = useState(ESTILOS_LOGO[0].id);
+  // Server Fn para geração de SVG com LLM
+  const gerarLogoSvgFn = useServerFn(gerarLogoVetorialSvg_ServerFn);
+
+  // Modo de criação de logo: "svg" (LLM Vetorial) vs "flux" (Difusão de Imagem)
+  const [modoLogo, setModoLogo] = useState<"svg" | "flux">("svg");
+
+  // Estado para Logos SVG
+  const [estiloLogoSvg, setEstiloLogoSvg] = useState<any>(ESTILOS_LOGO_SVG[0].id);
+
+  // Estado para Logos FLUX
+  const [estiloLogoFlux, setEstiloLogoFlux] = useState<any>(ESTILOS_LOGO_FLUX[0].id);
+  const [modeloFluxLogo, setModeloFluxLogo] = useState<"flux" | "flux-realism" | "flux-3d" | "turbo">("flux");
+  const [enhanceLogo, setEnhanceLogo] = useState(true);
+
+  // Estado Geral de Logos
   const [fundoEscuro, setFundoEscuro] = useState(false);
   const [gerandoLogo, setGerandoLogo] = useState(false);
   const [logos, setLogos] = useState<LogoGeradoItem[]>(logosSalvos);
 
   // Estado para Material de Escritório
   const [tipoMaterialSelecionado, setTipoMaterialSelecionado] = useState(TIPOS_MATERIAL_ESCRITORIO[0].id);
+  const [modeloMaterial, setModeloMaterial] = useState<"flux" | "flux-realism" | "flux-3d" | "turbo">("flux-3d");
+  const [enhanceMaterial, setEnhanceMaterial] = useState(true);
   const [gerandoMaterial, setGerandoMaterial] = useState(false);
   const [materiais, setMateriais] = useState<MaterialEscritorioItem[]>(materiaisSalvos);
 
   // Modal de Zoom de Imagem
-  const [imagemModal, setImagemModal] = useState<{ url: string; titulo: string } | null>(null);
+  const [imagemModal, setImagemModal] = useState<{ url: string; titulo: string; svgCode?: string } | null>(null);
 
   // Sincroniza se as props mudarem
   React.useEffect(() => {
@@ -173,32 +228,93 @@ export function GeradorIdentidadeVisual({
     setMateriais(materiaisSalvos);
   }, [materiaisSalvos]);
 
-  // GERAÇÃO DE LOGOTIPO COM IA (FLUX.1)
-  const handleGerarLogos = () => {
+  // 1. GERAÇÃO DE LOGOTIPO VETORIAL SVG PURO VIA LLM (100% GRÁTIS)
+  const handleGerarLogoSvg = async () => {
     setGerandoLogo(true);
     try {
-      const estiloObj = ESTILOS_LOGO.find((e) => e.id === estiloLogoSelecionado) || ESTILOS_LOGO[0];
+      const apiSettings = getApiSettings();
+      const customKeys = {
+        groq: apiSettings.groq.key,
+        gemini: apiSettings.gemini.key,
+        openrouter: apiSettings.openrouter.key,
+        cerebras: apiSettings.cerebras.key,
+        lovable: apiSettings.lovable.key,
+        ollamaBaseUrl: apiSettings.ollama.baseUrl,
+      };
+
+      toast.info(`Criando logotipo vetorial SVG para ${empresaNome}...`);
+
+      const res = await gerarLogoSvgFn({
+        data: {
+          empresaNome,
+          segmento,
+          cidade,
+          estilo: estiloLogoSvg,
+          corPrimariaHex,
+          customKeys,
+        },
+      });
+
+      if (res.sucesso && res.svgCode) {
+        const estiloObj = ESTILOS_LOGO_SVG.find((e) => e.id === estiloLogoSvg);
+        const novoLogo: LogoGeradoItem = {
+          id: `svg_logo_${Date.now()}`,
+          url: res.dataUrl,
+          estilo: `SVG: ${estiloObj?.nome || "Vetorial"}`,
+          prompt: `Logo vetorial SVG puro gerado com IA (${res.provider} / ${res.model})`,
+          criadoEm: new Date().toISOString(),
+          tipoFormato: "svg_vetorial",
+          svgCode: res.svgCode,
+          modeloUsado: `${res.provider} (${res.model})`,
+        };
+
+        const atualizados = [novoLogo, ...logos];
+        setLogos(atualizados);
+        onSalvarLogos?.(atualizados);
+        toast.success(`Logotipo vetorial SVG gerado com sucesso!`);
+      } else {
+        toast.error("Não foi possível gerar o código SVG do logotipo.");
+      }
+    } catch (err: any) {
+      console.error("Erro ao gerar SVG:", err);
+      toast.error(err?.message || "Falha ao gerar logo vetorial.");
+    } finally {
+      setGerandoLogo(false);
+    }
+  };
+
+  // 2. GERAÇÃO DE LOGOTIPO COM FLUX.1 (DIFUSÃO / IMAGEM)
+  const handleGerarLogosFlux = () => {
+    setGerandoLogo(true);
+    try {
+      const estiloObj = ESTILOS_LOGO_FLUX.find((e) => e.id === estiloLogoFlux) || ESTILOS_LOGO_FLUX[0];
       const novosItens: LogoGeradoItem[] = [];
 
       // Gera 2 variações do estilo selecionado
       for (let i = 1; i <= 2; i++) {
         const seedExtra = Math.floor(Math.random() * 999999);
         const promptMontado = `${estiloObj.promptEn} for company named "${empresaNome}", niche ${segmento} in ${cidade} Brazil, brand color accent ${corPrimariaHex}, variation ${i}, seed ${seedExtra}`;
-        const url = gerarUrlPollinationsFlux(promptMontado, 800, 800);
+        const url = gerarUrlPollinationsFlux(promptMontado, 800, 800, {
+          model: modeloFluxLogo,
+          enhance: enhanceLogo,
+          seed: seedExtra,
+        });
 
         novosItens.push({
           id: `logo_${Date.now()}_${i}`,
           url,
-          estilo: estiloObj.nome,
+          estilo: `${estiloObj.nome} (${modeloFluxLogo.toUpperCase()})`,
           prompt: promptMontado,
           criadoEm: new Date().toISOString(),
+          tipoFormato: "imagem_flux",
+          modeloUsado: modeloFluxLogo,
         });
       }
 
       const listaAtualizada = [...novosItens, ...logos];
       setLogos(listaAtualizada);
       onSalvarLogos?.(listaAtualizada);
-      toast.success(`2 novas opções de logotipo conceituais geradas para ${empresaNome}!`);
+      toast.success(`2 opções de logotipo conceituais geradas com ${modeloFluxLogo.toUpperCase()}!`);
     } catch {
       toast.error("Erro ao gerar opções de logotipo.");
     } finally {
@@ -206,7 +322,7 @@ export function GeradorIdentidadeVisual({
     }
   };
 
-  // GERAÇÃO DE MATERIAL DE ESCRITÓRIO COM IA (FLUX.1)
+  // 3. GERAÇÃO DE MATERIAL DE ESCRITÓRIO COM IA (FLUX-3D / FLUX-REALISM)
   const handleGerarMaterial = () => {
     setGerandoMaterial(true);
     try {
@@ -215,15 +331,19 @@ export function GeradorIdentidadeVisual({
         TIPOS_MATERIAL_ESCRITORIO[0];
 
       const promptFinal = materialObj.promptEn(empresaNome, segmento, cidade, corPrimariaHex);
-      const url = gerarUrlPollinationsFlux(promptFinal, 1200, 800);
+      const url = gerarUrlPollinationsFlux(promptFinal, 1200, 800, {
+        model: modeloMaterial,
+        enhance: enhanceMaterial,
+      });
 
       const novoItem: MaterialEscritorioItem = {
         id: `mat_${Date.now()}`,
         url,
         tipo: materialObj.id,
-        titulo: materialObj.titulo,
+        titulo: `${materialObj.titulo} (${modeloMaterial.toUpperCase()})`,
         prompt: promptFinal,
         criadoEm: new Date().toISOString(),
+        modeloUsado: modeloMaterial,
       };
 
       const listaAtualizada = [novoItem, ...materiais];
@@ -251,7 +371,21 @@ export function GeradorIdentidadeVisual({
     toast.info("Item de papelaria removido.");
   };
 
-  const handleDownload = async (url: string, nomeArquivo: string) => {
+  const handleDownload = async (url: string, nomeArquivo: string, svgCode?: string) => {
+    if (svgCode) {
+      const blob = new Blob([svgCode], { type: "image/svg+xml;charset=utf-8" });
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `${nomeArquivo}.svg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+      toast.success(`Download de ${nomeArquivo}.svg concluído!`);
+      return;
+    }
+
     try {
       const res = await fetch(url);
       const blob = await res.blob();
@@ -274,6 +408,11 @@ export function GeradorIdentidadeVisual({
     toast.success("URL da imagem copiada para a área de transferência!");
   };
 
+  const handleCopiarSvgCode = (svgCode: string) => {
+    navigator.clipboard.writeText(svgCode);
+    toast.success("Código SVG copiado para a área de transferência!");
+  };
+
   return (
     <Card className="border-border/80 shadow-xs">
       <CardHeader className="pb-3 border-b bg-muted/10">
@@ -284,12 +423,17 @@ export function GeradorIdentidadeVisual({
                 <PenTool className="h-4 w-4 text-primary" />
                 <span>Gerador de Logotipos & Material de Escritório por IA</span>
               </CardTitle>
-              <Badge variant="secondary" className="text-[10px] font-mono">
-                FLUX.1 Engine
-              </Badge>
+              <div className="flex items-center gap-1.5">
+                <Badge variant="secondary" className="text-[10px] font-mono">
+                  FLUX.1 + Realism + 3D
+                </Badge>
+                <Badge variant="outline" className="text-[10px] font-mono text-emerald-600 border-emerald-500/30 bg-emerald-500/5">
+                  SVG Vetorial LLM
+                </Badge>
+              </div>
             </div>
             <CardDescription className="text-xs text-muted-foreground">
-              Crie identidades visuais completas, marcas registradas e mockups de papelaria corporativa
+              Crie logotipos vetoriais sem perda de qualidade, marcas conceituais e mockups de papelaria corporativa
               para {empresaNome}.
             </CardDescription>
           </div>
@@ -321,55 +465,168 @@ export function GeradorIdentidadeVisual({
         {/* ======================================================== */}
         {subAba === "logos" && (
           <div className="space-y-4">
-            {/* CONTROLES DO GERADOR DE LOGOS */}
-            <div className="flex flex-wrap items-center gap-3 bg-muted/20 p-3 rounded-lg border border-border/70">
-              <div className="flex-1 min-w-[240px] space-y-1">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+            {/* SELETOR DE MODO DO LOGO: SVG VETORIAL VS FLUX IMAGEM */}
+            <div className="flex items-center gap-2 pb-1 border-b border-border/60">
+              <span className="text-xs font-semibold text-muted-foreground">Tecnologia de Geração:</span>
+              <div className="inline-flex rounded-lg p-0.5 bg-muted/60 border border-border/80">
+                <button
+                  type="button"
+                  onClick={() => setModoLogo("svg")}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${
+                    modoLogo === "svg"
+                      ? "bg-background text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Code2 className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>Logotipo Vetorial SVG (Recomendado)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModoLogo("flux")}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${
+                    modoLogo === "flux"
+                      ? "bg-background text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
                   <Sparkles className="h-3.5 w-3.5 text-primary" />
-                  <span>Estilo do Logotipo:</span>
-                </label>
-                <Select
-                  value={estiloLogoSelecionado}
-                  onValueChange={setEstiloLogoSelecionado}
-                >
-                  <SelectTrigger className="h-8 text-xs bg-background">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ESTILOS_LOGO.map((est) => (
-                      <SelectItem key={est.id} value={est.id} className="text-xs">
-                        <div className="space-y-0.5">
-                          <p className="font-semibold">{est.nome}</p>
-                          <p className="text-[10px] text-muted-foreground">{est.desc}</p>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center gap-2 pt-5">
-                <Button
-                  size="sm"
-                  onClick={handleGerarLogos}
-                  disabled={gerandoLogo}
-                  className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground shadow-xs"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${gerandoLogo ? "animate-spin" : ""}`} />
-                  <span>{gerandoLogo ? "Criando Conceitos..." : "Gerar Opções de Logo"}</span>
-                </Button>
-
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setFundoEscuro(!fundoEscuro)}
-                  className="h-8 text-xs"
-                  title="Inverter contraste de fundo para testar visibilidade"
-                >
-                  {fundoEscuro ? "☀️ Fundo Claro" : "🌙 Fundo Escuro"}
-                </Button>
+                  <span>Conceito Visual FLUX.1 (Imagens)</span>
+                </button>
               </div>
             </div>
+
+            {/* CONTROLES CONFORME O MODO SELECIONADO */}
+            {modoLogo === "svg" ? (
+              <div className="flex flex-wrap items-center gap-3 bg-emerald-500/5 p-3 rounded-lg border border-emerald-500/20">
+                <div className="flex-1 min-w-[260px] space-y-1">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Code2 className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>Formato da Composição Vetorial SVG:</span>
+                  </label>
+                  <Select
+                    value={estiloLogoSvg}
+                    onValueChange={setEstiloLogoSvg}
+                  >
+                    <SelectTrigger className="h-8 text-xs bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ESTILOS_LOGO_SVG.map((est) => (
+                        <SelectItem key={est.id} value={est.id} className="text-xs">
+                          <div className="space-y-0.5">
+                            <p className="font-semibold">{est.nome}</p>
+                            <p className="text-[10px] text-muted-foreground">{est.desc}</p>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-2 pt-5">
+                  <Button
+                    size="sm"
+                    onClick={handleGerarLogoSvg}
+                    disabled={gerandoLogo}
+                    className="h-8 text-xs gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs"
+                  >
+                    <Wand2 className={`h-3.5 w-3.5 ${gerandoLogo ? "animate-spin" : ""}`} />
+                    <span>{gerandoLogo ? "Criando Código SVG..." : "Gerar Logo Vetorial com IA"}</span>
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setFundoEscuro(!fundoEscuro)}
+                    className="h-8 text-xs"
+                    title="Alternar contraste de fundo"
+                  >
+                    {fundoEscuro ? "☀️ Fundo Claro" : "🌙 Fundo Escuro"}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-3 bg-muted/20 p-3 rounded-lg border border-border/70">
+                <div className="flex-1 min-w-[220px] space-y-1">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    <span>Estilo Conceitual:</span>
+                  </label>
+                  <Select
+                    value={estiloLogoFlux}
+                    onValueChange={setEstiloLogoFlux}
+                  >
+                    <SelectTrigger className="h-8 text-xs bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ESTILOS_LOGO_FLUX.map((est) => (
+                        <SelectItem key={est.id} value={est.id} className="text-xs">
+                          <div className="space-y-0.5">
+                            <p className="font-semibold">{est.nome}</p>
+                            <p className="text-[10px] text-muted-foreground">{est.desc}</p>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="w-[180px] space-y-1">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Layers className="h-3.5 w-3.5 text-blue-500" />
+                    <span>Modelo de IA:</span>
+                  </label>
+                  <Select
+                    value={modeloFluxLogo}
+                    onValueChange={(val: any) => setModeloFluxLogo(val)}
+                  >
+                    <SelectTrigger className="h-8 text-xs bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MODELOS_POLLINATIONS.map((mod) => (
+                        <SelectItem key={mod.id} value={mod.id} className="text-xs">
+                          {mod.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-2 pt-5">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-muted-foreground mr-1">
+                    <Checkbox
+                      checked={enhanceLogo}
+                      onCheckedChange={(c) => setEnhanceLogo(c === true)}
+                      className="h-3.5 w-3.5"
+                    />
+                    <span>Enhance com IA</span>
+                  </label>
+
+                  <Button
+                    size="sm"
+                    onClick={handleGerarLogosFlux}
+                    disabled={gerandoLogo}
+                    className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground shadow-xs"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${gerandoLogo ? "animate-spin" : ""}`} />
+                    <span>{gerandoLogo ? "Criando Conceitos..." : "Gerar Opções FLUX"}</span>
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setFundoEscuro(!fundoEscuro)}
+                    className="h-8 text-xs"
+                    title="Alternar contraste de fundo"
+                  >
+                    {fundoEscuro ? "☀️ Fundo Claro" : "🌙 Fundo Escuro"}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* STATUS DO LOGO ATIVO */}
             {logoAtivoUrl && (
@@ -384,7 +641,7 @@ export function GeradorIdentidadeVisual({
                   <img
                     src={logoAtivoUrl}
                     alt="Logo Ativo"
-                    className="h-7 w-auto max-w-[80px] object-contain rounded bg-white p-0.5 border"
+                    className="h-7 w-auto max-w-[100px] object-contain rounded bg-white p-0.5 border"
                   />
                 </div>
               </div>
@@ -395,6 +652,8 @@ export function GeradorIdentidadeVisual({
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 pt-1">
                 {logos.map((item) => {
                   const ehAtivo = logoAtivoUrl === item.url;
+                  const ehSvg = item.tipoFormato === "svg_vetorial" || !!item.svgCode;
+
                   return (
                     <div
                       key={item.id}
@@ -402,19 +661,33 @@ export function GeradorIdentidadeVisual({
                         ehAtivo
                           ? "border-primary ring-2 ring-primary/20 shadow-md"
                           : "border-border/70 hover:border-border hover:shadow-sm"
-                      } ${fundoEscuro ? "bg-stone-900" : "bg-white"}`}
+                      } ${fundoEscuro ? "bg-stone-900 text-white" : "bg-white text-stone-900"}`}
                     >
-                      {/* IMAGEM DO LOGO */}
+                      {/* IMAGEM OU SVG DO LOGO */}
                       <div className="aspect-square p-4 flex items-center justify-center relative overflow-hidden">
-                        <img
-                          src={item.url}
-                          alt={`${empresaNome} - ${item.estilo}`}
-                          className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
-                          loading="lazy"
-                        />
+                        {ehSvg && item.svgCode ? (
+                          <div
+                            className="w-full h-full flex items-center justify-center [&>svg]:w-full [&>svg]:h-full [&>svg]:max-h-full [&>svg]:object-contain"
+                            dangerouslySetInnerHTML={{ __html: item.svgCode }}
+                          />
+                        ) : (
+                          <img
+                            src={item.url}
+                            alt={`${empresaNome} - ${item.estilo}`}
+                            className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
+                            loading="lazy"
+                          />
+                        )}
+
                         <button
                           type="button"
-                          onClick={() => setImagemModal({ url: item.url, titulo: `${empresaNome} - ${item.estilo}` })}
+                          onClick={() =>
+                            setImagemModal({
+                              url: item.url,
+                              titulo: `${empresaNome} - ${item.estilo}`,
+                              svgCode: item.svgCode,
+                            })
+                          }
                           className="absolute top-2 right-2 p-1.5 rounded-md bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
                           title="Ampliar logo"
                         >
@@ -428,11 +701,18 @@ export function GeradorIdentidadeVisual({
                           <span className="text-[11px] font-semibold truncate text-foreground">
                             {item.estilo}
                           </span>
-                          {ehAtivo && (
-                            <Badge variant="default" className="text-[9px] px-1.5 py-0 h-4 bg-emerald-600 text-white">
-                              Oficial
-                            </Badge>
-                          )}
+                          <div className="flex items-center gap-1 shrink-0">
+                            {ehSvg && (
+                              <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-emerald-500/40 text-emerald-600 bg-emerald-500/5">
+                                SVG
+                              </Badge>
+                            )}
+                            {ehAtivo && (
+                              <Badge variant="default" className="text-[8px] px-1.5 py-0 h-3.5 bg-emerald-600 text-white">
+                                Oficial
+                              </Badge>
+                            )}
+                          </div>
                         </div>
 
                         <div className="flex items-center gap-1 pt-1">
@@ -440,34 +720,57 @@ export function GeradorIdentidadeVisual({
                             <Button
                               size="sm"
                               variant={ehAtivo ? "secondary" : "default"}
-                              onClick={() => onDefinirComoLogoOficial(item.url, `logo-${empresaNome.toLowerCase().replace(/\s+/g, "-")}.png`)}
+                              onClick={() =>
+                                onDefinirComoLogoOficial(
+                                  item.url,
+                                  `logo-${empresaNome.toLowerCase().replace(/\s+/g, "-")}.${ehSvg ? "svg" : "png"}`,
+                                )
+                              }
                               className="h-7 text-[11px] flex-1 gap-1 px-2"
                               title="Usar este logo no site e cabeçalho"
                             >
                               <CheckCircle2 className="h-3 w-3" />
-                              <span>{ehAtivo ? "Logo Ativo" : "Definir Oficial"}</span>
+                              <span>{ehAtivo ? "Ativo" : "Definir Oficial"}</span>
                             </Button>
                           )}
 
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleDownload(item.url, `logo-${empresaNome.toLowerCase().replace(/\s+/g, "-")}`)}
+                            onClick={() =>
+                              handleDownload(
+                                item.url,
+                                `logo-${empresaNome.toLowerCase().replace(/\s+/g, "-")}`,
+                                item.svgCode,
+                              )
+                            }
                             className="h-7 w-7 p-0 shrink-0"
-                            title="Baixar em Alta Resolução"
+                            title={ehSvg ? "Baixar arquivo .SVG vetorial" : "Baixar em Alta Resolução"}
                           >
                             <Download className="h-3 w-3" />
                           </Button>
 
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleCopiarUrl(item.url)}
-                            className="h-7 w-7 p-0 shrink-0 text-muted-foreground hover:text-foreground"
-                            title="Copiar URL direta"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </Button>
+                          {ehSvg && item.svgCode ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleCopiarSvgCode(item.svgCode!)}
+                              className="h-7 w-7 p-0 shrink-0 text-emerald-600 hover:text-emerald-700"
+                              title="Copiar código SVG puro"
+                            >
+                              <Code2 className="h-3 w-3" />
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleCopiarUrl(item.url)}
+                              className="h-7 w-7 p-0 shrink-0 text-muted-foreground hover:text-foreground"
+                              title="Copiar URL direta"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                          )}
 
                           <Button
                             size="sm"
@@ -489,7 +792,7 @@ export function GeradorIdentidadeVisual({
                 <PenTool className="h-8 w-8 text-muted-foreground mx-auto opacity-40" />
                 <p className="text-xs font-semibold text-foreground">Nenhuma opção de logotipo gerada ainda</p>
                 <p className="text-[11px] text-muted-foreground max-w-md mx-auto">
-                  Selecione o estilo desejado no topo e clique em <strong>"Gerar Opções de Logo"</strong> para criar marcas conceituais de alto impacto com IA.
+                  Selecione a tecnologia desejada no topo (SVG Vetorial puro ou FLUX.1) e clique para gerar marcas conceituais de alto impacto para {empresaNome}.
                 </p>
               </div>
             )}
@@ -503,7 +806,7 @@ export function GeradorIdentidadeVisual({
           <div className="space-y-4">
             {/* CONTROLES DO MATERIAL DE ESCRITÓRIO */}
             <div className="flex flex-wrap items-center gap-3 bg-muted/20 p-3 rounded-lg border border-border/70">
-              <div className="flex-1 min-w-[260px] space-y-1">
+              <div className="flex-1 min-w-[240px] space-y-1">
                 <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                   <Briefcase className="h-3.5 w-3.5 text-primary" />
                   <span>Peça de Escritório & Mockup:</span>
@@ -528,7 +831,38 @@ export function GeradorIdentidadeVisual({
                 </Select>
               </div>
 
-              <div className="pt-5">
+              <div className="w-[180px] space-y-1">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <Layers className="h-3.5 w-3.5 text-blue-500" />
+                  <span>Modelo de IA:</span>
+                </label>
+                <Select
+                  value={modeloMaterial}
+                  onValueChange={(val: any) => setModeloMaterial(val)}
+                >
+                  <SelectTrigger className="h-8 text-xs bg-background">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MODELOS_POLLINATIONS.map((mod) => (
+                      <SelectItem key={mod.id} value={mod.id} className="text-xs">
+                        {mod.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-2 pt-5">
+                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-muted-foreground mr-1">
+                  <Checkbox
+                    checked={enhanceMaterial}
+                    onCheckedChange={(c) => setEnhanceMaterial(c === true)}
+                    className="h-3.5 w-3.5"
+                  />
+                  <span>Enhance com IA</span>
+                </label>
+
                 <Button
                   size="sm"
                   onClick={handleGerarMaterial}
@@ -634,12 +968,19 @@ export function GeradorIdentidadeVisual({
             </DialogTitle>
           </DialogHeader>
           {imagemModal && (
-            <div className="flex items-center justify-center p-2 min-h-[400px]">
-              <img
-                src={imagemModal.url}
-                alt={imagemModal.titulo}
-                className="max-h-[75vh] w-auto max-w-full object-contain rounded-md"
-              />
+            <div className="flex items-center justify-center p-4 min-h-[400px]">
+              {imagemModal.svgCode ? (
+                <div
+                  className="w-full max-h-[75vh] flex items-center justify-center [&>svg]:max-w-full [&>svg]:max-h-[70vh] bg-stone-900/50 p-6 rounded-lg"
+                  dangerouslySetInnerHTML={{ __html: imagemModal.svgCode }}
+                />
+              ) : (
+                <img
+                  src={imagemModal.url}
+                  alt={imagemModal.titulo}
+                  className="max-h-[75vh] w-auto max-w-full object-contain rounded-md"
+                />
+              )}
             </div>
           )}
         </DialogContent>
