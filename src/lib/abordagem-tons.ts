@@ -1,6 +1,7 @@
 import type { EmpresaCtx } from "./ai.functions";
 
 export type TomAbordagemId =
+  | "primeiro_contato_pdf"
   | "amigavel_elogio"
   | "consultivo_parceiro"
   | "descontraido_curioso"
@@ -25,18 +26,28 @@ export interface TomAbordagemItem {
 
 export const TONS_ABORDAGEM: TomAbordagemItem[] = [
   {
-    id: "amigavel_elogio",
-    nome: "1. Amigável & Elogio Genuíno",
-    subtitulo: "Rapport caloroso e valorização da qualidade do cliente",
-    descricao: "Começa elogiando sinceramente o trabalho ou reputação da empresa na cidade. Quebra a barreira defensiva logo na primeira linha.",
-    icone: "Sparkles",
+    id: "primeiro_contato_pdf",
+    nome: "1. Primeiro Contato (Levantamento em PDF)",
+    subtitulo: "Abertura respeitosa com palavras-chave do diagnóstico e envio de PDF",
+    descricao: "Zero bajulação, sem emojis e sem travessões. Cita pesquisas reais da cidade e pede permissão para enviar o levantamento em PDF.",
+    icone: "FileText",
     tagline: "Recomendado para 1º Contato",
-    canalRecomendado: "WhatsApp & Instagram Direct",
+    canalRecomendado: "WhatsApp & E-mail",
     badgeCls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
   },
   {
+    id: "amigavel_elogio",
+    nome: "2. Amigável & Reconhecimento Local",
+    subtitulo: "Rapport caloroso e consideração pela atuação do cliente",
+    descricao: "Menciona a atuação da empresa no setor sem bajulação forçada, quebrando a barreira inicial com simpatia e respeito.",
+    icone: "Sparkles",
+    tagline: "Rapport Acolhedor",
+    canalRecomendado: "WhatsApp & Instagram Direct",
+    badgeCls: "bg-teal-500/10 text-teal-600 border-teal-500/30",
+  },
+  {
     id: "consultivo_parceiro",
-    nome: "2. Consultivo & Parceiro Regional",
+    nome: "3. Consultivo & Parceiro Regional",
     subtitulo: "Troca de ideias entre empreendedores da mesma região",
     descricao: "Postura de parceiro estratégico que identificou oportunidades de mercado na região e quer compartilhar insights sem forçar venda.",
     icone: "Users",
@@ -147,9 +158,55 @@ export function gerarTextoProntoPorTom(
   const seg = empresa.segmento || "produtos e serviços";
   const auditLink = `https://locomotivacrm.com.br/auditoria/${empresa.id}`;
 
+  const termosArray = (empresa.termosEncontrados || empresa.buscasPartida || "")
+    .split(/[\n,;]+/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const termo1 = termosArray[0] || `${seg} em ${cid}`;
+  const termo2 = termosArray[1] || `${seg} na região`;
+
   // =========================================================================
-  // 1. TOM: AMIGÁVEL & ELOGIO GENUÍNO (CALOROSO / HUMANIZADO)
+  // 1. TOM: PRIMEIRO CONTATO (LEVANTAMENTO EM PDF) - RECOMENDADO BASE
   // =========================================================================
+  if (tom === "primeiro_contato_pdf") {
+    switch (canal) {
+      case "whatsapp":
+        return {
+          ganchoAbertura: `Levantamento de busca por ${termo1} em ${cid}`,
+          dicaEnvio: "Envie no horário comercial. Texto sóbrio e sem emojis. Ao receber confirmação, envie o PDF gerado nos slides.",
+          texto: `Olá, tudo bem?\n\nMe chamo [Seu Nome], atuo com análise de mercado na ${agencia} aqui na Serra Gaúcha.\n\nEstávamos concluindo um levantamento sobre a procura no Google por '${termo1}' e '${termo2}' em ${cid}, e acompanhando as empresas do setor, identifiquei a atuação da ${nome}.\n\nMapeamos como os clientes da nossa região estão pesquisando esses serviços hoje e reunimos essas observações em um documento resumido em PDF, com dados práticos sobre a presença digital e a demanda do setor.\n\nPosso te enviar o arquivo por aqui para você dar uma olhada quando tiver um momento?\n\nUm abraço,\n[Seu Nome]\n${agencia}`,
+        };
+
+      case "instagram":
+        return {
+          ganchoAbertura: `Levantamento de procura por ${termo1} em ${cid}`,
+          dicaEnvio: "Mensagem direta no direct, convidando educadamente para o envio do PDF no WhatsApp.",
+          texto: `Olá, tudo bem?\n\nSou o [Seu Nome], da ${agencia} aqui na serra. Concluímos recentemente um levantamento sobre a procura no Google por '${termo1}' em ${cid} e reunimos os dados em um PDF com a análise de presença digital do setor.\n\nQual seria o melhor WhatsApp de vocês para eu te enviar esse material para darem uma olhada?\n\nUm abraço,\n[Seu Nome]`,
+        };
+
+      case "email":
+        return {
+          assunto: `Levantamento de busca local em ${cid}: procura por ${termo1} e presença digital da ${nome}`,
+          ganchoAbertura: `Levantamento sobre a busca por ${termo1} em ${cid}`,
+          dicaEnvio: "Anexe o PDF da apresentação de slides no e-mail ou proponha o envio.",
+          texto: `Olá, tudo bem com você?\n\nMe chamo [Seu Nome] e atuo na área de inteligência de mercado da ${agencia}, aqui na Serra Gaúcha.\n\nNossa equipe concluiu recentemente um estudo sobre o comportamento de busca dos clientes de ${cid} que procuram por '${termo1}' e '${termo2}' no Google. Durante o mapeamento das empresas da região, analisamos a presença digital da ${nome}.\n\nSintetizamos os principais dados em um relatório resumido em PDF, mostrando os termos mais pesquisados e oportunidades claras para melhorar a visibilidade e o canal de atendimento no WhatsApp.\n\nPosso te enviar esse arquivo por aqui ou por WhatsApp para você avaliar com a sua equipe?\n\nAtenciosamente,\n[Seu Nome]\n${agencia} - Serra Gaúcha`,
+        };
+
+      case "ligacaoReuniao":
+        return {
+          ganchoAbertura: `Olá, tudo bem? Me chamo [Seu Nome], da ${agencia}.`,
+          dicaEnvio: "Fale com clareza e ritmo pausado ao telefone.",
+          texto: `Olá, tudo bem? Meu nome é [Seu Nome], da ${agencia} aqui na região. Estou ligando com brevidade porque concluímos um levantamento sobre a procura por '${termo1}' no Google aqui em ${cid}. Mapeamos como os clientes estão pesquisando e reunimos esses dados em um documento resumido em PDF. Gostaria de confirmar o seu melhor e-mail ou WhatsApp para eu te enviar esse material sem compromisso.`,
+        };
+
+      case "propostaValor360":
+        return {
+          ganchoAbertura: `Levantamento de presença digital e posicionamento estratégico da ${nome}`,
+          dicaEnvio: "Apresentação consultiva para envio junto ao PDF oficial.",
+          texto: `LEVANTAMENTO ESTRATÉGICO DE PRESENÇA DIGITAL\nEMPRESA: ${nome.toUpperCase()} (${cid}/RS)\n\nEste documento reúne a análise técnica da presença digital e a demanda de busca mapeada para '${termo1}' e '${termo2}' no Google na região da Serra Gaúcha, com recomendações práticas para estruturação do canal comercial e atração de novos clientes.`,
+        };
+    }
+  }
   if (tom === "amigavel_elogio") {
     switch (canal) {
       case "whatsapp":

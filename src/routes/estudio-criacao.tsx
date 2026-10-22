@@ -94,6 +94,7 @@ export const Route = createFileRoute("/estudio-criacao")({
 
 const TIPOS_PROMPTS = [
   { value: "anti_ia_master", label: "Prompt Base Anti-IA (GSAP Master)" },
+  { value: "abordagem_primeiro_contato", label: "Prompt Base Abordagem (Primeiro Contato + PDF)" },
   { value: "site_geral", label: "Briefing de Arquitetura & UX" },
   { value: "copy_vendas", label: "Copywriting de Conversão (Sem Clichês)" },
   { value: "google_ads", label: "Campanha Google Ads (Busca Local)" },
@@ -736,6 +737,43 @@ Tom de voz humano, direto e focado em benefícios reais. Sem jargões de IA.
 - Resumo do Lead: ${relatorioLead.resumo || "Presença digital necessita de autoridade e acabamento nobre."}
 
 Gere o código HTML5 completo do site ONE-PAGE cinematográfico pronto para produção com todas as seções e imagens geradas por FLUX.1.`;
+    }
+
+    if (tipo === "abordagem_primeiro_contato") {
+      const termosDiag = (empresa.termosEncontrados || empresa.buscasPartida || `${empresa.segmento} em ${empresa.cidade}`).replace(/\n/g, ", ");
+      return `[Contexto do Sistema]
+Você é um consultor e estrategista da Locomotiva Comunicação, agência de comunicação e tecnologia da Serra Gaúcha (RS).
+Sua missão é redigir uma mensagem de PRIMEIRO CONTATO com um potencial cliente (${empresa.nome}, em ${empresa.cidade}/RS, do segmento de ${empresa.segmento}).
+
+[Diretrizes Rígidas de Redação e Tom de Voz - Prompt Base Anti-Vício de I.A.]
+1. ZERO PUXA-SAQUISMO E ZERO ELOGIOS FORÇADOS:
+   - Você NÃO conhece o trabalho da empresa a fundo e nunca comprou deles.
+   - É expressamente proibido tecer elogios exagerados ou bajulações (proibido dizer "admiro seu trabalho impecável", "fiquei encantado com a qualidade", "vocês são os melhores da cidade").
+   - Mantenha uma postura honesta, profissional, sóbria e cordial: mencione apenas que acompanha o mercado local e identificou a atuação da empresa no segmento em que ela atua.
+
+2. PROIBIÇÃO ABSOLUTA DE VÍCIOS DE I.A. (SEM EMOJIS E SEM TRAVESSÕES):
+   - PROIBIDO O USO DE QUALQUER EMOJI OU EMOTICON: Não utilize nenhum emoji no texto (zero emojis, nada de emojis ou emoticons).
+   - PROIBIDO O USO DE TRAVESSÕES: Não use travessões ("—" ou "--") no meio ou no fim de frases. Utilize pontuação humana natural: vírgula, ponto final ou quebra de linha.
+   - PROIBIDO O USO DE JARGÕES CORPORATIVOS VAZIOS: Banidas expressões como "espero que esta mensagem o encontre bem", "venho por meio desta", "alavancar", "no mundo dinâmico de hoje", "revolucionário".
+   - Não utilize listas com marcadores artificiais nem formatação excessiva em negrito.
+
+3. CONEXÃO COM AS PALAVRAS-CHAVE DA ABA DIAGNÓSTICO:
+   - Cite com naturalidade 1 ou 2 termos reais de busca no Google levantados no diagnóstico (${termosDiag}) que os clientes utilizam para encontrar o serviço na cidade.
+   - Mostre que foi realizado um levantamento sobre como o público local pesquisa na internet por esses serviços na região.
+
+4. OBJETIVO ÚNICO: ABRIR CANAL E ENVIAR O PDF DO LEVANTAMENTO:
+   - Não tente vender nada na primeira mensagem, não mencione preços e não force reuniões de uma hora.
+   - O intuito exclusivo é abrir um canal amigável de conversa e pedir autorização para enviar o documento em PDF gerado na apresentação de slides (Levantamento sobre a presença digital e comunicação da empresa na região).
+   - Fechamento leve e educado pedindo permissão para o envio do arquivo.
+
+[Dados do Lead]
+- Empresa: ${empresa.nome}
+- Cidade: ${empresa.cidade}/RS (Serra Gaúcha)
+- Segmento: ${empresa.areaAtuacao || empresa.segmento}
+- Palavras-chave do Diagnóstico: ${termosDiag}
+- Situação da Presença: ${empresa.site ? "Possui site" : "Sem site próprio"} · Instagram: ${empresa.instagram || "Sem arroba informado"}
+
+Escreva agora a mensagem pronta para envio no WhatsApp.`;
     }
 
     if (tipo === "site_geral") {

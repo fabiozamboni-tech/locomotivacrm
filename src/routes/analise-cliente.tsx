@@ -204,7 +204,7 @@ function AnaliseClientePage() {
 
   // Estados de Tons de Abordagem Amigáveis & IA (awesome-free-llm-apis)
   const gerarAbordagemIAFn = useServerFn(gerarAbordagemAmigavelIA_ServerFn);
-  const [tomAbordagem, setTomAbordagem] = useState<TomAbordagemId>("amigavel_elogio");
+  const [tomAbordagem, setTomAbordagem] = useState<TomAbordagemId>("primeiro_contato_pdf");
   const [provedorIaAbordagem, setProvedorIaAbordagem] = useState<ProvedorIaTipo>("auto");
   const [instrucaoIaAbordagem, setInstrucaoIaAbordagem] = useState("");
   const [gerandoAbordagemIA, setGerandoAbordagemIA] = useState(false);
@@ -400,6 +400,18 @@ function AnaliseClientePage() {
     if (!empresa) return;
     setGerandoAbordagemIA(true);
     try {
+      // Coleta palavras-chave reais da aba Diagnóstico
+      const termosDiag: string[] = [];
+      if (empresa.termosEncontrados) {
+        termosDiag.push(...empresa.termosEncontrados.split(/[\n,;]+/));
+      }
+      if (empresa.buscasPartida) {
+        termosDiag.push(...empresa.buscasPartida.split(/[\n,;]+/));
+      }
+      if (resRelatorio?.seo?.termos) {
+        termosDiag.push(...resRelatorio.seo.termos.map((t) => t.termo));
+      }
+
       const res = await gerarAbordagemIAFn({
         data: {
           empresa: toCtx(empresa),
@@ -407,6 +419,8 @@ function AnaliseClientePage() {
           tom: tomAbordagem,
           provedor: provedorIaAbordagem,
           instrucaoCustomizada: instrucaoIaAbordagem,
+          palavrasChave: termosDiag.map((t) => t.trim()).filter(Boolean),
+          diagnosticoResumo: resRelatorio?.relatorio?.resumoExecutivo || undefined,
         },
       });
 
@@ -1458,6 +1472,7 @@ function AnaliseClientePage() {
                           <div className="space-y-1">
                             <div className="flex items-center justify-between gap-1">
                               <span className="text-xs font-bold leading-tight flex items-center gap-1.5">
+                                {t.id === "primeiro_contato_pdf" && <FileText className="h-3.5 w-3.5 text-emerald-500 shrink-0" />}
                                 {t.id === "amigavel_elogio" && <HeartHandshake className="h-3.5 w-3.5 text-rose-500 shrink-0" />}
                                 {t.id === "consultivo_parceiro" && <Users className="h-3.5 w-3.5 text-blue-500 shrink-0" />}
                                 {t.id === "descontraido_curioso" && <Coffee className="h-3.5 w-3.5 text-amber-500 shrink-0" />}
