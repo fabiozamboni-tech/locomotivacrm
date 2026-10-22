@@ -704,17 +704,20 @@ Paleta de Cores e Tipografia: Combinação contida de no máximo 3 cores e hiera
 Crie um design moderno com Tailwind CSS, 100% responsivo e elegante.`
 }
 
-[Estrutura e Elementos Obrigatórios - Site Completo Multi-Páginas]
-1. Home / Início (Hero de alto impacto, Proposta de Valor e CTA direto).
-2. Quem Somos / Sobre a Empresa (História, fundação e autoridade local).
-3. Serviços & Especialidades (Catálogo detalhado de soluções e benefícios).
-4. Portfólio / Projetos Realizados (Galeria de casos de sucesso).
+[Estrutura e Elementos Obrigatórios - Formato ONE-PAGE (Landing Page Cinematográfica)]
+1. Home / Hero de alto impacto (Aceternity Spotlight, shadcn/ui badge, SplitType TextGenerateEffect e CTA direto para WhatsApp).
+2. Quem Somos / Sobre a Empresa (História autêntica, valores e autoridade local).
+3. Serviços & Especialidades (Catálogo detalhado de soluções, benefícios técnicos e cards minimalistas).
+4. Portfólio / Projetos Realizados (Galeria de casos de sucesso com imagens geradas por IA via FLUX.1).
 5. Diferenciais, Normas Técnicas & Garantias.
 6. Contato, Localização & Orçamento (Formulário e link de WhatsApp).
 
-[Animações e Interatividade]
-GSAP Integrado: Toda a camada de animação deve ser controlada via GSAP e ScrollTrigger.
-Parallax suave nas imagens de transição de seção.
+[Experiência Scroll-Driven e Bibliotecas Visuais]
+- GSAP + ScrollTrigger + Lenis: rolagem cinematográfica a 60fps sincronizada.
+- SplitType (~3kb): divisão de títulos por caracteres/palavras com TextGenerateEffect.
+- Aceternity UI: Spotlight na Hero e texturas sutis de fundo.
+- shadcn/ui: Badges minimalistas em pílula, cards elegantes e tipografia precisa.
+- FLUX.1: Imagens 100% ativas via https://image.pollinations.ai/prompt/...
 
 [Texto e Conteúdo]
 Tom de voz humano, direto e focado em benefícios reais. Sem jargões de IA.
@@ -732,7 +735,7 @@ Tom de voz humano, direto e focado em benefícios reais. Sem jargões de IA.
 - Responsivo: ${diagnosticoSite.responsivo ? "Sim" : "Não"}
 - Resumo do Lead: ${relatorioLead.resumo || "Presença digital necessita de autoridade e acabamento nobre."}
 
-Gere o código HTML5 completo do site multi-páginas pronto para produção.`;
+Gere o código HTML5 completo do site ONE-PAGE cinematográfico pronto para produção com todas as seções e imagens geradas por FLUX.1.`;
     }
 
     if (tipo === "site_geral") {
@@ -1531,7 +1534,7 @@ Pilares de Conteúdo:
                   <div className="space-y-1">
                     <h3 className="text-base font-bold text-foreground">Nenhum site gerado para esta empresa ainda</h3>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Selecione o modelo de IA no painel à esquerda, confirme as diretrizes Anti-IA Bespoke e clique em <strong>"Gerar Novo Site"</strong> para criar um projeto completo com animações GSAP e navegação multi-páginas.
+                      Selecione o modelo de IA no painel à esquerda, confirme as diretrizes Anti-IA Bespoke e clique em <strong>"Gerar Novo Site"</strong> para criar um projeto cinematográfico One-Page com GSAP, Lenis, SplitType e tokens visuais shadcn/ui.
                     </p>
                   </div>
                   <Button
