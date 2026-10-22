@@ -147,6 +147,22 @@ export interface Empresa {
   estudioChatMensagens?: EstudioChatMessage[];
   estudioUsarAntiIaBespoke?: boolean;
   estudioUsarSkillsClaude?: boolean;
+  estudioMotorScroll?: "gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional";
+  estudioLogosGerados?: Array<{
+    id: string;
+    url: string;
+    estilo: string;
+    prompt: string;
+    criadoEm: string;
+  }>;
+  estudioMaterialEscritorioGerados?: Array<{
+    id: string;
+    url: string;
+    tipo: string;
+    titulo: string;
+    prompt: string;
+    criadoEm: string;
+  }>;
   // Diagnóstico
   diagnostico: {
     site: {

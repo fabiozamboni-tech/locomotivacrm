@@ -33,6 +33,7 @@ export interface GerarSiteInput {
   modeloPreferencial?: string;
   usarAntiIaBespoke?: boolean;
   usarSkillsClaude?: boolean;
+  motorScroll?: "gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional";
   skillsAdicionais?: Array<{ id: string; nome: string; prompt: string }>;
   customPromptOverride?: {
     promptSystem?: string;
@@ -72,6 +73,7 @@ export interface RefinarSiteInput {
   modeloPreferencial?: string;
   usarAntiIaBespoke?: boolean;
   usarSkillsClaude?: boolean;
+  motorScroll?: "gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional";
   skillsAdicionais?: Array<{ id: string; nome: string; prompt: string }>;
   logoBase64?: string;
   logoNomeArquivo?: string;
@@ -422,8 +424,10 @@ export function construirSiteEditorialAntiIa(
     instrucoesDesignMd?: string;
     diagnostico?: any;
     relatorio?: any;
+    motorScroll?: "gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional";
   },
 ): string {
+  const motor = opcoes?.motorScroll || "gsap_lenis_split";
   const whatsappNum = (empresa.whatsapp || empresa.telefone || "54999999999").replace(/\D/g, "");
   const whatsappLink = `https://wa.me/55${whatsappNum}?text=${encodeURIComponent(
     `Olá ${empresa.nome}! Conheci o trabalho de vocês e gostaria de solicitar um orçamento para o meu projeto.`,
@@ -579,7 +583,110 @@ export function construirSiteEditorialAntiIa(
     </div>
   </header>
 
-  <!-- HERO SECTION DE ALTO IMPACTO (DESIGN EDITORIAL + ACETERNITY SPOTLIGHT + SPLIT-TYPE) -->
+  ${
+    motor === "scrollcraft_canvas"
+      ? `<!-- HERO SECTION: SCROLLCRAFT CANVAS SCRUBBED STAGE (singhharsh1708/scrollcraft) -->
+  <section id="home" class="relative">
+    <div id="scrollcraft-pinned-container" class="relative h-[260vh] w-full">
+      <div class="sticky top-0 h-screen w-full overflow-hidden flex items-center justify-center bg-stone-950">
+        <!-- Canvas reativo e scrubbed 60fps -->
+        <canvas id="hero-canvas" class="absolute inset-0 w-full h-full object-cover opacity-85"></canvas>
+        <div class="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/40 to-transparent pointer-events-none"></div>
+
+        <!-- Overlays Narrativos em Etapas (Stepped Narrative Overlays) -->
+        <div class="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-white space-y-6">
+          <div id="step-card-1" class="step-card space-y-4">
+            <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-stone-500/60 bg-stone-900/80 backdrop-blur-md text-[11px] font-semibold text-stone-200 uppercase tracking-widest shadow-lg">
+              <span class="size-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>ScrollCraft Engine · ${area} · ${city}/RS</span>
+            </div>
+            <h1 class="split-title font-heading font-extrabold text-3xl sm:text-5xl lg:text-6xl tracking-tight leading-[1.1] text-white">
+              Precisão milimétrica e acabamento nobre para projetos singulares.
+            </h1>
+            <p class="text-sm sm:text-lg text-stone-300 max-w-2xl mx-auto font-normal leading-relaxed">
+              Role a página para explorar a estrutura e o detalhamento técnico em <strong>${city}</strong>.
+            </p>
+            <div class="pt-2">
+              <span class="text-xs text-stone-400 font-mono tracking-wider animate-bounce block">Role para baixo ⬇</span>
+            </div>
+          </div>
+
+          <div id="step-card-2" class="step-card hidden opacity-0 space-y-4">
+            <span class="text-xs font-mono font-bold uppercase tracking-widest text-emerald-400">Rigor Construtivo & Norma Técnica</span>
+            <h2 class="font-heading font-extrabold text-2xl sm:text-4xl lg:text-5xl tracking-tight text-white">
+              Materiais nobres com procedência garantida e entrega pontual.
+            </h2>
+            <p class="text-sm sm:text-base text-stone-300 max-w-xl mx-auto">
+              Cada etapa é supervisionada por quem entende do ofício e respeita seu investimento.
+            </p>
+          </div>
+
+          <div id="step-card-3" class="step-card hidden opacity-0 space-y-4">
+            <span class="text-xs font-mono font-bold uppercase tracking-widest text-amber-400">Atendimento Consultivo Direto</span>
+            <h2 class="font-heading font-extrabold text-2xl sm:text-4xl lg:text-5xl tracking-tight text-white">
+              Pronto para dar início ao seu projeto?
+            </h2>
+            <div class="pt-2">
+              <a href="${whatsappLink}" target="_blank" rel="noopener" class="px-8 py-4 bg-white text-ink text-xs font-bold uppercase tracking-widest hover:bg-stone-200 transition-all inline-flex items-center gap-2 shadow-xl">
+                <span>Falar no WhatsApp com o Especialista</span>
+                <i data-lucide="arrow-right" class="size-4 text-ink"></i>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>`
+      : motor === "scrollcraft_dimensional"
+      ? `<!-- HERO SECTION: SCROLL-CRAFT DIMENSIONAL SCROLLYTELLING (nateherkai/scroll-craft) -->
+  <section id="home" class="relative pt-12 pb-24 sm:pt-20 sm:pb-32 overflow-hidden bg-gradient-to-b from-[#FAF8F5] to-[#F4F1EA]">
+    <!-- Plano 1: Fundo Atmosférico com malha sutil (z-0) -->
+    <div class="pointer-events-none absolute inset-0 opacity-20 bg-[radial-gradient(#18181b_1px,transparent_1px)] [background-size:24px_24px] z-0"></div>
+    <div class="pointer-events-none absolute -top-40 right-10 opacity-25 blur-3xl w-[500px] h-[500px] bg-amber-500/30 rounded-full animate-pulse z-0"></div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+        <!-- Plano 3: Primeiro Plano com Oclusão Dimensional (z-20) -->
+        <div class="lg:col-span-7 z-20 space-y-6">
+          <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-stone-300 bg-white/80 backdrop-blur-md text-[11px] font-semibold text-stone-700 uppercase tracking-widest shadow-xs">
+            <span class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Dimensional Scrollytelling · ${area} · ${city}/RS</span>
+          </div>
+          <h1 class="split-title font-heading font-extrabold text-3xl sm:text-5xl lg:text-6xl text-ink tracking-tight leading-[1.08]">
+            Arquitetura e acabamento com profundidade tangível.
+          </h1>
+          <p class="text-base sm:text-lg text-stone-600 font-normal leading-relaxed max-w-xl">
+            Conhecimento técnico que se traduz em acabamentos refinados, segurança e valorização do seu imóvel em <strong>${city}</strong>.
+          </p>
+          <div class="flex flex-wrap items-center gap-4 pt-2">
+            <a href="${whatsappLink}" target="_blank" rel="noopener" class="px-7 py-3.5 bg-ink text-white text-xs font-bold uppercase tracking-wider hover:bg-stone-800 transition-all inline-flex items-center gap-2 shadow-sm">
+              <span>Iniciar Atendimento no WhatsApp</span>
+              <i data-lucide="arrow-right" class="size-4"></i>
+            </a>
+            <a href="#solucoes" class="px-7 py-3.5 border border-stone-300 text-stone-800 text-xs font-semibold uppercase tracking-wider hover:bg-stone-100 transition-colors">
+              Explorar Soluções
+            </a>
+          </div>
+        </div>
+
+        <!-- Plano 2: Sujeito Principal com Perspectiva e Sombra Espacial (z-10) -->
+        <div class="lg:col-span-5 z-10 relative">
+          <div class="dimensional-subject parallax-wrap relative aspect-[4/5] rounded-lg overflow-hidden border border-stone-300 shadow-2xl transition-transform duration-700">
+            <img
+              src="${imagens.hero}"
+              alt="${empresa.nome} em ${city}"
+              class="parallax-img w-full h-full object-cover scale-105"
+            />
+            <div class="absolute inset-0 bg-gradient-to-t from-stone-950/70 via-transparent to-transparent flex flex-col justify-end p-6 text-white">
+              <span class="text-[10px] font-mono uppercase tracking-widest text-amber-300 font-semibold">Signature Craft Move</span>
+              <p class="text-sm font-bold">${empresa.nome} · Excelência Construtiva</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>`
+      : `<!-- HERO SECTION DE ALTO IMPACTO (DESIGN EDITORIAL + ACETERNITY SPOTLIGHT + SPLIT-TYPE) -->
   <section id="home" class="relative pt-12 pb-20 sm:pt-16 sm:pb-28 overflow-hidden">
     <!-- Aceternity Spotlight Glow Effect -->
     <div class="pointer-events-none absolute -top-40 left-0 md:left-60 md:-top-20 opacity-30 blur-3xl w-[600px] h-[600px] bg-gradient-to-tr from-amber-500/25 via-orange-400/20 to-transparent rounded-full animate-pulse"></div>
@@ -627,7 +734,8 @@ export function construirSiteEditorialAntiIa(
       </div>
 
     </div>
-  </section>
+  </section>`
+  }
 
   <!-- SEÇÃO DE DIFERENCIAIS ASSIMÉTRICOS (SEM GRIDS REPETITIVOS 3X3) -->
   <section id="diferenciais" class="py-20 sm:py-28 bg-[#F4F1EA] border-y border-stone-200">
@@ -1079,6 +1187,72 @@ export function construirSiteEditorialAntiIa(
           ease: "power2.out"
         });
       });
+      // 3. Suporte a Canvas Scrubbing (ScrollCraft singhharsh1708)
+      const heroCanvas = document.getElementById('hero-canvas');
+      if (heroCanvas && typeof ScrollTrigger !== 'undefined') {
+        const ctx = heroCanvas.getContext('2d');
+        function resizeCanvas() {
+          heroCanvas.width = window.innerWidth * (window.devicePixelRatio || 1);
+          heroCanvas.height = window.innerHeight * (window.devicePixelRatio || 1);
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        function drawCanvas(progress) {
+          if (!ctx) return;
+          const w = heroCanvas.width;
+          const h = heroCanvas.height;
+          ctx.clearRect(0, 0, w, h);
+          const grad = ctx.createRadialGradient(w / 2, h / 2, 20, w / 2, h / 2, Math.max(w, h) / 1.2);
+          grad.addColorStop(0, '#27272a');
+          grad.addColorStop(1, '#09090b');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, w, h);
+
+          ctx.save();
+          ctx.translate(w / 2, h / 2);
+          ctx.rotate(progress * Math.PI * 0.7);
+          const s = 1 + progress * 0.5;
+          ctx.scale(s, s);
+          ctx.strokeStyle = 'rgba(217, 119, 6, 0.5)';
+          ctx.lineWidth = 2 * (window.devicePixelRatio || 1);
+          ctx.beginPath();
+          ctx.arc(0, 0, 160 * (window.devicePixelRatio || 1), 0, Math.PI * 2);
+          ctx.stroke();
+
+          ctx.strokeStyle = 'rgba(16, 185, 129, 0.4)';
+          ctx.strokeRect(-110 * (window.devicePixelRatio || 1), -110 * (window.devicePixelRatio || 1), 220 * (window.devicePixelRatio || 1), 220 * (window.devicePixelRatio || 1));
+          ctx.restore();
+        }
+        drawCanvas(0);
+
+        ScrollTrigger.create({
+          trigger: '#scrollcraft-pinned-container',
+          start: 'top top',
+          end: 'bottom bottom',
+          scrub: 1,
+          onUpdate: (self) => {
+            const p = self.progress;
+            drawCanvas(p);
+            const s1 = document.getElementById('step-card-1');
+            const s2 = document.getElementById('step-card-2');
+            const s3 = document.getElementById('step-card-3');
+            if (s1 && s2 && s3) {
+              if (p < 0.33) {
+                s1.classList.remove('hidden'); s1.style.opacity = String(1 - (p / 0.33) * 0.5);
+                s2.classList.add('hidden'); s3.classList.add('hidden');
+              } else if (p < 0.68) {
+                s1.classList.add('hidden');
+                s2.classList.remove('hidden'); s2.style.opacity = '1';
+                s3.classList.add('hidden');
+              } else {
+                s1.classList.add('hidden'); s2.classList.add('hidden');
+                s3.classList.remove('hidden'); s3.style.opacity = '1';
+              }
+            }
+          }
+        });
+      }
     }
   </script>
 </body>
@@ -1115,6 +1289,7 @@ export const gerarSiteCompletoIA_ServerFn = createServerFn({ method: "POST" })
         relatorio: data.relatorio,
         usarAntiIaBespoke: data.usarAntiIaBespoke,
         usarSkillsClaude: data.usarSkillsClaude,
+        motorScroll: data.motorScroll,
         skillsAdicionais: data.skillsAdicionais,
         logoBase64: data.logoBase64,
         logoNomeArquivo: data.logoNomeArquivo,
@@ -1168,6 +1343,7 @@ export const gerarSiteCompletoIA_ServerFn = createServerFn({ method: "POST" })
         instrucoesDesignMd: data.instrucoesDesignMd,
         diagnostico: data.diagnostico,
         relatorio: data.relatorio,
+        motorScroll: data.motorScroll,
       });
     }
 

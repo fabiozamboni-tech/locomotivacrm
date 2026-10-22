@@ -30,6 +30,7 @@ interface ModalRefinarPromptIaProps {
   modeloNome: string;
   usarAntiIaBespoke: boolean;
   skillsAtivasCount: number;
+  motorScroll?: "gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional";
   initialPromptSystem: string;
   initialPromptUser: string;
   onConfirmarEGerar: (promptCustomizado: {
@@ -47,6 +48,7 @@ export function ModalRefinarPromptIa({
   modeloNome,
   usarAntiIaBespoke,
   skillsAtivasCount,
+  motorScroll,
   initialPromptSystem,
   initialPromptUser,
   onConfirmarEGerar,
@@ -122,6 +124,15 @@ export function ModalRefinarPromptIa({
                 <Layers className="h-2.5 w-2.5" />
                 {skillsAtivasCount} Skill{skillsAtivasCount === 1 ? "" : "s"}
               </Badge>
+              {motorScroll && (
+                <Badge variant="outline" className="text-[10px] gap-1 border-blue-500/30 text-blue-600 bg-blue-500/5">
+                  {motorScroll === "scrollcraft_canvas"
+                    ? "ScrollCraft (Apple Canvas)"
+                    : motorScroll === "scrollcraft_dimensional"
+                    ? "Scroll-Craft Dimensional"
+                    : "GSAP Editorial"}
+                </Badge>
+              )}
             </div>
           </div>
         </DialogHeader>

@@ -17,6 +17,7 @@ export interface MontarPromptSiteParams {
   relatorio?: any;
   usarAntiIaBespoke?: boolean;
   usarSkillsClaude?: boolean;
+  motorScroll?: "gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional";
   skillsAdicionais?: Array<{ id: string; nome: string; prompt: string }>;
   logoBase64?: string;
   logoNomeArquivo?: string;
@@ -36,6 +37,7 @@ export function montarPromptSiteCompleto(params: MontarPromptSiteParams): {
     relatorio,
     usarAntiIaBespoke = true,
     usarSkillsClaude = true,
+    motorScroll = "gsap_lenis_split",
     skillsAdicionais = [],
     logoBase64,
     logoNomeArquivo,
@@ -136,8 +138,27 @@ Navegação: Cabeçalho sticky translúcido com links por âncoras (#) para toda
 [Diretriz Obrigatória de Conteúdo - Diagnóstico & Relatório do Cliente]
 Você DEVE utilizar obrigatoriamente as informações levantadas no Diagnóstico & Relatório do Cliente e no Dossiê 360 para redigir o conteúdo. Resolva os problemas diagnosticados no material anterior (falta de clareza, lentidão, ausência de CTAs ou pouca prova social) e converta as dores e objeções do público em argumentos de alta credibilidade e conversão.
 
-[Experiência Scroll-Driven e Bibliotecas Visuais Obrigatórias]
-- GSAP + ScrollTrigger + Lenis Integrados: A rolagem DEVE ser cinematográfica (60fps smooth scroll) via Lenis sincronizado com GSAP ScrollTrigger:
+[Experiência Scroll-Driven e Arquitetura de Movimento Obrigatória]
+${
+  motorScroll === "scrollcraft_canvas"
+    ? `MOTOR SELECIONADO: SCROLLCRAFT CANVAS SCRUBBED TIMELINE (singhharsh1708/scrollcraft)
+- Implemente uma experiência de rolagem imersiva estilo Apple (ex: AirPods / Pro Display) com um estágio fixado (<div class="pinned-stage sticky top-0 h-screen w-full overflow-hidden">) e um elemento <canvas id="hero-canvas" class="w-full h-full object-cover"> responsivo.
+- GSAP ScrollTrigger Pinned Timeline: Sincronize a rotação, escala e transição gráfica do canvas com o scroll do usuário (ScrollTrigger.create({ trigger: ".pinned-container", pin: true, start: "top top", end: "+=250%", scrub: 1, onUpdate: (self) => renderCanvas(self.progress) })).
+- Overlays Narrativos em Etapas (Stepped Narrative): Cards flutuantes com sombras suaves e backdrop blur surgindo em 3 momentos sequenciais:
+  * 0% - 30%: Apresentação do nome e proposta de valor em ${empresa.cidade}.
+  * 30% - 65%: Destaque dos materiais nobres, precisão milimétrica e acabamento artesanal.
+  * 65% - 100%: Conclusão com métricas de autoridade e CTA magnético para WhatsApp.
+- 100 no Google Lighthouse: Código limpo, zero bibliotecas pesadas, renderização a 60fps via requestAnimationFrame, e adaptação perfeita para desktop e telas verticais de smartphones.`
+    : motorScroll === "scrollcraft_dimensional"
+    ? `MOTOR SELECIONADO: SCROLL-CRAFT DIMENSIONAL SCROLLYTELLING (nateherkai/scroll-craft)
+- Camadas Dimensionais com Oclusão Real: Estruture a Hero e seções principais em 3 planos de profundidade independentes:
+  1. Plano de Fundo (z-0): textura de material nobre (linho rústico, granito acetinado ou malha arquitetônica) com parallax lento.
+  2. Plano do Sujeito (z-10): o produto ou serviço principal em grande angular com sombras dinâmicas e perspectiva realista.
+  3. Plano de Primeiro Plano (z-20): tipografia monumental com efeito de oclusão (o texto cruza visualmente por trás ou sobre o elemento físico).
+- Curva de Sentimento Intencional (Feeling Curve): Conduza o visitante em 4 atos emocionais (Ato 1: Curiosidade inicial -> Ato 2: Tensão técnica e rigor construtivo -> Ato 3: Revelação do resultado prático -> Ato 4: Resolução desimpedida no WhatsApp).
+- Signature Move Espacial: Implemente um movimento tridimensional característico e inesquecível ao rolar a página (ex: escala coordenada de profundidade enquanto o card de especificações se fixa e o fundo se desloca em velocidade assimétrica).
+- Proibição Rígida Anti-Clichê: Proibido bonecos 3D clay, proibido caixas isométricas flutuantes, proibido grids repetitivos de features.`
+    : `- GSAP + ScrollTrigger + Lenis Integrados: A rolagem DEVE ser cinematográfica (60fps smooth scroll) via Lenis sincronizado com GSAP ScrollTrigger:
   <script src="https://unpkg.com/lenis@1.1.18/dist/lenis.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
@@ -149,7 +170,8 @@ Você DEVE utilizar obrigatoriamente as informações levantadas no Diagnóstico
 - SplitType (~3kb) com Aceternity TextGenerateEffect: Utilize SplitType para dividir os títulos principais em caracteres/palavras e aplicar animação com blur e stagger de entrada suave:
   <script src="https://unpkg.com/split-type"></script>
   const split = new SplitType('.split-title', { types: 'words, chars' });
-  gsap.from(split.chars, { opacity: 0, y: 18, filter: 'blur(8px)', stagger: 0.018, duration: 0.85, ease: 'power3.out' });
+  gsap.from(split.chars, { opacity: 0, y: 18, filter: 'blur(8px)', stagger: 0.018, duration: 0.85, ease: 'power3.out' });`
+}
 - Aceternity UI Components:
   * Spotlight: Luz ambiente suave desfocada na Hero (ex: div com blur-3xl, gradiente translúcido âmbar/esmeralda e animate-pulse).
   * BackgroundBeams / Mesh: Texturas de fundo delicadas (linhas finas ou gradientes sutis) para profundidade e evitar fundos chapados.
@@ -236,7 +258,13 @@ ${
 
 ESTILIZAÇÃO E DINAMISMO:
 - Crie o site no formato ONE-PAGE (Landing Page Cinematográfica) reunindo todas as informações em uma única página rica com navegação suave por âncoras.
-- Integre GSAP + ScrollTrigger + Lenis para rolagem a 60fps, SplitType para o Aceternity TextGenerateEffect nos títulos principais, Spotlight e tokens visuais minimalistas do shadcn/ui.
+${
+  motorScroll === "scrollcraft_canvas"
+    ? "- MOTOR: ScrollCraft Canvas Scrubbed (singhharsh1708/scrollcraft). Estágio fixado com <canvas id=\"hero-canvas\"> animado e scrubbed via GSAP ScrollTrigger, overlays narrativos em 3 etapas progressivas e máxima pontuação no Lighthouse."
+    : motorScroll === "scrollcraft_dimensional"
+    ? "- MOTOR: Scroll-Craft Dimensional Scrollytelling (nateherkai/scroll-craft). 3 planos de profundidade independentes (fundo, sujeito, primeiro plano com oclusão), curva de sentimento em 4 atos e signature move espacial."
+    : "- MOTOR: Padrão Editorial GSAP + ScrollTrigger + Lenis para rolagem a 60fps, SplitType para o Aceternity TextGenerateEffect nos títulos principais, iluminação Spotlight e tokens visuais minimalistas do shadcn/ui."
+}
 
 Gere agora o código HTML5 completo do site ONE-PAGE seguindo rigorosamente todas as regras humanas Anti-IA (sem nenhum marquee), com todas as imagens geradas por FLUX.1.`;
 

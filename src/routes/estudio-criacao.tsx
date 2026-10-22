@@ -91,6 +91,7 @@ import {
 import { montarPromptSiteCompleto } from "@/lib/site-generator-prompt";
 import { ModalGerenciarSkills } from "@/components/estudio-criacao/modal-gerenciar-skills";
 import { ModalRefinarPromptIa } from "@/components/estudio-criacao/modal-refinar-prompt-ia";
+import { GeradorIdentidadeVisual } from "@/components/estudio-criacao/gerador-identidade-visual";
 
 export const Route = createFileRoute("/estudio-criacao")({
   validateSearch: z.object({
@@ -153,6 +154,14 @@ function EstudioCriacaoPage() {
     empresa?.estudioUsarSkillsClaude ?? true,
   );
 
+  // Arquitetura & Motor de Rolagem (Padrão GSAP, ScrollCraft Canvas singhharsh1708, ou Scroll-Craft Dimensional nateherkai)
+  const [motorScroll, setMotorScroll] = useState<"gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional">(
+    empresa?.estudioMotorScroll || "gsap_lenis_split",
+  );
+
+  // Cor primária ativa selecionada na paleta cromática
+  const [corPrimariaHex, setCorPrimariaHex] = useState<string>("#722F37");
+
   // Gestão de Skills (Anthropic Claude + Customizadas)
   const [skills, setSkills] = useState<CustomSkill[]>(() => loadSkillsLocais());
   const [modalSkillsOpen, setModalSkillsOpen] = useState(false);
@@ -211,6 +220,7 @@ function EstudioCriacaoPage() {
       setChatMensagens(empresa.estudioChatMensagens || []);
       setUsarAntiIaBespoke(empresa.estudioUsarAntiIaBespoke ?? true);
       setUsarSkillsClaude(empresa.estudioUsarSkillsClaude ?? true);
+      setMotorScroll(empresa.estudioMotorScroll || "gsap_lenis_split");
     }
   }, [
     empresa?.id,
@@ -221,6 +231,7 @@ function EstudioCriacaoPage() {
     empresa?.estudioChatMensagens,
     empresa?.estudioUsarAntiIaBespoke,
     empresa?.estudioUsarSkillsClaude,
+    empresa?.estudioMotorScroll,
   ]);
 
   // Auto-scroll do chat ao receber nova mensagem
@@ -331,12 +342,13 @@ function EstudioCriacaoPage() {
       relatorio: empresa.relatorioLead,
       usarAntiIaBespoke,
       usarSkillsClaude: claudeAtivo,
+      motorScroll,
       skillsAdicionais: skills.filter((s) => s.ativa && s.id !== "claude-frontend-design"),
       logoBase64: logoAnexo?.dataUrl,
       logoNomeArquivo: logoAnexo?.nome,
       instrucoesDesignMd: designMdAnexo?.conteudo,
     });
-  }, [empresa, usarAntiIaBespoke, usarSkillsClaude, skills, logoAnexo, designMdAnexo]);
+  }, [empresa, usarAntiIaBespoke, usarSkillsClaude, motorScroll, skills, logoAnexo, designMdAnexo]);
 
   // 1. GERAR NOVO SITE COMPLETO (DO ZERO OU COM PROMPT CUSTOMIZADO)
   const handleGerarSite = async (customPromptOverride?: { promptSystem: string; promptUser: string }) => {
@@ -373,6 +385,7 @@ function EstudioCriacaoPage() {
           modeloPreferencial: agenteSelecionado.modelo,
           usarAntiIaBespoke,
           usarSkillsClaude: claudeAtivo,
+          motorScroll,
           skillsAdicionais: skills.filter((s) => s.ativa && s.id !== "claude-frontend-design"),
           customPromptOverride,
           customKeys,
@@ -428,6 +441,7 @@ function EstudioCriacaoPage() {
         estudioChatMensagens: novoChat,
         estudioUsarAntiIaBespoke: usarAntiIaBespoke,
         estudioUsarSkillsClaude: usarSkillsClaude,
+        estudioMotorScroll: motorScroll,
         analiseAtualizadaEm: new Date().toISOString(),
       });
 
@@ -496,6 +510,7 @@ function EstudioCriacaoPage() {
           modeloPreferencial: agenteSelecionado.modelo,
           usarAntiIaBespoke,
           usarSkillsClaude,
+          motorScroll,
           skillsAdicionais: skills.filter((s) => s.ativa && s.id !== "claude-frontend-design"),
           logoBase64: logoAnexo?.dataUrl,
           logoNomeArquivo: logoAnexo?.nome,
@@ -538,6 +553,7 @@ function EstudioCriacaoPage() {
         estudioChatMensagens: chatAtualizado,
         estudioUsarAntiIaBespoke: usarAntiIaBespoke,
         estudioUsarSkillsClaude: usarSkillsClaude,
+        estudioMotorScroll: motorScroll,
         analiseAtualizadaEm: new Date().toISOString(),
       });
 
@@ -1074,7 +1090,65 @@ Pilares de Conteúdo:
                   </Select>
                 </div>
 
-                {/* 2.1 GESTÃO DE SKILLS DE IA & DIRETRIZES DA ANTHROPIC */}
+                {/* 2.1 ARQUITETURA & MOTOR DE ROLAGEM (SCROLL ENGINE) */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <Layers className="h-3.5 w-3.5 text-blue-500" />
+                      <span>Motor de Rolagem & Arquitetura</span>
+                    </label>
+                    <Badge
+                      variant="outline"
+                      className="text-[9px] px-1.5 py-0 h-4 font-normal border-blue-500/30 text-blue-600 dark:text-blue-400"
+                    >
+                      {motorScroll === "scrollcraft_canvas"
+                        ? "Apple Canvas"
+                        : motorScroll === "scrollcraft_dimensional"
+                        ? "Dimensional"
+                        : "GSAP Lenis"}
+                    </Badge>
+                  </div>
+                  <Select
+                    value={motorScroll}
+                    onValueChange={(val: any) => {
+                      setMotorScroll(val);
+                      if (empresa) updateEmpresa(empresa.id, { estudioMotorScroll: val });
+                      toast.info(
+                        val === "scrollcraft_canvas"
+                          ? "Motor ScrollCraft Canvas ativado (estilo Apple / singhharsh1708)."
+                          : val === "scrollcraft_dimensional"
+                          ? "Motor Scroll-Craft Dimensional ativado (scrollytelling nateherkai)."
+                          : "Motor GSAP + Lenis + SplitType ativado (padrão editorial).",
+                      );
+                    }}
+                  >
+                    <SelectTrigger className="h-8 text-xs bg-background font-medium">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="gsap_lenis_split" className="text-xs">
+                        <div className="space-y-0.5">
+                          <p className="font-semibold">GSAP + Lenis + SplitType (Padrão Editorial)</p>
+                          <p className="text-[10px] text-muted-foreground">Rolagem a 60fps com tipografia staggered e Spotlight</p>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="scrollcraft_canvas" className="text-xs">
+                        <div className="space-y-0.5">
+                          <p className="font-semibold text-blue-600 dark:text-blue-400">ScrollCraft Canvas Scrubbing (Apple-Style)</p>
+                          <p className="text-[10px] text-muted-foreground">Canvas pinned timeline do singhharsh1708 com overlays em etapas</p>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="scrollcraft_dimensional" className="text-xs">
+                        <div className="space-y-0.5">
+                          <p className="font-semibold text-purple-600 dark:text-purple-400">Scroll-Craft Dimensional Hero (nateherkai)</p>
+                          <p className="text-[10px] text-muted-foreground">3 planos de profundidade com oclusão real e signature move</p>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* 2.2 GESTÃO DE SKILLS DE IA & DIRETRIZES DA ANTHROPIC */}
                 <div className="rounded-md border border-border/70 bg-background/80 p-2.5 space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
@@ -1706,10 +1780,38 @@ Pilares de Conteúdo:
 
       {/* CONTEÚDO DA ABA 2: IDENTIDADE VISUAL E PALETA CROMÁTICA */}
       {abaAtiva === "paleta" && (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <PaletaCoresCard
             nomeEmpresa={empresa.nome}
             segmento={empresa.segmento}
+            onSelecionarCor={(hex) => setCorPrimariaHex(hex)}
+          />
+
+          <GeradorIdentidadeVisual
+            empresaId={empresa.id}
+            empresaNome={empresa.nome}
+            segmento={empresa.segmento}
+            cidade={empresa.cidade}
+            corPrimariaHex={corPrimariaHex}
+            logoAtivoUrl={logoAnexo?.dataUrl}
+            logosSalvos={empresa.estudioLogosGerados || []}
+            materiaisSalvos={empresa.estudioMaterialEscritorioGerados || []}
+            onSalvarLogos={(novosLogos) => {
+              updateEmpresa(empresa.id, { estudioLogosGerados: novosLogos });
+            }}
+            onSalvarMateriais={(novosMateriais) => {
+              updateEmpresa(empresa.id, { estudioMaterialEscritorioGerados: novosMateriais });
+            }}
+            onDefinirComoLogoOficial={(logoUrl, nomeArquivo) => {
+              const anexo = {
+                nome: nomeArquivo || `logo-${empresa.nome.toLowerCase().replace(/\s+/g, "-")}.png`,
+                dataUrl: logoUrl,
+                tipo: "image/png",
+              };
+              setLogoAnexo(anexo);
+              updateEmpresa(empresa.id, { estudioLogoAnexo: anexo });
+              toast.success(`Logo definido como a marca oficial de ${empresa.nome} no Estúdio!`);
+            }}
           />
         </div>
       )}
@@ -1880,6 +1982,7 @@ Pilares de Conteúdo:
         modeloNome={agenteSelecionado.modelo}
         usarAntiIaBespoke={usarAntiIaBespoke}
         skillsAtivasCount={skills.filter((s) => s.ativa).length}
+        motorScroll={motorScroll}
         initialPromptSystem={promptMontado.promptSystem}
         initialPromptUser={promptMontado.promptUser}
         onConfirmarEGerar={(customizado) => handleGerarSite(customizado)}

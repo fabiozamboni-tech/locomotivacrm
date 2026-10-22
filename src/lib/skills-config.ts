@@ -62,6 +62,49 @@ export const SKILLS_INICIAIS_PADRAO: CustomSkill[] = [
     criadaEm: "2026-10-20T00:00:00.000Z",
     sistema: true,
   },
+  {
+    id: "scrollcraft-canvas-harsh",
+    nome: "ScrollCraft Canvas Scrubbing (singhharsh1708/scrollcraft)",
+    descricao: "Arquitetura cinematográfica estilo Apple: pinned stage em <canvas>, animação scrubbed sincronizada ao scroll e 100 no Lighthouse.",
+    prompt: `[DIRETRIZES DE ARQUITETURA SCROLLCRAFT - CANVAS SCRUBBED TIMELINE (singhharsh1708/scrollcraft)]
+- Implemente uma experiência de rolagem imersiva estilo lançamentos de produtos da Apple utilizando um estágio fixado (<div class="pinned-stage sticky top-0 h-screen w-full">) contendo um elemento <canvas id="hero-canvas"> responsivo.
+- O canvas deve reagir à rolagem através do GSAP ScrollTrigger com 'scrub: 1' ou 'scrub: true', interpolando a rotação, escala e iluminação de partículas, wireframes arquitetônicos ou sequências de frames 60fps conforme o usuário rola a página.
+- Narrativa em Camadas Flutuantes (Stepped Narrative Overlays): conforme o scroll avança no container fixado (ex: altura de 300vh a 400vh), cards de texto e métricas de autoridade devem surgir com fade e deslizar suavemente sobre o canvas, sincronizados em momentos-chave da rolagem:
+  * Etapa 1 (0-30%): Abertura do conceito e nome da empresa com tipografia imponente.
+  * Etapa 2 (30-65%): Destaque da precisão técnica, acabamento de materiais e diferenciais de qualidade.
+  * Etapa 3 (65-100%): Chamada final de ação (CTA) com botão magnético direto para WhatsApp.
+- Eficiência e Zero-Overhead: Mantenha o código ultra leve, sem dependências volumosas, com exportação HTML/CSS/JS pura e garantia de pontuação 100 no Google Lighthouse (Performance, Acessibilidade e SEO).
+- Responsividade Dual-Frame: Adapte o desenho do canvas e os overlays tanto para visualização horizontal (Desktop) quanto vertical (Mobile), mantendo o ponto focal e a proporção adequados em qualquer tamanho de tela.`,
+    ativa: false,
+    categoria: "codigo",
+    criadaEm: "2026-10-22T00:00:00.000Z",
+    sistema: true,
+  },
+  {
+    id: "scroll-craft-dimensional",
+    nome: "Scroll-Craft Dimensional Scrollytelling (nateherkai/scroll-craft)",
+    descricao: "Scrollytelling de alto padrão com camadas dimensionais independentes (fundo, sujeito, primeiro plano com oclusão), curva de sentimento e signature move.",
+    prompt: `[DIRETRIZES DE SCROLLYTELLING DIMENSIONAL (nateherkai/scroll-craft)]
+- Camadas Dimensionais com Oclusão Real: Estruture a Hero e seções principais em 3 planos de profundidade independentes:
+  1. Plano de Fundo (z-0 / background plane): textura de material nobre (linho, granito sutil, malha arquitetônica) com parallax lento.
+  2. Plano do Sujeito (z-10 / subject plane): a imagem principal ou produto comercial em destaque com perspectiva nítida.
+  3. Plano de Primeiro Plano (z-20 / foreground plane): tipografia editorial e elementos gráficos que passam SOBRE ou POR TRÁS do sujeito (efeito de oclusão dimensional cinematográfico).
+- Curva de Sentimento Intencional (Feeling Curve): O scroll deve conduzir o visitante através de uma jornada emocional deliberada:
+  * Ato 1: Curiosidade inicial através de tipografia contrastante e respiro generoso.
+  * Ato 2: Tensão técnica e rigor construtivo (detalhamento minucioso dos serviços e normas).
+  * Ato 3: Revelação do resultado prático com fotos autênticas e depoimentos regionais.
+  * Ato 4: Resolução clara com canal de contato desimpedido.
+- Signature Move Obrigatório: O site DEVE possuir um movimento espacial característico inesquecível (ex: transição de escala de card enquanto texto se afasta em profundidade, ou revelação de corte transversal da obra).
+- Proibições Rígidas Anti-Clichê:
+  * PROIBIDO o uso de 3D clay / bonequinhos low-poly sem textura real.
+  * PROIBIDO o uso de diorama flutuante em caixas isométricas genéricas.
+  * PROIBIDO o uso de grids repetitivos de features lado a lado.
+  * Priorize materiais táteis reais: veios de mármore, reflexos de vidro lapidado, texturas de madeira nobre e acabamentos de metal escovado condizentes com o nicho do lead.`,
+    ativa: false,
+    categoria: "design",
+    criadaEm: "2026-10-22T00:00:00.000Z",
+    sistema: true,
+  },
 ];
 
 export const LS_ESTUDIO_SKILLS = "radar.estudio.skills.v2";
@@ -73,10 +116,11 @@ export function loadSkillsLocais(): CustomSkill[] {
     if (!raw) return SKILLS_INICIAIS_PADRAO;
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      // Garante que a skill Claude sempre exista
-      const hasClaude = parsed.some((s) => s.id === "claude-frontend-design");
-      if (!hasClaude) {
-        return [SKILLS_INICIAIS_PADRAO[0], ...parsed];
+      // Garante que todas as skills do sistema iniciais estejam presentes mesmo se o usuário tiver salvo antes
+      const existingIds = new Set(parsed.map((s: any) => s.id));
+      const missingSystem = SKILLS_INICIAIS_PADRAO.filter((s) => s.sistema && !existingIds.has(s.id));
+      if (missingSystem.length > 0) {
+        return [...parsed, ...missingSystem];
       }
       return parsed;
     }
