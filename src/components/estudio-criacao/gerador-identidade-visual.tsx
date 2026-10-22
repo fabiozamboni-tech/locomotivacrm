@@ -36,6 +36,11 @@ import {
   gerarLogoVetorialSvg_ServerFn,
 } from "@/lib/image-generator.server";
 import { getApiSettings } from "@/lib/api-settings";
+import {
+  checarCotaDiaria,
+  registrarConsumoDiario,
+  obterResumoSaldo,
+} from "@/lib/ai-quota-guard";
 
 export interface LogoGeradoItem {
   id: string;
@@ -196,6 +201,12 @@ export function GeradorIdentidadeVisual({
   // Modo de criação de logo: "svg" (LLM Vetorial) vs "flux" (Difusão de Imagem)
   const [modoLogo, setModoLogo] = useState<"svg" | "flux">("svg");
 
+  // Motor para Logos SVG: "svg_llm" ou "recraft"
+  const [motorLogo, setMotorLogo] = useState<"svg_llm" | "recraft">("svg_llm");
+
+  // Saldo e Cotas Diárias em Tempo Real
+  const [resumoSaldo, setResumoSaldo] = useState(() => obterResumoSaldo());
+
   // Estado para Logos SVG
   const [estiloLogoSvg, setEstiloLogoSvg] = useState<any>(ESTILOS_LOGO_SVG[0].id);
 
@@ -228,11 +239,40 @@ export function GeradorIdentidadeVisual({
     setMateriais(materiaisSalvos);
   }, [materiaisSalvos]);
 
-  // 1. GERAÇÃO DE LOGOTIPO VETORIAL SVG PURO VIA LLM (100% GRÁTIS)
+  // 1. GERAÇÃO DE LOGOTIPO VETORIAL SVG PURO VIA LLM OU RECRAFT.AI
   const handleGerarLogoSvg = async () => {
+    const apiSettings = getApiSettings();
+
+    // Checagem de Cota Diária antes da requisição
+    const provedorAlvo =
+      motorLogo === "recraft"
+        ? "recraft"
+        : apiSettings.provedorIaAtivo === "auto"
+        ? "groq"
+        : apiSettings.provedorIaAtivo;
+
+    const checagem = checarCotaDiaria({
+      categoria: "logos",
+      provedor: provedorAlvo,
+      cotas: apiSettings.cotasDiarias,
+    });
+
+    if (checagem.bloqueado) {
+      toast.error(
+        checagem.motivo ||
+          "Limite diário de logotipos atingido. Novas gerações estarão disponíveis após a meia-noite.",
+      );
+      return;
+    }
+
+    let motorFinal = motorLogo;
+    if (checagem.acaoRecomendada === "fallback_gratuito") {
+      toast.warning(checagem.motivo);
+      motorFinal = "svg_llm";
+    }
+
     setGerandoLogo(true);
     try {
-      const apiSettings = getApiSettings();
       const customKeys = {
         groq: apiSettings.groq.key,
         gemini: apiSettings.gemini.key,
@@ -240,6 +280,10 @@ export function GeradorIdentidadeVisual({
         cerebras: apiSettings.cerebras.key,
         lovable: apiSettings.lovable.key,
         ollamaBaseUrl: apiSettings.ollama.baseUrl,
+        recraft: apiSettings.recraft?.key,
+        openai: apiSettings.openai?.key,
+        fal: apiSettings.fal?.key,
+        firefly: apiSettings.firefly?.key,
       };
 
       toast.info(`Criando logotipo vetorial SVG para ${empresaNome}...`);
@@ -251,6 +295,7 @@ export function GeradorIdentidadeVisual({
           cidade,
           estilo: estiloLogoSvg,
           corPrimariaHex,
+          motor: motorFinal,
           customKeys,
         },
       });
@@ -271,6 +316,17 @@ export function GeradorIdentidadeVisual({
         const atualizados = [novoLogo, ...logos];
         setLogos(atualizados);
         onSalvarLogos?.(atualizados);
+
+        // Registra consumo no Quota Guard
+        registrarConsumoDiario({
+          categoria: "logos",
+          provedor: res.provider || motorFinal,
+          detalhe: `${empresaNome} (${estiloLogoSvg})`,
+          sucesso: true,
+          fallback: motorFinal !== motorLogo,
+        });
+        setResumoSaldo(obterResumoSaldo(apiSettings.cotasDiarias));
+
         toast.success(`Logotipo vetorial SVG gerado com sucesso!`);
       } else {
         toast.error("Não foi possível gerar o código SVG do logotipo.");
@@ -285,6 +341,20 @@ export function GeradorIdentidadeVisual({
 
   // 2. GERAÇÃO DE LOGOTIPO COM FLUX.1 (DIFUSÃO / IMAGEM)
   const handleGerarLogosFlux = () => {
+    const apiSettings = getApiSettings();
+
+    // Checagem de Cota Diária
+    const checagem = checarCotaDiaria({
+      categoria: "logos",
+      provedor: "pollinations",
+      cotas: apiSettings.cotasDiarias,
+    });
+
+    if (checagem.bloqueado) {
+      toast.error(checagem.motivo || "Limite diário de logotipos atingido.");
+      return;
+    }
+
     setGerandoLogo(true);
     try {
       const estiloObj = ESTILOS_LOGO_FLUX.find((e) => e.id === estiloLogoFlux) || ESTILOS_LOGO_FLUX[0];
@@ -314,6 +384,16 @@ export function GeradorIdentidadeVisual({
       const listaAtualizada = [...novosItens, ...logos];
       setLogos(listaAtualizada);
       onSalvarLogos?.(listaAtualizada);
+
+      // Registra consumo
+      registrarConsumoDiario({
+        categoria: "logos",
+        provedor: "pollinations",
+        detalhe: `${empresaNome} (FLUX ${modeloFluxLogo})`,
+        sucesso: true,
+      });
+      setResumoSaldo(obterResumoSaldo(apiSettings.cotasDiarias));
+
       toast.success(`2 opções de logotipo conceituais geradas com ${modeloFluxLogo.toUpperCase()}!`);
     } catch {
       toast.error("Erro ao gerar opções de logotipo.");
@@ -324,6 +404,20 @@ export function GeradorIdentidadeVisual({
 
   // 3. GERAÇÃO DE MATERIAL DE ESCRITÓRIO COM IA (FLUX-3D / FLUX-REALISM)
   const handleGerarMaterial = () => {
+    const apiSettings = getApiSettings();
+
+    // Checagem de Cota Diária
+    const checagem = checarCotaDiaria({
+      categoria: "imagens",
+      provedor: "pollinations",
+      cotas: apiSettings.cotasDiarias,
+    });
+
+    if (checagem.bloqueado) {
+      toast.error(checagem.motivo || "Limite diário de imagens atingido.");
+      return;
+    }
+
     setGerandoMaterial(true);
     try {
       const materialObj =
@@ -349,6 +443,16 @@ export function GeradorIdentidadeVisual({
       const listaAtualizada = [novoItem, ...materiais];
       setMateriais(listaAtualizada);
       onSalvarMateriais?.(listaAtualizada);
+
+      // Registra consumo
+      registrarConsumoDiario({
+        categoria: "imagens",
+        provedor: "pollinations",
+        detalhe: `${empresaNome} (${materialObj.id})`,
+        sucesso: true,
+      });
+      setResumoSaldo(obterResumoSaldo(apiSettings.cotasDiarias));
+
       toast.success(`${materialObj.titulo} gerado com sucesso para ${empresaNome}!`);
     } catch {
       toast.error("Erro ao gerar mockup de papelaria corporativa.");
@@ -428,7 +532,7 @@ export function GeradorIdentidadeVisual({
                   FLUX.1 + Realism + 3D
                 </Badge>
                 <Badge variant="outline" className="text-[10px] font-mono text-emerald-600 border-emerald-500/30 bg-emerald-500/5">
-                  SVG Vetorial LLM
+                  🎨 Cota hoje: {resumoSaldo.logos.usado} / {resumoSaldo.logos.limite} logos
                 </Badge>
               </div>
             </div>
@@ -499,7 +603,7 @@ export function GeradorIdentidadeVisual({
             {/* CONTROLES CONFORME O MODO SELECIONADO */}
             {modoLogo === "svg" ? (
               <div className="flex flex-wrap items-center gap-3 bg-emerald-500/5 p-3 rounded-lg border border-emerald-500/20">
-                <div className="flex-1 min-w-[260px] space-y-1">
+                <div className="flex-1 min-w-[240px] space-y-1">
                   <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                     <Code2 className="h-3.5 w-3.5 text-emerald-600" />
                     <span>Formato da Composição Vetorial SVG:</span>
@@ -520,6 +624,29 @@ export function GeradorIdentidadeVisual({
                           </div>
                         </SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="w-[200px] space-y-1">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>Motor Vetorial:</span>
+                  </label>
+                  <Select
+                    value={motorLogo}
+                    onValueChange={(v: any) => setMotorLogo(v)}
+                  >
+                    <SelectTrigger className="h-8 text-xs bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="svg_llm" className="text-xs">
+                        LLM Vetorial (Groq/Gemini Grátis)
+                      </SelectItem>
+                      <SelectItem value="recraft" className="text-xs">
+                        Recraft.ai (Chave Própria)
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

@@ -92,6 +92,7 @@ import { montarPromptSiteCompleto } from "@/lib/site-generator-prompt";
 import { ModalGerenciarSkills } from "@/components/estudio-criacao/modal-gerenciar-skills";
 import { ModalRefinarPromptIa } from "@/components/estudio-criacao/modal-refinar-prompt-ia";
 import { GeradorIdentidadeVisual } from "@/components/estudio-criacao/gerador-identidade-visual";
+import { checarCotaDiaria, registrarConsumoDiario } from "@/lib/ai-quota-guard";
 
 export const Route = createFileRoute("/estudio-criacao")({
   validateSearch: z.object({
@@ -357,6 +358,27 @@ function EstudioCriacaoPage() {
       return;
     }
 
+    const apiSettings = getApiSettings();
+
+    // Checagem de Cota Diária antes de iniciar geração
+    const checagem = checarCotaDiaria({
+      categoria: "sites",
+      provedor: agenteSelecionado.provider,
+      cotas: apiSettings.cotasDiarias,
+    });
+
+    if (checagem.bloqueado) {
+      toast.error(
+        checagem.motivo ||
+          "Limite diário de geração de sites atingido. O sistema bloqueou a chamada para proteger seu orçamento.",
+      );
+      return;
+    }
+
+    if (checagem.acaoRecomendada === "fallback_gratuito") {
+      toast.warning(checagem.motivo);
+    }
+
     try {
       setGerandoSite(true);
       toast.info(
@@ -365,7 +387,6 @@ function EstudioCriacaoPage() {
         }...`,
       );
 
-      const apiSettings = getApiSettings();
       const customKeys = {
         groq: apiSettings.groq.key,
         gemini: apiSettings.gemini.key,
@@ -373,6 +394,9 @@ function EstudioCriacaoPage() {
         cerebras: apiSettings.cerebras.key,
         lovable: apiSettings.lovable.key,
         ollamaBaseUrl: apiSettings.ollama.baseUrl,
+        openai: apiSettings.openai?.key,
+        anthropic: apiSettings.anthropic?.key,
+        perplexity: apiSettings.perplexity?.key,
       };
 
       const claudeSkill = skills.find((s) => s.id === "claude-frontend-design");
@@ -400,6 +424,15 @@ function EstudioCriacaoPage() {
 
       const novoHtml = res.html;
       setSiteHtml(novoHtml);
+
+      // Registra o consumo diário no Quota Guard
+      registrarConsumoDiario({
+        categoria: "sites",
+        provedor: agenteSelecionado.provider,
+        detalhe: `${empresa.nome} (Landing Page One-Page)`,
+        sucesso: true,
+        fallback: checagem.acaoRecomendada === "fallback_gratuito",
+      });
 
       // Registra a nova versão no histórico
       const novaVersaoId = `versao_${Date.now()}`;

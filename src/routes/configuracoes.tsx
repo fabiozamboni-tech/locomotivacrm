@@ -8,10 +8,16 @@ import {
   getApiSettings,
   saveApiSetting,
   saveProvedorIaAtivo,
+  saveCotasDiarias,
   type ApiSettingsMap,
   type ProvedorIaTipo,
   type ApiProviderKey,
 } from "@/lib/api-settings";
+import {
+  obterResumoSaldo,
+  resetarConsumoHoje,
+  type CotasDiariasConfig,
+} from "@/lib/ai-quota-guard";
 import {
   getComunicacaoSettings,
   saveComunicacaoSettings,
@@ -154,6 +160,10 @@ function ConfiguracoesPage() {
   const [testing, setTesting] = useState<Record<string, boolean>>({});
   const [testingAll, setTestingAll] = useState(false);
 
+  // Cotas Diárias & Rate-Limiter
+  const [cotasEdicao, setCotasEdicao] = useState<CotasDiariasConfig>(() => settings.cotasDiarias);
+  const [resumoCotas, setResumoCotas] = useState(() => obterResumoSaldo(settings.cotasDiarias));
+
   // E-mail e WhatsApp
   const [comunicacao, setComunicacao] = useState<ComunicacaoSettings>(getComunicacaoSettings());
   const [showSmtpPass, setShowSmtpPass] = useState(false);
@@ -165,12 +175,19 @@ function ConfiguracoesPage() {
   useEffect(() => {
     const cur = getApiSettings();
     setSettings(cur);
+    setCotasEdicao(cur.cotasDiarias);
+    setResumoCotas(obterResumoSaldo(cur.cotasDiarias));
     setComunicacao(getComunicacaoSettings());
     testSingleApi("serpapi", cur.serpapi.key);
     testSingleApi("brasilapi");
     testSingleApi("registrobr");
     testSingleApi("openstreetmap");
     if (cur.apify.key) testSingleApi("apify", cur.apify.key);
+    if (cur.openai?.key) testSingleApi("openai", cur.openai.key);
+    if (cur.anthropic?.key) testSingleApi("anthropic", cur.anthropic.key);
+    if (cur.perplexity?.key) testSingleApi("perplexity", cur.perplexity.key);
+    if (cur.recraft?.key) testSingleApi("recraft", cur.recraft.key);
+    if (cur.fal?.key) testSingleApi("fal", cur.fal.key);
   }, []);
 
   const toggleShowKey = (provider: string) => {
@@ -215,6 +232,19 @@ function ConfiguracoesPage() {
     toast.success(`Motor de IA prioritário definido como: ${val.toUpperCase()}`);
   };
 
+  const handleSaveCotas = () => {
+    const updated = saveCotasDiarias(cotasEdicao);
+    setSettings(updated);
+    setResumoCotas(obterResumoSaldo(updated.cotasDiarias));
+    toast.success("Limites diários e políticas de bloqueio salvas com sucesso!");
+  };
+
+  const handleResetarContadores = () => {
+    resetarConsumoHoje();
+    setResumoCotas(obterResumoSaldo(settings.cotasDiarias));
+    toast.success("Contadores de consumo diário resetados para 0 hoje!");
+  };
+
   const testSingleApi = async (provider: string, apiKey?: string, model?: string) => {
     setTesting((prev) => ({ ...prev, [provider]: true }));
     try {
@@ -244,7 +274,23 @@ function ConfiguracoesPage() {
 
   const testAllApis = async () => {
     setTestingAll(true);
-    const providers = ["serpapi", "groq", "gemini", "cerebras", "openrouter", "apify", "brasilapi", "registrobr", "openstreetmap", "lovable"];
+    const providers = [
+      "serpapi",
+      "groq",
+      "gemini",
+      "cerebras",
+      "openrouter",
+      "openai",
+      "anthropic",
+      "perplexity",
+      "recraft",
+      "fal",
+      "apify",
+      "brasilapi",
+      "registrobr",
+      "openstreetmap",
+      "lovable",
+    ];
     for (const p of providers) {
       const conf = (settings as any)[p];
       await testSingleApi(p, typeof conf === "object" ? conf?.key : undefined);
@@ -862,7 +908,255 @@ function ConfiguracoesPage() {
         {/* ------------------------------------------------------------------- */}
         <TabsContent value="apis" className="space-y-5 mt-0">
           
-          {/* 1. SELETOR DE MOTOR DE IA PRIORITÁRIO */}
+          {/* 1. GESTÃO DE COTAS DIÁRIAS & BLOQUEIO PREVENTIVO */}
+          <Card className="border-border/60 bg-gradient-to-br from-card via-card to-emerald-500/5 shadow-sm">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    <ShieldCheck className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-bold flex items-center gap-2">
+                      Gestão de Cotas Diárias & Proteção de Orçamento
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Defina limites de segurança diários para geração de imagens, logotipos, sites e pesquisas. O sistema bloqueia chamadas externas ao atingir a cota para evitar surpresas na fatura.
+                    </CardDescription>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-xs gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Proteção Anti-Cobrança Ativa
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleResetarContadores}
+                    className="text-xs h-7 text-muted-foreground hover:text-foreground gap-1"
+                    title="Zerar contadores de hoje para testes"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Resetar Hoje
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-4 pt-1">
+              {/* Grid dos 4 recursos com barra de progresso e inputs */}
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                
+                {/* 1. IMAGENS */}
+                <div className="p-3.5 rounded-lg border border-border/70 bg-card space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                      🖼️ Imagens
+                    </span>
+                    <Badge variant="outline" className="text-[10px] font-mono">
+                      {resumoCotas.imagens.usado} / {cotasEdicao.maxImagensDia} hoje
+                    </Badge>
+                  </div>
+                  <div className="w-full bg-muted/60 h-2 rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full transition-all",
+                        resumoCotas.imagens.porcentagem >= 100
+                          ? "bg-red-500"
+                          : resumoCotas.imagens.porcentagem >= 75
+                          ? "bg-amber-500"
+                          : "bg-emerald-500"
+                      )}
+                      style={{ width: `${Math.min(100, resumoCotas.imagens.porcentagem)}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>Limite diário:</span>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        min="1"
+                        max="500"
+                        value={cotasEdicao.maxImagensDia}
+                        onChange={(e) =>
+                          setCotasEdicao((prev) => ({
+                            ...prev,
+                            maxImagensDia: Math.max(1, Number(e.target.value) || 20),
+                          }))
+                        }
+                        className="h-6 w-16 text-xs text-right font-mono"
+                      />
+                      <span>/dia</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. LOGOTIPOS */}
+                <div className="p-3.5 rounded-lg border border-border/70 bg-card space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                      🎨 Logotipos SVG
+                    </span>
+                    <Badge variant="outline" className="text-[10px] font-mono">
+                      {resumoCotas.logos.usado} / {cotasEdicao.maxLogosDia} hoje
+                    </Badge>
+                  </div>
+                  <div className="w-full bg-muted/60 h-2 rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full transition-all",
+                        resumoCotas.logos.porcentagem >= 100
+                          ? "bg-red-500"
+                          : resumoCotas.logos.porcentagem >= 75
+                          ? "bg-amber-500"
+                          : "bg-purple-500"
+                      )}
+                      style={{ width: `${Math.min(100, resumoCotas.logos.porcentagem)}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>Limite diário:</span>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        min="1"
+                        max="200"
+                        value={cotasEdicao.maxLogosDia}
+                        onChange={(e) =>
+                          setCotasEdicao((prev) => ({
+                            ...prev,
+                            maxLogosDia: Math.max(1, Number(e.target.value) || 10),
+                          }))
+                        }
+                        className="h-6 w-16 text-xs text-right font-mono"
+                      />
+                      <span>/dia</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. PROJETOS DE SITES */}
+                <div className="p-3.5 rounded-lg border border-border/70 bg-card space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                      🌐 Sites & Páginas
+                    </span>
+                    <Badge variant="outline" className="text-[10px] font-mono">
+                      {resumoCotas.sites.usado} / {cotasEdicao.maxSitesDia} hoje
+                    </Badge>
+                  </div>
+                  <div className="w-full bg-muted/60 h-2 rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full transition-all",
+                        resumoCotas.sites.porcentagem >= 100
+                          ? "bg-red-500"
+                          : resumoCotas.sites.porcentagem >= 75
+                          ? "bg-amber-500"
+                          : "bg-blue-500"
+                      )}
+                      style={{ width: `${Math.min(100, resumoCotas.sites.porcentagem)}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>Limite diário:</span>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={cotasEdicao.maxSitesDia}
+                        onChange={(e) =>
+                          setCotasEdicao((prev) => ({
+                            ...prev,
+                            maxSitesDia: Math.max(1, Number(e.target.value) || 5),
+                          }))
+                        }
+                        className="h-6 w-16 text-xs text-right font-mono"
+                      />
+                      <span>/dia</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. PESQUISAS WEB */}
+                <div className="p-3.5 rounded-lg border border-border/70 bg-card space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                      🔍 Pesquisas Web
+                    </span>
+                    <Badge variant="outline" className="text-[10px] font-mono">
+                      {resumoCotas.pesquisas.usado} / {cotasEdicao.maxPesquisasDia} hoje
+                    </Badge>
+                  </div>
+                  <div className="w-full bg-muted/60 h-2 rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full transition-all",
+                        resumoCotas.pesquisas.porcentagem >= 100
+                          ? "bg-red-500"
+                          : resumoCotas.pesquisas.porcentagem >= 75
+                          ? "bg-amber-500"
+                          : "bg-indigo-500"
+                      )}
+                      style={{ width: `${Math.min(100, resumoCotas.pesquisas.porcentagem)}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>Limite diário:</span>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        min="1"
+                        max="500"
+                        value={cotasEdicao.maxPesquisasDia}
+                        onChange={(e) =>
+                          setCotasEdicao((prev) => ({
+                            ...prev,
+                            maxPesquisasDia: Math.max(1, Number(e.target.value) || 30),
+                          }))
+                        }
+                        className="h-6 w-16 text-xs text-right font-mono"
+                      />
+                      <span>/dia</span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Switches de Políticas */}
+              <div className="p-3 rounded-lg bg-background/60 border border-border/60 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
+                <div className="space-y-1.5">
+                  <label className="flex items-center gap-2 cursor-pointer font-semibold text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={cotasEdicao.bloqueioRigido}
+                      onChange={(e) => setCotasEdicao((prev) => ({ ...prev, bloqueioRigido: e.target.checked }))}
+                      className="rounded border-border h-4 w-4 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span>Bloqueio Rígido Ativo (Trava requisições pagas ao bater a cota para proteger seu cartão)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-muted-foreground ml-6">
+                    <input
+                      type="checkbox"
+                      checked={cotasEdicao.fallbackParaGratuito}
+                      onChange={(e) => setCotasEdicao((prev) => ({ ...prev, fallbackParaGratuito: e.target.checked }))}
+                      className="rounded border-border h-4 w-4 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span>Fallback Automático para Motores Gratuitos (Se a cota paga esgotar, comuta para Pollinations/Groq sem travar)</span>
+                  </label>
+                </div>
+
+                <Button onClick={handleSaveCotas} className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white shrink-0">
+                  Salvar Limites de Cotas
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 2. SELETOR DE MOTOR DE IA PRIORITÁRIO */}
           <Card className="border-border/60 bg-gradient-to-r from-blue-500/5 via-indigo-500/5 to-purple-500/5">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between flex-wrap gap-2">
@@ -886,14 +1180,18 @@ function ConfiguracoesPage() {
                   value={settings.provedorIaAtivo}
                   onValueChange={(v) => handleSaveProvedorAtivo(v as ProvedorIaTipo)}
                 >
-                  <SelectTrigger className="w-full sm:w-[320px] text-xs">
+                  <SelectTrigger className="w-full sm:w-[360px] text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="auto">⚡ Automático (Melhor Rota + Fallback Dinâmico)</SelectItem>
+                    <SelectItem value="anthropic">Anthropic Claude (Claude 3.5 Sonnet · Elite UI/UX)</SelectItem>
+                    <SelectItem value="openai">OpenAI ChatGPT (GPT-4o · Lógica & Multimodal)</SelectItem>
+                    <SelectItem value="perplexity">Perplexity AI (Sonar · Pesquisa Web ao Vivo)</SelectItem>
+                    <SelectItem value="gemini">Google Gemini (Gemini 2.0 Flash · 1.500 req/dia grátis)</SelectItem>
                     <SelectItem value="groq">Groq (Llama 3.3 70B · 14.400 req/dia grátis)</SelectItem>
-                    <SelectItem value="gemini">Google Gemini (Gemini 2.0 Flash · 1M Contexto)</SelectItem>
                     <SelectItem value="openrouter">OpenRouter Hub (Claude, GPT-4o, Kimi, GLM, DeepSeek)</SelectItem>
+                    <SelectItem value="cerebras">Cerebras AI (Wafer-Scale Ultra Veloz)</SelectItem>
                     <SelectItem value="lovable">Lovable AI Gateway</SelectItem>
                     <SelectItem value="ollama">Ollama Local (Offline / Privado)</SelectItem>
                   </SelectContent>
@@ -905,7 +1203,434 @@ function ConfiguracoesPage() {
             </CardContent>
           </Card>
 
-          {/* 2. PROVEDORES DE IA GRATUITOS (awesome-free-llm-apis) */}
+          {/* 3. PROVEDORES PREMIUM COM CHAVES PRÓPRIAS (BYOK - Bring Your Own Key) */}
+          <Card className="border-border/60 bg-gradient-to-br from-card via-card to-purple-500/5">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Key className="h-4 w-4 text-purple-500" />
+                    Provedores de IA Premium com Chave Própria (BYOK)
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Conecte suas chaves de API caso assine planos da OpenAI, Anthropic, Perplexity, Recraft, fal.ai ou Adobe Firefly. Seus dados nunca são compartilhados.
+                  </CardDescription>
+                </div>
+                <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30">
+                  Alta Fidelidade & Qualidade Máxima
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3.5">
+
+                {/* ANTHROPIC CLAUDE */}
+                <div className="p-3.5 rounded-lg border border-border/60 bg-card hover:border-border transition-colors space-y-2.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs uppercase tracking-wider text-foreground">Anthropic Claude</span>
+                      <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-500/30">
+                        Claude 3.5 Sonnet · Elite UI/UX & Código GSAP
+                      </Badge>
+                      <a
+                        href="https://console.anthropic.com/settings/keys"
+                        target="_blank"
+                        rel="noopener"
+                        className="text-[11px] text-blue-500 hover:underline flex items-center gap-0.5 ml-1"
+                      >
+                        Obter Chave Claude <ExternalLink className="size-3" />
+                      </a>
+                    </div>
+                    {testing["anthropic"] ? (
+                      <Badge variant="outline" className="text-xs gap-1 border-blue-500/30 text-blue-500">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Testando...
+                      </Badge>
+                    ) : testResults["anthropic"] ? (
+                      <Badge
+                        variant="outline"
+                        className={`text-xs gap-1 ${
+                          testResults["anthropic"].status === "online"
+                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                            : "bg-red-500/10 text-red-600 border-red-500/30"
+                        }`}
+                      >
+                        {testResults["anthropic"].status === "online" ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                        {testResults["anthropic"].status === "online" ? `Ativa (${testResults["anthropic"].latencyMs}ms)` : testResults["anthropic"].message}
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type={showKeys["anthropic"] ? "text" : "password"}
+                        value={settings.anthropic?.key || ""}
+                        onChange={(e) => handleKeyChange("anthropic", e.target.value)}
+                        placeholder="sk-ant-... (Chave do console Anthropic)"
+                        className="text-xs font-mono pr-8"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleShowKey("anthropic")}
+                        className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                      >
+                        {showKeys["anthropic"] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                    <Button size="sm" onClick={() => handleSaveKey("anthropic")} className="text-xs h-9 px-3">
+                      Salvar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => testSingleApi("anthropic", settings.anthropic?.key, settings.anthropic?.model)}
+                      disabled={testing["anthropic"]}
+                      className="text-xs h-9 px-3"
+                    >
+                      Testar
+                    </Button>
+                  </div>
+                </div>
+
+                {/* OPENAI (CHATGPT + DALL-E 3) */}
+                <div className="p-3.5 rounded-lg border border-border/60 bg-card hover:border-border transition-colors space-y-2.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs uppercase tracking-wider text-foreground">OpenAI (ChatGPT & DALL-E 3)</span>
+                      <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+                        GPT-4o + DALL-E 3 Imagens
+                      </Badge>
+                      <a
+                        href="https://platform.openai.com/api-keys"
+                        target="_blank"
+                        rel="noopener"
+                        className="text-[11px] text-blue-500 hover:underline flex items-center gap-0.5 ml-1"
+                      >
+                        Obter Chave OpenAI <ExternalLink className="size-3" />
+                      </a>
+                    </div>
+                    {testing["openai"] ? (
+                      <Badge variant="outline" className="text-xs gap-1 border-blue-500/30 text-blue-500">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Testando...
+                      </Badge>
+                    ) : testResults["openai"] ? (
+                      <Badge
+                        variant="outline"
+                        className={`text-xs gap-1 ${
+                          testResults["openai"].status === "online"
+                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                            : "bg-red-500/10 text-red-600 border-red-500/30"
+                        }`}
+                      >
+                        {testResults["openai"].status === "online" ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                        {testResults["openai"].status === "online" ? `Ativa (${testResults["openai"].latencyMs}ms)` : testResults["openai"].message}
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type={showKeys["openai"] ? "text" : "password"}
+                        value={settings.openai?.key || ""}
+                        onChange={(e) => handleKeyChange("openai", e.target.value)}
+                        placeholder="sk-... (Chave OpenAI API)"
+                        className="text-xs font-mono pr-8"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleShowKey("openai")}
+                        className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                      >
+                        {showKeys["openai"] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                    <Button size="sm" onClick={() => handleSaveKey("openai")} className="text-xs h-9 px-3">
+                      Salvar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => testSingleApi("openai", settings.openai?.key, settings.openai?.model)}
+                      disabled={testing["openai"]}
+                      className="text-xs h-9 px-3"
+                    >
+                      Testar
+                    </Button>
+                  </div>
+                </div>
+
+                {/* PERPLEXITY API */}
+                <div className="p-3.5 rounded-lg border border-border/60 bg-card hover:border-border transition-colors space-y-2.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs uppercase tracking-wider text-foreground">Perplexity API</span>
+                      <Badge variant="outline" className="text-[10px] bg-cyan-500/10 text-cyan-600 border-cyan-500/30">
+                        Sonar · Pesquisa Web ao Vivo & Concorrentes Reais
+                      </Badge>
+                      <a
+                        href="https://www.perplexity.ai/settings/api"
+                        target="_blank"
+                        rel="noopener"
+                        className="text-[11px] text-blue-500 hover:underline flex items-center gap-0.5 ml-1"
+                      >
+                        Obter Chave Perplexity <ExternalLink className="size-3" />
+                      </a>
+                    </div>
+                    {testing["perplexity"] ? (
+                      <Badge variant="outline" className="text-xs gap-1 border-blue-500/30 text-blue-500">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Testando...
+                      </Badge>
+                    ) : testResults["perplexity"] ? (
+                      <Badge
+                        variant="outline"
+                        className={`text-xs gap-1 ${
+                          testResults["perplexity"].status === "online"
+                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                            : "bg-red-500/10 text-red-600 border-red-500/30"
+                        }`}
+                      >
+                        {testResults["perplexity"].status === "online" ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                        {testResults["perplexity"].status === "online" ? `Ativa (${testResults["perplexity"].latencyMs}ms)` : testResults["perplexity"].message}
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type={showKeys["perplexity"] ? "text" : "password"}
+                        value={settings.perplexity?.key || ""}
+                        onChange={(e) => handleKeyChange("perplexity", e.target.value)}
+                        placeholder="pplx-... (Chave Perplexity API)"
+                        className="text-xs font-mono pr-8"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleShowKey("perplexity")}
+                        className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                      >
+                        {showKeys["perplexity"] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                    <Button size="sm" onClick={() => handleSaveKey("perplexity")} className="text-xs h-9 px-3">
+                      Salvar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => testSingleApi("perplexity", settings.perplexity?.key, settings.perplexity?.model)}
+                      disabled={testing["perplexity"]}
+                      className="text-xs h-9 px-3"
+                    >
+                      Testar
+                    </Button>
+                  </div>
+                </div>
+
+                {/* RECRAFT.AI (LOGOTIPOS VETORIAIS SVG NATIVOS) */}
+                <div className="p-3.5 rounded-lg border border-border/60 bg-card hover:border-border transition-colors space-y-2.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs uppercase tracking-wider text-foreground">Recraft.ai</span>
+                      <Badge variant="outline" className="text-[10px] bg-rose-500/10 text-rose-600 border-rose-500/30">
+                        Top 1 Mundial para Logotipos Vetoriais SVG & Ícones
+                      </Badge>
+                      <a
+                        href="https://www.recraft.ai/profile"
+                        target="_blank"
+                        rel="noopener"
+                        className="text-[11px] text-blue-500 hover:underline flex items-center gap-0.5 ml-1"
+                      >
+                        Obter Chave Recraft <ExternalLink className="size-3" />
+                      </a>
+                    </div>
+                    {testing["recraft"] ? (
+                      <Badge variant="outline" className="text-xs gap-1 border-blue-500/30 text-blue-500">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Testando...
+                      </Badge>
+                    ) : testResults["recraft"] ? (
+                      <Badge
+                        variant="outline"
+                        className={`text-xs gap-1 ${
+                          testResults["recraft"].status === "online"
+                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                            : "bg-red-500/10 text-red-600 border-red-500/30"
+                        }`}
+                      >
+                        {testResults["recraft"].status === "online" ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                        {testResults["recraft"].status === "online" ? `Ativa (${testResults["recraft"].latencyMs}ms)` : testResults["recraft"].message}
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type={showKeys["recraft"] ? "text" : "password"}
+                        value={settings.recraft?.key || ""}
+                        onChange={(e) => handleKeyChange("recraft", e.target.value)}
+                        placeholder="Chave de API Recraft.ai (recraft-...)"
+                        className="text-xs font-mono pr-8"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleShowKey("recraft")}
+                        className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                      >
+                        {showKeys["recraft"] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                    <Button size="sm" onClick={() => handleSaveKey("recraft")} className="text-xs h-9 px-3">
+                      Salvar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => testSingleApi("recraft", settings.recraft?.key)}
+                      disabled={testing["recraft"]}
+                      className="text-xs h-9 px-3"
+                    >
+                      Testar
+                    </Button>
+                  </div>
+                </div>
+
+                {/* FAL.AI (FLUX.1 DEV/PRO) */}
+                <div className="p-3.5 rounded-lg border border-border/60 bg-card hover:border-border transition-colors space-y-2.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs uppercase tracking-wider text-foreground">fal.ai</span>
+                      <Badge variant="outline" className="text-[10px] bg-indigo-500/10 text-indigo-600 border-indigo-500/30">
+                        FLUX.1 Sub-segundo · Ultra Rápido & Baixo Custo (~$0.003/img)
+                      </Badge>
+                      <a
+                        href="https://fal.ai/dashboard/keys"
+                        target="_blank"
+                        rel="noopener"
+                        className="text-[11px] text-blue-500 hover:underline flex items-center gap-0.5 ml-1"
+                      >
+                        Obter Chave fal.ai <ExternalLink className="size-3" />
+                      </a>
+                    </div>
+                    {testing["fal"] ? (
+                      <Badge variant="outline" className="text-xs gap-1 border-blue-500/30 text-blue-500">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Testando...
+                      </Badge>
+                    ) : testResults["fal"] ? (
+                      <Badge
+                        variant="outline"
+                        className={`text-xs gap-1 ${
+                          testResults["fal"].status === "online"
+                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                            : "bg-red-500/10 text-red-600 border-red-500/30"
+                        }`}
+                      >
+                        {testResults["fal"].status === "online" ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                        {testResults["fal"].status === "online" ? `Ativa (${testResults["fal"].latencyMs}ms)` : testResults["fal"].message}
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type={showKeys["fal"] ? "text" : "password"}
+                        value={settings.fal?.key || ""}
+                        onChange={(e) => handleKeyChange("fal", e.target.value)}
+                        placeholder="Chave fal.ai (fal_key-...)"
+                        className="text-xs font-mono pr-8"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleShowKey("fal")}
+                        className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                      >
+                        {showKeys["fal"] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                    <Button size="sm" onClick={() => handleSaveKey("fal")} className="text-xs h-9 px-3">
+                      Salvar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => testSingleApi("fal", settings.fal?.key)}
+                      disabled={testing["fal"]}
+                      className="text-xs h-9 px-3"
+                    >
+                      Testar
+                    </Button>
+                  </div>
+                </div>
+
+                {/* ADOBE FIREFLY SERVICES */}
+                <div className="p-3.5 rounded-lg border border-border/60 bg-card hover:border-border transition-colors space-y-2.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs uppercase tracking-wider text-foreground">Adobe Firefly</span>
+                      <Badge variant="outline" className="text-[10px] bg-red-500/10 text-red-600 border-red-500/30">
+                        Firefly Services API · Imagens Comerciais Licenciadas
+                      </Badge>
+                      <a
+                        href="https://developer.adobe.com/firefly-services/"
+                        target="_blank"
+                        rel="noopener"
+                        className="text-[11px] text-blue-500 hover:underline flex items-center gap-0.5 ml-1"
+                      >
+                        Adobe Console <ExternalLink className="size-3" />
+                      </a>
+                    </div>
+                    {testing["firefly"] ? (
+                      <Badge variant="outline" className="text-xs gap-1 border-blue-500/30 text-blue-500">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Testando...
+                      </Badge>
+                    ) : testResults["firefly"] ? (
+                      <Badge
+                        variant="outline"
+                        className={`text-xs gap-1 ${
+                          testResults["firefly"].status === "online"
+                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                            : "bg-red-500/10 text-red-600 border-red-500/30"
+                        }`}
+                      >
+                        {testResults["firefly"].status === "online" ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                        {testResults["firefly"].status === "online" ? `Ativa (${testResults["firefly"].latencyMs}ms)` : testResults["firefly"].message}
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type={showKeys["firefly"] ? "text" : "password"}
+                        value={settings.firefly?.key || ""}
+                        onChange={(e) => handleKeyChange("firefly", e.target.value)}
+                        placeholder="Client ID / API Key do Adobe Developer Console"
+                        className="text-xs font-mono pr-8"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleShowKey("firefly")}
+                        className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                      >
+                        {showKeys["firefly"] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                    <Button size="sm" onClick={() => handleSaveKey("firefly")} className="text-xs h-9 px-3">
+                      Salvar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => testSingleApi("firefly", settings.firefly?.key)}
+                      disabled={testing["firefly"]}
+                      className="text-xs h-9 px-3"
+                    >
+                      Testar
+                    </Button>
+                  </div>
+                </div>
+
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 4. PROVEDORES DE IA GRATUITOS (awesome-free-llm-apis) */}
           <Card className="border-border/60">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between flex-wrap gap-2">

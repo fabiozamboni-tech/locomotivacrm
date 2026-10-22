@@ -1,11 +1,26 @@
+import { DEFAULT_COTAS_DIARIAS, type CotasDiariasConfig } from "./ai-quota-guard";
+
 export interface ApiConfig {
   key: string;
   enabled: boolean;
   model?: string;
   baseUrl?: string;
+  clientId?: string;
+  clientSecret?: string;
+  webhookUrl?: string;
 }
 
-export type ProvedorIaTipo = "auto" | "groq" | "gemini" | "openrouter" | "cerebras" | "lovable" | "ollama";
+export type ProvedorIaTipo =
+  | "auto"
+  | "openai"
+  | "anthropic"
+  | "perplexity"
+  | "gemini"
+  | "groq"
+  | "cerebras"
+  | "openrouter"
+  | "lovable"
+  | "ollama";
 
 export type ApiProviderKey =
   | "serpapi"
@@ -16,30 +31,48 @@ export type ApiProviderKey =
   | "gemini"
   | "openrouter"
   | "cerebras"
-  | "ollama";
+  | "ollama"
+  | "openai"
+  | "anthropic"
+  | "perplexity"
+  | "recraft"
+  | "fal"
+  | "firefly"
+  | "manus";
 
 export interface ApiSettingsMap {
   serpapi: ApiConfig;
   apify: ApiConfig;
   lovable: ApiConfig;
   apollo: ApiConfig;
-  // Provedores gratuitos de LLM (awesome-free-llm-apis)
+  // Provedores de IA Gratuitos (awesome-free-llm-apis)
   groq: ApiConfig;
   gemini: ApiConfig;
   openrouter: ApiConfig;
   cerebras: ApiConfig;
   ollama: ApiConfig;
+  // Novos Provedores Premium (BYOK - Bring Your Own Key)
+  openai: ApiConfig;
+  anthropic: ApiConfig;
+  perplexity: ApiConfig;
+  recraft: ApiConfig;
+  fal: ApiConfig;
+  firefly: ApiConfig;
+  manus: ApiConfig;
+  // Roteamento e Cotas
   provedorIaAtivo: ProvedorIaTipo;
+  cotasDiarias: CotasDiariasConfig;
   github?: {
     token: string;
     defaultOwner?: string;
   };
 }
 
-const STORAGE_KEY = "locomotiva_api_keys_v2";
+const STORAGE_KEY = "locomotiva_api_keys_v3";
+const PREV_STORAGE_KEY = "locomotiva_api_keys_v2";
 const LEGACY_STORAGE_KEY = "locomotiva_api_keys_v1";
 
-const DEFAULT_SETTINGS: ApiSettingsMap = {
+export const DEFAULT_SETTINGS: ApiSettingsMap = {
   serpapi: {
     key: "ec62da1cce88a0223fee434841dbaceef4b27c63b8825d53de8d25090ccdbe02",
     enabled: true,
@@ -83,7 +116,45 @@ const DEFAULT_SETTINGS: ApiSettingsMap = {
     baseUrl: "http://localhost:11434/v1",
     model: "llama3.3",
   },
+  // Provedores Pagos / BYOK
+  openai: {
+    key: "",
+    enabled: false,
+    model: "gpt-4o",
+  },
+  anthropic: {
+    key: "",
+    enabled: false,
+    model: "claude-3-5-sonnet-20241022",
+  },
+  perplexity: {
+    key: "",
+    enabled: false,
+    model: "sonar",
+  },
+  recraft: {
+    key: "",
+    enabled: false,
+    model: "recraftv4_1_vector",
+  },
+  fal: {
+    key: "",
+    enabled: false,
+    model: "fal-ai/flux/dev",
+  },
+  firefly: {
+    key: "",
+    enabled: false,
+    clientId: "",
+    clientSecret: "",
+  },
+  manus: {
+    key: "",
+    enabled: false,
+    webhookUrl: "",
+  },
   provedorIaAtivo: "auto",
+  cotasDiarias: DEFAULT_COTAS_DIARIAS,
   github: {
     token: "",
     defaultOwner: "",
@@ -93,7 +164,10 @@ const DEFAULT_SETTINGS: ApiSettingsMap = {
 export function getApiSettings(): ApiSettingsMap {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
+    const raw =
+      localStorage.getItem(STORAGE_KEY) ||
+      localStorage.getItem(PREV_STORAGE_KEY) ||
+      localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!raw) return DEFAULT_SETTINGS;
     const parsed = JSON.parse(raw);
 
@@ -151,6 +225,42 @@ export function getApiSettings(): ApiSettingsMap {
         ...DEFAULT_SETTINGS.ollama,
         ...(parsed.ollama || {}),
       },
+      openai: {
+        ...DEFAULT_SETTINGS.openai,
+        ...(parsed.openai || {}),
+      },
+      anthropic: {
+        ...DEFAULT_SETTINGS.anthropic,
+        ...(parsed.anthropic || {}),
+      },
+      perplexity: {
+        ...DEFAULT_SETTINGS.perplexity,
+        ...(parsed.perplexity || {}),
+      },
+      recraft: {
+        ...DEFAULT_SETTINGS.recraft,
+        ...(parsed.recraft || {}),
+      },
+      fal: {
+        ...DEFAULT_SETTINGS.fal,
+        ...(parsed.fal || {}),
+      },
+      firefly: {
+        ...DEFAULT_SETTINGS.firefly,
+        ...(parsed.firefly || {}),
+      },
+      manus: {
+        ...DEFAULT_SETTINGS.manus,
+        ...(parsed.manus || {}),
+      },
+      cotasDiarias: {
+        ...DEFAULT_SETTINGS.cotasDiarias,
+        ...(parsed.cotasDiarias || {}),
+        limitesPorProvedor: {
+          ...DEFAULT_SETTINGS.cotasDiarias.limitesPorProvedor,
+          ...(parsed.cotasDiarias?.limitesPorProvedor || {}),
+        },
+      },
       github: {
         token: parsed.github?.token || DEFAULT_SETTINGS.github?.token || "",
         defaultOwner: parsed.github?.defaultOwner || DEFAULT_SETTINGS.github?.defaultOwner || "fabiozamboni-tech",
@@ -183,7 +293,7 @@ export function saveGithubConfig(config: { token?: string; defaultOwner?: string
 }
 
 export function saveApiSetting(
-  provider: keyof Omit<ApiSettingsMap, "provedorIaAtivo">,
+  provider: keyof Omit<ApiSettingsMap, "provedorIaAtivo" | "cotasDiarias" | "github">,
   config: Partial<ApiConfig>,
 ): ApiSettingsMap {
   const current = getApiSettings();
@@ -218,6 +328,31 @@ export function saveProvedorIaAtivo(provedor: ProvedorIaTipo): ApiSettingsMap {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     } catch (err) {
       console.error("Erro ao salvar provedor IA ativo:", err);
+    }
+  }
+
+  return updated;
+}
+
+export function saveCotasDiarias(novasCotas: Partial<CotasDiariasConfig>): ApiSettingsMap {
+  const current = getApiSettings();
+  const updated: ApiSettingsMap = {
+    ...current,
+    cotasDiarias: {
+      ...current.cotasDiarias,
+      ...novasCotas,
+      limitesPorProvedor: {
+        ...current.cotasDiarias.limitesPorProvedor,
+        ...(novasCotas.limitesPorProvedor || {}),
+      },
+    },
+  };
+
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    } catch (err) {
+      console.error("Erro ao salvar cotas diárias no localStorage:", err);
     }
   }
 

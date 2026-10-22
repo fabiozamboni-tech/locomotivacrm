@@ -26,7 +26,16 @@ import type { ApiSettingsMap } from "@/lib/api-settings";
 
 export interface AgenteIaOption {
   id: string;
-  provider: "groq" | "gemini" | "openrouter" | "cerebras" | "lovable" | "ollama" | "bespoke";
+  provider:
+    | "groq"
+    | "gemini"
+    | "openrouter"
+    | "cerebras"
+    | "lovable"
+    | "ollama"
+    | "bespoke"
+    | "openai"
+    | "anthropic";
   nome: string;
   modelo: string;
   descricao: string;
@@ -34,7 +43,7 @@ export interface AgenteIaOption {
   badge: string;
   badgeVariant?: "default" | "secondary" | "outline";
   destaque?: boolean;
-  categoria: "openrouter" | "rapidos" | "editorial";
+  categoria: "openrouter" | "rapidos" | "editorial" | "direto";
 }
 
 export const AGENTES_IA_CATALOGO: AgenteIaOption[] = [

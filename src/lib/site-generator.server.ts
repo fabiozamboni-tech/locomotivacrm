@@ -28,8 +28,22 @@ export interface GerarSiteInput {
     cerebras?: string;
     lovable?: string;
     ollamaBaseUrl?: string;
+    openai?: string;
+    anthropic?: string;
+    perplexity?: string;
   };
-  provedorPreferencial?: "auto" | "groq" | "gemini" | "openrouter" | "cerebras" | "lovable" | "ollama" | "bespoke";
+  provedorPreferencial?:
+    | "auto"
+    | "groq"
+    | "gemini"
+    | "openrouter"
+    | "cerebras"
+    | "lovable"
+    | "ollama"
+    | "bespoke"
+    | "openai"
+    | "anthropic"
+    | "perplexity";
   modeloPreferencial?: string;
   usarAntiIaBespoke?: boolean;
   usarSkillsClaude?: boolean;
@@ -68,8 +82,22 @@ export interface RefinarSiteInput {
     cerebras?: string;
     lovable?: string;
     ollamaBaseUrl?: string;
+    openai?: string;
+    anthropic?: string;
+    perplexity?: string;
   };
-  provedorPreferencial?: "auto" | "groq" | "gemini" | "openrouter" | "cerebras" | "lovable" | "ollama" | "bespoke";
+  provedorPreferencial?:
+    | "auto"
+    | "groq"
+    | "gemini"
+    | "openrouter"
+    | "cerebras"
+    | "lovable"
+    | "ollama"
+    | "bespoke"
+    | "openai"
+    | "anthropic"
+    | "perplexity";
   modeloPreferencial?: string;
   usarAntiIaBespoke?: boolean;
   usarSkillsClaude?: boolean;
@@ -1444,7 +1472,7 @@ Aplique esta alteração no código HTML mantendo todo o restante do site funcio
 
     let generatedHtml = "";
     let respostaTexto = "";
-    let providerUsed = data.provedorPreferencial || "auto";
+    let providerUsed: string = data.provedorPreferencial || "auto";
     let modelUsed = data.modeloPreferencial || "default";
 
     try {

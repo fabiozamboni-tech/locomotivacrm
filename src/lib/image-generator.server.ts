@@ -13,14 +13,21 @@ export interface GerarImagemInput {
   nicho?: string;
   cidade?: string;
   empresaNome?: string;
-  provedorPreferencial?: "auto" | "gemini" | "pollinations";
+  provedorPreferencial?: "auto" | "gemini" | "pollinations" | "openai" | "fal" | "firefly";
+  customKeys?: {
+    gemini?: string;
+    openai?: string;
+    fal?: string;
+    firefly?: string;
+    recraft?: string;
+  };
   customGeminiKey?: string;
 }
 
 export interface GerarImagemOutput {
   sucesso: boolean;
   url: string;
-  provedor: "google_imagen_3" | "pollinations_flux" | "fallback";
+  provedor: "google_imagen_3" | "pollinations_flux" | "openai_dalle3" | "fal_flux" | "fallback";
   promptEmIngles: string;
   erro?: string;
 }
@@ -151,8 +158,80 @@ export const gerarImagemSite_ServerFn = createServerFn({ method: "POST" })
       aspectRatioGoogle = "1:1";
     }
 
-    // 1. TENTA GOOGLE IMAGEN 3 SE HOUVER CHAVE DISPONÍVEL OU PROVEDOR SELECIONADO
+    // 1. TENTA OPENAI DALL-E 3 SE SOLICITADO OU HOUVER CHAVE
+    const openaiKey = data.customKeys?.openai || process.env.OPENAI_API_KEY;
+    if (data.provedorPreferencial === "openai" && openaiKey) {
+      try {
+        const res = await fetch("https://api.openai.com/v1/images/generations", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${openaiKey}`,
+          },
+          body: JSON.stringify({
+            model: "dall-e-3",
+            prompt: promptIngles,
+            n: 1,
+            size: data.formato === "1:1" ? "1024x1024" : "1792x1024",
+            quality: "standard",
+          }),
+        });
+
+        if (res.ok) {
+          const json: any = await res.json();
+          const imgUrl = json?.data?.[0]?.url;
+          if (imgUrl) {
+            return {
+              sucesso: true,
+              url: imgUrl,
+              provedor: "openai_dalle3",
+              promptEmIngles: promptIngles,
+            };
+          }
+        }
+      } catch (err) {
+        console.warn("[Imagem IA] Falha no DALL-E 3, usando fallback:", err);
+      }
+    }
+
+    // 2. TENTA FAL.AI (FLUX.1 DEV/PRO) SE SOLICITADO OU HOUVER CHAVE
+    const falKey = data.customKeys?.fal || process.env.FAL_KEY;
+    if (data.provedorPreferencial === "fal" && falKey) {
+      try {
+        const res = await fetch("https://fal.run/fal-ai/flux/dev", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Key ${falKey}`,
+          },
+          body: JSON.stringify({
+            prompt: promptIngles,
+            image_size: data.formato === "1:1" ? "square_hd" : "landscape_16_9",
+            num_images: 1,
+            enable_safety_checker: true,
+          }),
+        });
+
+        if (res.ok) {
+          const json: any = await res.json();
+          const imgUrl = json?.images?.[0]?.url;
+          if (imgUrl) {
+            return {
+              sucesso: true,
+              url: imgUrl,
+              provedor: "fal_flux",
+              promptEmIngles: promptIngles,
+            };
+          }
+        }
+      } catch (err) {
+        console.warn("[Imagem IA] Falha no fal.ai, usando fallback:", err);
+      }
+    }
+
+    // 3. TENTA GOOGLE IMAGEN 3 SE HOUVER CHAVE DISPONÍVEL OU PROVEDOR SELECIONADO
     const geminiKey =
+      data.customKeys?.gemini ||
       data.customGeminiKey ||
       process.env.GEMINI_API_KEY ||
       process.env.GOOGLE_API_KEY;
@@ -219,6 +298,7 @@ export interface GerarLogoSvgInput {
   estilo?: "horizontal_navbar" | "monograma_icone" | "emblema_selo" | "minimalista_moderno";
   corPrimariaHex?: string;
   corSecundariaHex?: string;
+  motor?: "svg_llm" | "recraft" | "pollinations_flux" | "fal_flux" | "dalle3";
   customKeys?: {
     groq?: string;
     gemini?: string;
@@ -226,8 +306,22 @@ export interface GerarLogoSvgInput {
     cerebras?: string;
     lovable?: string;
     ollamaBaseUrl?: string;
+    recraft?: string;
+    openai?: string;
+    fal?: string;
+    firefly?: string;
   };
-  provedorPreferencial?: "auto" | "groq" | "gemini" | "openrouter" | "cerebras" | "lovable" | "ollama";
+  provedorPreferencial?:
+    | "auto"
+    | "groq"
+    | "gemini"
+    | "openrouter"
+    | "cerebras"
+    | "lovable"
+    | "ollama"
+    | "openai"
+    | "anthropic"
+    | "recraft";
   modeloPreferencial?: string;
 }
 
@@ -242,7 +336,7 @@ export interface GerarLogoSvgOutput {
 }
 
 /**
- * Server Function: Gera logotipos vetoriais SVG puros através de LLMs (Groq, Gemini, etc.)
+ * Server Function: Gera logotipos vetoriais SVG puros através de LLMs (Groq, Gemini, etc.) ou Recraft.ai
  */
 export const gerarLogoVetorialSvg_ServerFn = createServerFn({ method: "POST" })
   .inputValidator((data: GerarLogoSvgInput) => data)
@@ -250,6 +344,48 @@ export const gerarLogoVetorialSvg_ServerFn = createServerFn({ method: "POST" })
     const estilo = data.estilo || "horizontal_navbar";
     const corPrimaria = data.corPrimariaHex || "#722F37";
     const corSecundaria = data.corSecundariaHex || "#18181B";
+
+    // 1. TENTA RECRAFT.AI SE SELECIONADO OU COM CHAVE DISPONÍVEL
+    const recraftKey = data.customKeys?.recraft || process.env.RECRAFT_API_TOKEN;
+    if ((data.motor === "recraft" || data.provedorPreferencial === "recraft") && recraftKey) {
+      try {
+        const promptRecraft = `minimalist elegant vector logo for ${data.empresaNome}, ${data.segmento}, ${data.cidade}, style ${estilo}, clean lines, isolated vector icon, primary color ${corPrimaria}, transparent background`;
+        const res = await fetch("https://external.api.recraft.ai/v1/images/generations", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${recraftKey}`,
+          },
+          body: JSON.stringify({
+            prompt: promptRecraft,
+            model: "recraftv4_1_vector",
+            style: "vector_illustration",
+          }),
+        });
+
+        if (res.ok) {
+          const json: any = await res.json();
+          const svgUrl = json?.data?.[0]?.url;
+          if (svgUrl) {
+            const svgRes = await fetch(svgUrl);
+            if (svgRes.ok) {
+              const svgCode = await svgRes.text();
+              const base64 = Buffer.from(svgCode, "utf-8").toString("base64");
+              return {
+                sucesso: true,
+                svgCode,
+                dataUrl: `data:image/svg+xml;base64,${base64}`,
+                titulo: `${data.empresaNome} - Recraft.ai (${estilo})`,
+                provider: "recraft",
+                model: "recraftv4_1_vector",
+              };
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[Recraft] Falha na API do Recraft, caindo para gerador SVG LLM:", err);
+      }
+    }
 
     let orientacaoViewBox = 'viewBox="0 0 360 90" width="100%" height="100%"';
     let orientacaoInstrucao = `Composição horizontal para cabeçalho de site (navbar).
@@ -300,7 +436,10 @@ Gere o código SVG puro agora.`;
           { role: "user", content: promptUser },
         ],
         {
-          provedorPreferencial: data.provedorPreferencial || "auto",
+          provedorPreferencial:
+            data.provedorPreferencial === "recraft"
+              ? "auto"
+              : data.provedorPreferencial || "auto",
           model: data.modeloPreferencial,
           customKeys: data.customKeys,
           temperature: 0.3,

@@ -10,7 +10,16 @@ export interface ChatMessage {
   content: string;
 }
 
-export type ProvedorNome = "groq" | "gemini" | "openrouter" | "cerebras" | "lovable" | "ollama";
+export type ProvedorNome =
+  | "groq"
+  | "gemini"
+  | "openrouter"
+  | "cerebras"
+  | "lovable"
+  | "ollama"
+  | "openai"
+  | "anthropic"
+  | "perplexity";
 
 export interface LlmCallOptions {
   provedorPreferencial?: ProvedorNome | "auto";
@@ -24,6 +33,9 @@ export interface LlmCallOptions {
     cerebras?: string;
     lovable?: string;
     ollamaBaseUrl?: string;
+    openai?: string;
+    anthropic?: string;
+    perplexity?: string;
   };
 }
 
@@ -135,6 +147,55 @@ export const PROVIDERS_CONFIG: Record<ProvedorNome, ProviderEndpointConfig> = {
       max_tokens: maxTokens,
     }),
   },
+  openai: {
+    nome: "openai",
+    url: "https://api.openai.com/v1/chat/completions",
+    defaultModel: "gpt-4o",
+    getKey: (custom) => custom?.openai || process.env.OPENAI_API_KEY,
+    getHeaders: (key) => ({
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+    }),
+    formatBody: (messages, model, temperature = 0.7, maxTokens = 4096) => ({
+      model: model || "gpt-4o",
+      messages,
+      temperature,
+      max_tokens: maxTokens,
+    }),
+  },
+  anthropic: {
+    nome: "anthropic",
+    url: "https://api.anthropic.com/v1/messages",
+    defaultModel: "claude-3-5-sonnet-20241022",
+    getKey: (custom) => custom?.anthropic || process.env.ANTHROPIC_API_KEY,
+    getHeaders: (key) => ({
+      "Content-Type": "application/json",
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+    }),
+    formatBody: (messages, model, temperature = 0.7, maxTokens = 4096) => ({
+      model: model || "claude-3-5-sonnet-20241022",
+      max_tokens: maxTokens,
+      temperature,
+      messages,
+    }),
+  },
+  perplexity: {
+    nome: "perplexity",
+    url: "https://api.perplexity.ai/chat/completions",
+    defaultModel: "sonar",
+    getKey: (custom) => custom?.perplexity || process.env.PERPLEXITY_API_KEY,
+    getHeaders: (key) => ({
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+    }),
+    formatBody: (messages, model, temperature = 0.7, maxTokens = 4096) => ({
+      model: model || "sonar",
+      messages,
+      temperature,
+      max_tokens: maxTokens,
+    }),
+  },
 };
 
 /**
@@ -165,6 +226,13 @@ export const PROVIDER_FALLBACK_MODELS: Record<ProvedorNome, string[]> = {
   cerebras: ["llama-3.3-70b", "llama3.1-8b"],
   lovable: ["google/gemini-3-flash-preview", "openai/gpt-5-mini"],
   ollama: ["llama3.3", "llama3.1", "llama3", "mistral"],
+  openai: ["gpt-4o", "gpt-4o-mini", "o3-mini", "gpt-4-turbo"],
+  anthropic: [
+    "claude-3-5-sonnet-20241022",
+    "claude-3-7-sonnet-20250219",
+    "claude-3-5-haiku-20241022",
+  ],
+  perplexity: ["sonar", "sonar-pro", "sonar-reasoning"],
 };
 
 /**
@@ -227,6 +295,70 @@ async function chamarGeminiNativo(
 }
 
 /**
+ * Chamada nativa à API da Anthropic (Claude 3.5 / 3.7 Sonnet)
+ */
+async function chamarAnthropicNativo(
+  key: string,
+  model: string,
+  messages: ChatMessage[],
+  temperature = 0.7,
+  maxTokens = 4096,
+  timeoutMs = 30000,
+): Promise<{ text: string; provider: ProvedorNome; model: string }> {
+  const cleanModel = model || "claude-3-5-sonnet-20241022";
+  const url = "https://api.anthropic.com/v1/messages";
+
+  const systemMsg = messages.find((m) => m.role === "system")?.content || "";
+  const nonSystem = messages
+    .filter((m) => m.role !== "system")
+    .map((m) => ({
+      role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
+      content: m.content,
+    }));
+
+  if (nonSystem.length === 0) {
+    nonSystem.push({ role: "user", content: systemMsg || "Olá" });
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: cleanModel,
+        max_tokens: maxTokens,
+        temperature,
+        system: systemMsg || undefined,
+        messages: nonSystem,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const err = await res.text().catch(() => "");
+      throw new Error(`Anthropic HTTP ${res.status}: ${err.slice(0, 300)}`);
+    }
+
+    const data: any = await res.json();
+    const textPart = data.content?.find((c: any) => c.type === "text");
+    const text = textPart?.text || "";
+    if (!text) {
+      throw new Error("Anthropic retornou resposta vazia");
+    }
+    return { text: text.trim(), provider: "anthropic", model: cleanModel };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Executa uma chamada para um provedor específico, com auto-recuperação de modelo caso receba 404/400 decommissioned.
  */
 async function callSpecificProvider(
@@ -236,6 +368,19 @@ async function callSpecificProvider(
   opts: LlmCallOptions,
   timeoutOverrideMs?: number,
 ): Promise<{ text: string; provider: ProvedorNome; model: string }> {
+  const timeoutMs = timeoutOverrideMs || 25000;
+
+  // Roteamento nativo direto para Anthropic
+  if (prov.nome === "anthropic") {
+    return await chamarAnthropicNativo(
+      key,
+      opts.model || prov.defaultModel,
+      messages,
+      opts.temperature,
+      opts.maxTokens,
+      timeoutMs,
+    );
+  }
   const initialModel = opts.model || prov.defaultModel;
   const fallbacks = PROVIDER_FALLBACK_MODELS[prov.nome] || [];
   const modelsToTry = [initialModel, ...fallbacks.filter((m) => m !== initialModel)];
@@ -245,7 +390,6 @@ async function callSpecificProvider(
     : prov.url;
 
   let lastError: Error | null = null;
-  const timeoutMs = timeoutOverrideMs || 25000;
 
   for (let i = 0; i < modelsToTry.length; i++) {
     const currentModel = modelsToTry[i];
@@ -381,7 +525,17 @@ export async function chamarLlmUniversal(
   }
 
   // Adiciona os demais em ordem de custo/eficiência para o fallback
-  const candidates: ProvedorNome[] = ["groq", "gemini", "cerebras", "lovable", "openrouter", "ollama"];
+  const candidates: ProvedorNome[] = [
+    "groq",
+    "gemini",
+    "cerebras",
+    "openrouter",
+    "openai",
+    "anthropic",
+    "perplexity",
+    "lovable",
+    "ollama",
+  ];
   for (const c of candidates) {
     if (!order.includes(c)) {
       order.push(c);
