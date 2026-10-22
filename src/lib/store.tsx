@@ -63,6 +63,7 @@ export type DbSyncStatus = "idle" | "syncing" | "synced" | "error";
 
 interface StoreValue {
   empresas: Empresa[];
+  empresasAtivas: Empresa[];
   empresasExcluidas: EmpresaExcluida[];
   instagramProfilesDb: InstagramProfile[];
   weights: ScoreWeights;
@@ -849,9 +850,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       });
   }, []);
 
+  const empresasAtivas = useMemo(
+    () => empresas.filter((e) => e.crmStage !== "excluidos" && !isEmpresaExcluida(e)),
+    [empresas, isEmpresaExcluida],
+  );
+
   const value = useMemo<StoreValue>(
     () => ({
       empresas,
+      empresasAtivas,
       empresasExcluidas,
       instagramProfilesDb,
       weights,
@@ -889,6 +896,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }),
     [
       empresas,
+      empresasAtivas,
       empresasExcluidas,
       instagramProfilesDb,
       kanbanColumns,

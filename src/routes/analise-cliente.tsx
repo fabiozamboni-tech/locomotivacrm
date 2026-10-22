@@ -163,14 +163,19 @@ const TIPOS_PROMPTS: { value: TipoPrompt; label: string; desc: string }[] = [
 function AnaliseClientePage() {
   const search = useSearch({ from: "/analise-cliente" });
   const navigate = useNavigate();
-  const { empresas, updateEmpresa, addHistorico } = useStore();
+  const { empresas, empresasAtivas, updateEmpresa, addHistorico } = useStore();
+
+  const empresasFiltradas = useMemo(
+    () => empresasAtivas || empresas.filter((e) => e.crmStage !== "excluidos"),
+    [empresasAtivas, empresas],
+  );
 
   const [selEmpresaId, setSelEmpresaId] = useState<string>(
-    search.empresa ?? empresas[0]?.id ?? "",
+    search.empresa ?? empresasFiltradas[0]?.id ?? "",
   );
   const [activeTab, setActiveTab] = useState<TabKey>(search.tab ?? "visao-geral");
 
-  const empresa = empresas.find((e) => e.id === selEmpresaId);
+  const empresa = empresasFiltradas.find((e) => e.id === selEmpresaId) || empresasFiltradas[0];
 
   // Sincroniza query params
   const handleTrocaEmpresa = (novoId: string) => {
@@ -851,7 +856,7 @@ function AnaliseClientePage() {
                 <SelectValue placeholder="Selecione a empresa..." />
               </SelectTrigger>
               <SelectContent>
-                {empresas.map((e) => (
+                {empresasFiltradas.map((e) => (
                   <SelectItem key={e.id} value={e.id} className="text-xs">
                     {e.nome} — {e.cidade} ({e.segmento})
                   </SelectItem>

@@ -52,7 +52,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const router = useRouter();
   const lock = useServerFn(lockSite);
-  const { theme, toggleTheme, empresas, dbSyncStatus, syncNow, databaseInfo } = useStore();
+  const { theme, toggleTheme, empresas, empresasAtivas, dbSyncStatus, syncNow, databaseInfo } = useStore();
+  const ativas = empresasAtivas || empresas.filter((e) => e.crmStage !== "excluidos");
   const [openSearch, setOpenSearch] = useState(false);
 
   if (pathname === "/login" || pathname === "/unlock") return <>{children}</>;
@@ -147,7 +148,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
           <Badge variant="outline" className="hidden lg:inline-flex gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            {empresas.length} empresas mapeadas
+            {ativas.length} empresas mapeadas
           </Badge>
           <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Alternar tema">
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -165,7 +166,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <CommandList>
           <CommandEmpty>Nenhum resultado.</CommandEmpty>
           <CommandGroup heading="Empresas">
-            {empresas.slice(0, 20).map((e) => (
+            {ativas.slice(0, 20).map((e) => (
               <CommandItem
                 key={e.id}
                 value={`${e.nome} ${e.cidade} ${e.segmento}`}

@@ -83,6 +83,14 @@ import { ExportarGithubModal } from "@/components/estudio-criacao/exportar-githu
 import { PaletaCoresCard } from "@/components/paleta-cores-card";
 import { PainelImagensSite } from "@/components/estudio-criacao/painel-imagens-site";
 import { PROMPT_BLOCO_SKILLS_CLAUDE } from "@/lib/skills-claude-prompt";
+import {
+  loadSkillsLocais,
+  saveSkillsLocais,
+  type CustomSkill,
+} from "@/lib/skills-config";
+import { montarPromptSiteCompleto } from "@/lib/site-generator-prompt";
+import { ModalGerenciarSkills } from "@/components/estudio-criacao/modal-gerenciar-skills";
+import { ModalRefinarPromptIa } from "@/components/estudio-criacao/modal-refinar-prompt-ia";
 
 export const Route = createFileRoute("/estudio-criacao")({
   validateSearch: z.object({
@@ -112,14 +120,19 @@ const SUGESTOES_CHAT = [
 function EstudioCriacaoPage() {
   const search = Route.useSearch() as { empresa?: string; tab?: "site" | "paleta" | "prompts" };
   const navigate = useNavigate();
-  const { empresas, updateEmpresa, addHistorico } = useStore();
+  const { empresas, empresasAtivas: storeEmpresasAtivas, updateEmpresa, addHistorico } = useStore();
+
+  const empresasAtivas = React.useMemo(
+    () => storeEmpresasAtivas || empresas.filter((e) => e.crmStage !== "excluidos"),
+    [storeEmpresasAtivas, empresas],
+  );
 
   const gerarSiteFn = useServerFn(gerarSiteCompletoIA_ServerFn);
   const refinarSiteFn = useServerFn(refinarSiteComIa_ServerFn);
 
-  // Empresa ativa
-  const empresaId = search.empresa || empresas[0]?.id || "";
-  const empresa = empresas.find((e) => e.id === empresaId) || empresas[0];
+  // Empresa ativa (apenas empresas ativas, nunca excluídas)
+  const empresaId = search.empresa || empresasAtivas[0]?.id || "";
+  const empresa = empresasAtivas.find((e) => e.id === empresaId) || empresasAtivas[0];
 
   // Sub-aba ativa superior
   const [abaAtiva, setAbaAtiva] = useState<"site" | "paleta" | "prompts">(search.tab || "site");
@@ -139,6 +152,11 @@ function EstudioCriacaoPage() {
   const [usarSkillsClaude, setUsarSkillsClaude] = useState<boolean>(
     empresa?.estudioUsarSkillsClaude ?? true,
   );
+
+  // Gestão de Skills (Anthropic Claude + Customizadas)
+  const [skills, setSkills] = useState<CustomSkill[]>(() => loadSkillsLocais());
+  const [modalSkillsOpen, setModalSkillsOpen] = useState(false);
+  const [modalPromptOpen, setModalPromptOpen] = useState(false);
 
   // Agente de IA selecionado
   const [agenteSelecionado, setAgenteSelecionado] = useState<AgenteIaOption>(AGENTES_IA_CATALOGO[0]);
@@ -292,8 +310,36 @@ function EstudioCriacaoPage() {
     toast.info("Diretrizes de design (.md) removidas.");
   };
 
-  // 1. GERAR NOVO SITE COMPLETO (DO ZERO)
-  const handleGerarSite = async () => {
+  const handleSkillsChange = (novasSkills: CustomSkill[]) => {
+    setSkills(novasSkills);
+    saveSkillsLocais(novasSkills);
+    const claudeSkill = novasSkills.find((s) => s.id === "claude-frontend-design");
+    if (claudeSkill) {
+      setUsarSkillsClaude(claudeSkill.ativa);
+      if (empresa) updateEmpresa(empresa.id, { estudioUsarSkillsClaude: claudeSkill.ativa });
+    }
+  };
+
+  const promptMontado = React.useMemo(() => {
+    if (!empresa) return { promptSystem: "", promptUser: "" };
+    const claudeSkill = skills.find((s) => s.id === "claude-frontend-design");
+    const claudeAtivo = claudeSkill ? claudeSkill.ativa : usarSkillsClaude;
+    return montarPromptSiteCompleto({
+      empresa: toCtx(empresa),
+      diagnostico: empresa.diagnostico,
+      dossier360: empresa.dossier360,
+      relatorio: empresa.relatorioLead,
+      usarAntiIaBespoke,
+      usarSkillsClaude: claudeAtivo,
+      skillsAdicionais: skills.filter((s) => s.ativa && s.id !== "claude-frontend-design"),
+      logoBase64: logoAnexo?.dataUrl,
+      logoNomeArquivo: logoAnexo?.nome,
+      instrucoesDesignMd: designMdAnexo?.conteudo,
+    });
+  }, [empresa, usarAntiIaBespoke, usarSkillsClaude, skills, logoAnexo, designMdAnexo]);
+
+  // 1. GERAR NOVO SITE COMPLETO (DO ZERO OU COM PROMPT CUSTOMIZADO)
+  const handleGerarSite = async (customPromptOverride?: { promptSystem: string; promptUser: string }) => {
     if (!empresa) {
       toast.error("Selecione uma empresa primeiro.");
       return;
@@ -317,13 +363,18 @@ function EstudioCriacaoPage() {
         ollamaBaseUrl: apiSettings.ollama.baseUrl,
       };
 
+      const claudeSkill = skills.find((s) => s.id === "claude-frontend-design");
+      const claudeAtivo = claudeSkill ? claudeSkill.ativa : usarSkillsClaude;
+
       const res = await gerarSiteFn({
         data: {
           empresa: toCtx(empresa),
           provedorPreferencial: agenteSelecionado.provider,
           modeloPreferencial: agenteSelecionado.modelo,
           usarAntiIaBespoke,
-          usarSkillsClaude,
+          usarSkillsClaude: claudeAtivo,
+          skillsAdicionais: skills.filter((s) => s.ativa && s.id !== "claude-frontend-design"),
+          customPromptOverride,
           customKeys,
           diagnostico: empresa.diagnostico,
           dossier360: empresa.dossier360,
@@ -445,6 +496,7 @@ function EstudioCriacaoPage() {
           modeloPreferencial: agenteSelecionado.modelo,
           usarAntiIaBespoke,
           usarSkillsClaude,
+          skillsAdicionais: skills.filter((s) => s.ativa && s.id !== "claude-frontend-design"),
           logoBase64: logoAnexo?.dataUrl,
           logoNomeArquivo: logoAnexo?.nome,
           instrucoesDesignMd: designMdAnexo?.conteudo,
@@ -858,16 +910,29 @@ Pilares de Conteúdo:
               Multi-IAs · GSAP ScrollTrigger · Anti-IA Bespoke
             </Badge>
           </div>
-          <h1 className="text-2xl font-extrabold tracking-tight flex items-center gap-2.5">
-            <Palette className="h-6 w-6 text-primary" />
-            <span>Estúdio de Criação</span>
-          </h1>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-2xl font-extrabold tracking-tight flex items-center gap-2">
+              <Palette className="h-6 w-6 text-primary shrink-0" />
+              <span>Estúdio de Criação</span>
+            </h1>
+            {empresa && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-muted-foreground/40 font-light text-xl">/</span>
+                <span className="text-xl sm:text-2xl font-extrabold bg-gradient-to-r from-primary via-indigo-600 to-violet-600 bg-clip-text text-transparent">
+                  {empresa.nome}
+                </span>
+                <Badge variant="outline" className="text-xs font-normal border-primary/30 text-muted-foreground">
+                  {empresa.cidade} · {empresa.segmento}
+                </Badge>
+              </div>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">
             Criação e refinamento de sites profissionais com GSAP, chat de prompts iterativos, paletas cromáticas e briefings.
           </p>
         </div>
 
-        {/* SELETOR DE EMPRESA RÁPIDO */}
+        {/* SELETOR DE EMPRESA RÁPIDO (APENAS ATIVAS) */}
         <div className="flex items-center gap-2 bg-card p-2 rounded-xl border shadow-xs min-w-[280px]">
           <Building2 className="h-4 w-4 text-primary shrink-0 ml-1" />
           <div className="flex-1 min-w-0">
@@ -879,7 +944,7 @@ Pilares de Conteúdo:
               onChange={(e) => handleTrocarEmpresa(e.target.value)}
               className="w-full bg-transparent text-xs font-bold text-foreground focus:outline-none truncate pt-0.5 cursor-pointer"
             >
-              {empresas.map((e) => (
+              {empresasAtivas.map((e) => (
                 <option key={e.id} value={e.id} className="bg-popover text-popover-foreground">
                   {e.nome} ({e.cidade} · {e.segmento})
                 </option>
@@ -1009,36 +1074,69 @@ Pilares de Conteúdo:
                   </Select>
                 </div>
 
-                {/* 2.1 CHECKBOX: UTILIZAR SKILLS CLAUDE (ANTHROPIC FRONTEND DESIGN) */}
-                <div className="flex items-start space-x-2 rounded-md border border-border/70 bg-background/80 p-2">
-                  <Checkbox
-                    id="usarSkillsClaude"
-                    checked={usarSkillsClaude}
-                    onCheckedChange={(checked) => {
-                      const ativo = checked === true;
-                      setUsarSkillsClaude(ativo);
-                      if (empresa) updateEmpresa(empresa.id, { estudioUsarSkillsClaude: ativo });
-                      toast.info(
-                        ativo
-                          ? "Skills Claude da Anthropic ativadas (grounding no nicho, sem vícios de IA)."
-                          : "Skills Claude desativadas.",
-                      );
-                    }}
-                    className="mt-0.5"
-                  />
-                  <div className="grid gap-0.5 leading-none">
-                    <label
-                      htmlFor="usarSkillsClaude"
-                      className="text-xs font-semibold text-foreground cursor-pointer flex items-center gap-1.5"
-                    >
-                      <span>Utilizar Skills Claude</span>
-                      <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5 font-normal text-muted-foreground">
-                        Anthropic
+                {/* 2.1 GESTÃO DE SKILLS DE IA & DIRETRIZES DA ANTHROPIC */}
+                <div className="rounded-md border border-border/70 bg-background/80 p-2.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5 text-primary" />
+                      <span className="text-xs font-semibold text-foreground">Skills de IA</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-primary/30 text-primary">
+                        {skills.filter((s) => s.ativa).length} ativa{skills.filter((s) => s.ativa).length === 1 ? "" : "s"}
                       </Badge>
-                    </label>
-                    <p className="text-[10px] text-muted-foreground leading-snug">
-                      Diretrizes oficiais de design autoral e anti-clichês da Anthropic no prompt base.
-                    </p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setModalSkillsOpen(true)}
+                        className="h-5 px-1.5 text-[10px] text-primary hover:bg-primary/10"
+                        title="Gerenciar e adicionar novas skills"
+                      >
+                        + Nova Skill
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 pt-0.5">
+                    {skills.slice(0, 3).map((s) => (
+                      <div key={s.id} className="flex items-center justify-between gap-2 text-xs">
+                        <label className="flex items-center gap-2 cursor-pointer truncate flex-1">
+                          <Checkbox
+                            checked={s.ativa}
+                            onCheckedChange={(checked) => {
+                              const ativo = checked === true;
+                              const atualizadas = skills.map((sk) =>
+                                sk.id === s.id ? { ...sk, ativa: ativo } : sk,
+                              );
+                              handleSkillsChange(atualizadas);
+                            }}
+                            className="h-3.5 w-3.5"
+                          />
+                          <span className="truncate text-[11px] text-foreground font-medium">
+                            {s.nome}
+                          </span>
+                        </label>
+                        {s.sistema ? (
+                          <Badge variant="secondary" className="text-[8px] px-1 py-0 h-3 font-normal shrink-0">
+                            {s.categoria || "sistema"}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[8px] px-1 py-0 h-3 font-normal text-primary border-primary/30 shrink-0">
+                            custom
+                          </Badge>
+                        )}
+                      </div>
+                    ))}
+                    {skills.length > 3 && (
+                      <button
+                        type="button"
+                        onClick={() => setModalSkillsOpen(true)}
+                        className="text-[10px] text-primary hover:underline block pt-0.5 font-medium"
+                      >
+                        + ver mais {skills.length - 3} skill{skills.length - 3 === 1 ? "" : "s"}...
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1125,24 +1223,39 @@ Pilares de Conteúdo:
                   </div>
                 </div>
 
-                {/* BOTÃO PRINCIPAL DE GERAÇÃO */}
-                <Button
-                  onClick={handleGerarSite}
-                  disabled={gerandoSite || refinandoSite}
-                  size="sm"
-                  className="w-full text-xs h-9 gap-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-primary text-white hover:opacity-90 shadow-xs"
-                >
-                  {gerandoSite ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-3.5 w-3.5" />
-                  )}
-                  <span>
-                    {gerandoSite
-                      ? "Pesquisando & Criando Site..."
-                      : `Gerar Novo Site (${agenteSelecionado.nome})`}
-                  </span>
-                </Button>
+                {/* BOTÕES DE GERAÇÃO: GERAR DIRETO OU VISUALIZAR & REFINAR PROMPT */}
+                <div className="space-y-1.5 pt-0.5">
+                  <Button
+                    onClick={() => handleGerarSite()}
+                    disabled={gerandoSite || refinandoSite}
+                    size="sm"
+                    className="w-full text-xs h-9 gap-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-primary text-white hover:opacity-90 shadow-xs"
+                  >
+                    {gerandoSite ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5" />
+                    )}
+                    <span>
+                      {gerandoSite
+                        ? "Pesquisando & Criando Site..."
+                        : `Gerar Novo Site (${agenteSelecionado.nome})`}
+                    </span>
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setModalPromptOpen(true)}
+                    disabled={gerandoSite || refinandoSite}
+                    className="w-full text-xs h-8 gap-1.5 border-primary/30 text-primary hover:bg-primary/5"
+                    title="Visualizar e refinar o prompt da IA antes de enviar"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    <span>Visualizar & Refinar Prompt da IA</span>
+                  </Button>
+                </div>
               </div>
 
               {/* ABAS DO PAINEL ESQUERDO: CHAT VS IMAGENS IA VS HISTÓRICO */}
@@ -1576,7 +1689,7 @@ Pilares de Conteúdo:
                     </p>
                   </div>
                   <Button
-                    onClick={handleGerarSite}
+                    onClick={() => handleGerarSite()}
                     disabled={gerandoSite}
                     size="sm"
                     className="gap-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-primary text-white"
@@ -1749,6 +1862,29 @@ Pilares de Conteúdo:
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* MODAL DE GESTÃO DE SKILLS DE IA */}
+      <ModalGerenciarSkills
+        open={modalSkillsOpen}
+        onOpenChange={setModalSkillsOpen}
+        skills={skills}
+        onSkillsChange={handleSkillsChange}
+      />
+
+      {/* MODAL PARA VISUALIZAR & REFINAR PROMPT DA IA */}
+      <ModalRefinarPromptIa
+        open={modalPromptOpen}
+        onOpenChange={setModalPromptOpen}
+        empresaNome={empresa.nome}
+        agenteNome={agenteSelecionado.nome}
+        modeloNome={agenteSelecionado.modelo}
+        usarAntiIaBespoke={usarAntiIaBespoke}
+        skillsAtivasCount={skills.filter((s) => s.ativa).length}
+        initialPromptSystem={promptMontado.promptSystem}
+        initialPromptUser={promptMontado.promptUser}
+        onConfirmarEGerar={(customizado) => handleGerarSite(customizado)}
+        gerando={gerandoSite}
+      />
     </div>
   );
 }
