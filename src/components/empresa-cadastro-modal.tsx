@@ -7,6 +7,7 @@ import { CRM_STAGES_ORDER, CRM_STAGE_LABEL } from "@/components/badges";
 import {
   gerarDadosCadastroIA_ServerFn,
   sugerirPublicoAlvoIA_ServerFn,
+  cleanDigits,
 } from "@/lib/cadastro-ia.functions";
 import {
   consultarCnpjBrasilAPI_ServerFn,
@@ -84,6 +85,18 @@ const SEGMENTOS_SUGERIDOS = [
   "Outro",
 ];
 
+function toSafeString(val: unknown): string {
+  if (val === null || val === undefined) return "";
+  if (typeof val === "string") return val.trim();
+  if (Array.isArray(val)) {
+    return val
+      .map((item) => (typeof item === "string" ? item.trim() : String(item ?? "").trim()))
+      .filter(Boolean)
+      .join("\n");
+  }
+  return String(val).trim();
+}
+
 export function EmpresaCadastroModal({
   empresa,
   open,
@@ -127,26 +140,26 @@ export function EmpresaCadastroModal({
 
   useEffect(() => {
     if (!empresa) return;
-    setNome(empresa.nome || "");
-    setRazaoSocial(empresa.razaoSocial || "");
-    setCnpj(empresa.cnpj || "");
-    setSegmento(empresa.segmento || "");
-    setAreaAtuacao(empresa.areaAtuacao || "");
-    setPublicoAlvo(empresa.publicoAlvo || "");
-    setCidade(empresa.cidade || "");
-    setBairro(empresa.bairro || "");
-    setEndereco(empresa.endereco || "");
-    setCep((empresa as any).cep || "");
-    setTelefone(empresa.telefone || "");
-    setWhatsapp(empresa.whatsapp || "");
-    setEmail(empresa.email || "");
-    setSite(empresa.site || "");
-    setInstagram(empresa.instagram || "");
+    setNome(toSafeString(empresa.nome));
+    setRazaoSocial(toSafeString(empresa.razaoSocial));
+    setCnpj(toSafeString(empresa.cnpj));
+    setSegmento(toSafeString(empresa.segmento));
+    setAreaAtuacao(toSafeString(empresa.areaAtuacao));
+    setPublicoAlvo(toSafeString(empresa.publicoAlvo));
+    setCidade(toSafeString(empresa.cidade) || "Bento Gonçalves");
+    setBairro(toSafeString(empresa.bairro));
+    setEndereco(toSafeString(empresa.endereco));
+    setCep(toSafeString((empresa as any).cep));
+    setTelefone(toSafeString(empresa.telefone));
+    setWhatsapp(toSafeString(empresa.whatsapp));
+    setEmail(toSafeString(empresa.email));
+    setSite(toSafeString(empresa.site));
+    setInstagram(toSafeString(empresa.instagram));
     setCrmStage(empresa.crmStage || "identificado");
-    setObservacoes(empresa.observacoes || "");
-    setBuscasPartida(empresa.buscasPartida || "");
-    setTermosEncontrados(empresa.termosEncontrados || "");
-    setBuscaGoogleMaps(empresa.buscaGoogleMaps || "");
+    setObservacoes(toSafeString(empresa.observacoes));
+    setBuscasPartida(toSafeString(empresa.buscasPartida));
+    setTermosEncontrados(toSafeString(empresa.termosEncontrados));
+    setBuscaGoogleMaps(toSafeString(empresa.buscaGoogleMaps));
     setDadosReceita(null);
     setMostrarQsa(false);
   }, [empresa]);
@@ -185,25 +198,25 @@ export function EmpresaCadastroModal({
 
       if (res) {
         if (res.nome && (!nome || nome === "Nova Empresa" || nome === res.razaoSocial)) {
-          setNome(res.nome);
+          setNome(toSafeString(res.nome));
         }
-        if (res.razaoSocial) setRazaoSocial(res.razaoSocial);
-        if (res.cnpj) setCnpj(res.cnpj);
-        if (res.segmentoRefinado) setSegmento(res.segmentoRefinado);
-        if (res.areaAtuacao) setAreaAtuacao(res.areaAtuacao);
-        if (res.publicoAlvo) setPublicoAlvo(res.publicoAlvo);
-        if (res.cidade) setCidade(res.cidade);
-        if (res.bairro) setBairro(res.bairro);
-        if (res.endereco) setEndereco(res.endereco);
-        if (res.cep) setCep(res.cep);
-        if (res.telefone) setTelefone(res.telefone);
-        if (res.whatsapp) setWhatsapp(res.whatsapp);
-        if (res.email) setEmail(res.email);
-        if (res.site && (!site || site === "https://")) setSite(res.site);
-        if (res.instagram && !instagram) setInstagram(res.instagram);
-        if (res.buscasPartida) setBuscasPartida(res.buscasPartida);
-        if (res.termosEncontrados) setTermosEncontrados(res.termosEncontrados);
-        if (res.buscaGoogleMaps) setBuscaGoogleMaps(res.buscaGoogleMaps);
+        if (res.razaoSocial) setRazaoSocial(toSafeString(res.razaoSocial));
+        if (res.cnpj) setCnpj(toSafeString(res.cnpj));
+        if (res.segmentoRefinado) setSegmento(toSafeString(res.segmentoRefinado));
+        if (res.areaAtuacao) setAreaAtuacao(toSafeString(res.areaAtuacao));
+        if (res.publicoAlvo) setPublicoAlvo(toSafeString(res.publicoAlvo));
+        if (res.cidade) setCidade(toSafeString(res.cidade));
+        if (res.bairro) setBairro(toSafeString(res.bairro));
+        if (res.endereco) setEndereco(toSafeString(res.endereco));
+        if (res.cep) setCep(toSafeString(res.cep));
+        if (res.telefone) setTelefone(toSafeString(res.telefone));
+        if (res.whatsapp) setWhatsapp(toSafeString(res.whatsapp));
+        if (res.email) setEmail(toSafeString(res.email));
+        if (res.site && (!site || site === "https://")) setSite(toSafeString(res.site));
+        if (res.instagram && !instagram) setInstagram(toSafeString(res.instagram));
+        if (res.buscasPartida) setBuscasPartida(toSafeString(res.buscasPartida));
+        if (res.termosEncontrados) setTermosEncontrados(toSafeString(res.termosEncontrados));
+        if (res.buscaGoogleMaps) setBuscaGoogleMaps(toSafeString(res.buscaGoogleMaps));
 
         if (res.dadosReceita) {
           setDadosReceita(res.dadosReceita);
@@ -250,7 +263,7 @@ export function EmpresaCadastroModal({
   };
 
   const handleBuscarCnpjReceita = async () => {
-    const raw = (cnpj || "").replace(/\D/g, "");
+    const raw = cleanDigits(cnpj);
     if (raw.length !== 14) {
       toast.warning("Digite os 14 dígitos do CNPJ para buscar na Receita Federal.");
       return;
@@ -265,31 +278,31 @@ export function EmpresaCadastroModal({
       }
 
       setDadosReceita(res);
-      if (res.razaoSocial) setRazaoSocial(res.razaoSocial);
+      if (res.razaoSocial) setRazaoSocial(toSafeString(res.razaoSocial));
       if (res.nomeFantasia && (!nome || nome === "Nova Empresa" || nome === res.razaoSocial)) {
-        setNome(res.nomeFantasia);
+        setNome(toSafeString(res.nomeFantasia));
       }
       if (res.cnaeDescricao && !segmento) {
-        setSegmento(res.cnaeDescricao);
+        setSegmento(toSafeString(res.cnaeDescricao));
       }
       if (res.municipio) {
-        setCidade(res.uf ? `${res.municipio} (${res.uf})` : res.municipio);
+        setCidade(toSafeString(res.uf ? `${res.municipio} (${res.uf})` : res.municipio));
       }
-      if (res.bairro) setBairro(res.bairro);
+      if (res.bairro) setBairro(toSafeString(res.bairro));
       if (res.logradouro) {
         const compl = res.complemento ? ` - ${res.complemento}` : "";
         const num = res.numero ? `, ${res.numero}` : "";
-        setEndereco(`${res.logradouro}${num}${compl}`);
+        setEndereco(toSafeString(`${res.logradouro}${num}${compl}`));
       }
-      if (res.cep) setCep(res.cep);
+      if (res.cep) setCep(toSafeString(res.cep));
       if (res.telefone && !telefone) {
-        setTelefone(res.telefone);
-        if (!whatsapp) setWhatsapp(res.telefone);
+        setTelefone(toSafeString(res.telefone));
+        if (!whatsapp) setWhatsapp(toSafeString(res.telefone));
       }
-      if (res.email && !email) setEmail(res.email);
+      if (res.email && !email) setEmail(toSafeString(res.email));
 
       if (!areaAtuacao && res.cnaeDescricao) {
-        setAreaAtuacao(`Atividade principal: ${res.cnaeDescricao}.`);
+        setAreaAtuacao(toSafeString(`Atividade principal: ${res.cnaeDescricao}.`));
       }
 
       toast.success(
@@ -306,7 +319,7 @@ export function EmpresaCadastroModal({
   };
 
   const handleBuscarCep = async () => {
-    const raw = (cep || "").replace(/\D/g, "");
+    const raw = cleanDigits(cep);
     if (raw.length !== 8) {
       toast.warning("Digite os 8 dígitos do CEP para busca rápida.");
       return;
@@ -320,9 +333,9 @@ export function EmpresaCadastroModal({
         return;
       }
 
-      if (res.rua) setEndereco(res.rua);
-      if (res.bairro) setBairro(res.bairro);
-      if (res.cidade) setCidade(res.estado ? `${res.cidade} (${res.estado})` : res.cidade);
+      if (res.rua) setEndereco(toSafeString(res.rua));
+      if (res.bairro) setBairro(toSafeString(res.bairro));
+      if (res.cidade) setCidade(toSafeString(res.estado ? `${res.cidade} (${res.estado})` : res.cidade));
       toast.success("Endereço preenchido automaticamente pelo CEP!");
     } catch (err: any) {
       toast.error(err.message || "Erro ao consultar CEP.");
@@ -332,7 +345,7 @@ export function EmpresaCadastroModal({
   };
 
   const handleSalvar = () => {
-    const nomeLimpo = (nome || "").trim();
+    const nomeLimpo = toSafeString(nome);
     if (!nomeLimpo) {
       toast.warning("O Nome da empresa é obrigatório.");
       return;
@@ -341,25 +354,25 @@ export function EmpresaCadastroModal({
     try {
       const patch: Partial<Empresa> = {
         nome: nomeLimpo,
-        razaoSocial: (razaoSocial || "").trim() || undefined,
-        cnpj: (cnpj || "").trim() || undefined,
-        segmento: (segmento || "").trim() || "Outros",
-        areaAtuacao: (areaAtuacao || "").trim() || undefined,
-        publicoAlvo: (publicoAlvo || "").trim() || undefined,
-        cidade: (cidade || "").trim() || "Bento Gonçalves",
-        bairro: (bairro || "").trim() || undefined,
-        endereco: (endereco || "").trim() || "",
-        cep: (cep || "").trim() || undefined,
-        telefone: (telefone || "").trim() || undefined,
-        whatsapp: (whatsapp || "").trim() || undefined,
-        email: (email || "").trim() || undefined,
-        site: (site || "").trim() || undefined,
-        instagram: (instagram || "").trim() || undefined,
+        razaoSocial: toSafeString(razaoSocial) || undefined,
+        cnpj: toSafeString(cnpj) || undefined,
+        segmento: toSafeString(segmento) || "Outros",
+        areaAtuacao: toSafeString(areaAtuacao) || undefined,
+        publicoAlvo: toSafeString(publicoAlvo) || undefined,
+        cidade: toSafeString(cidade) || "Bento Gonçalves",
+        bairro: toSafeString(bairro) || undefined,
+        endereco: toSafeString(endereco) || "",
+        cep: toSafeString(cep) || undefined,
+        telefone: toSafeString(telefone) || undefined,
+        whatsapp: toSafeString(whatsapp) || undefined,
+        email: toSafeString(email) || undefined,
+        site: toSafeString(site) || undefined,
+        instagram: toSafeString(instagram) || undefined,
         crmStage,
-        observacoes: (observacoes || "").trim() || undefined,
-        buscasPartida: (buscasPartida || "").trim() || undefined,
-        termosEncontrados: (termosEncontrados || "").trim() || undefined,
-        buscaGoogleMaps: (buscaGoogleMaps || "").trim() || undefined,
+        observacoes: toSafeString(observacoes) || undefined,
+        buscasPartida: toSafeString(buscasPartida) || undefined,
+        termosEncontrados: toSafeString(termosEncontrados) || undefined,
+        buscaGoogleMaps: toSafeString(buscaGoogleMaps) || undefined,
       };
 
       const empresaIdStr = String(empresa?.id || "");
