@@ -34,6 +34,7 @@ import {
   Building2,
   Trash2,
   RotateCcw,
+  Copy,
 } from "lucide-react";
 import {
   siteUrl,
@@ -272,6 +273,106 @@ function SortableEmpresaRow({
             })}
           </SelectContent>
         </Select>
+      </td>
+
+      {/* Telefones de Contato */}
+      <td className="py-3 px-2 min-w-[170px]">
+        {(() => {
+          const hasWhats = !!e.whatsapp;
+          const hasTel = !!e.telefone;
+          const mesmoNumero = Boolean(
+            e.whatsapp &&
+            e.telefone &&
+            e.whatsapp.replace(/\D/g, "") === e.telefone.replace(/\D/g, "")
+          );
+
+          const copiarTel = (tel: string, ev: React.MouseEvent) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            navigator.clipboard.writeText(tel);
+            toast.success(`Telefone ${tel} copiado!`);
+          };
+
+          if (!hasWhats && !hasTel) {
+            return (
+              <span className="text-[11px] text-muted-foreground/50 italic">
+                Sem telefone
+              </span>
+            );
+          }
+
+          if (mesmoNumero) {
+            return (
+              <div className="flex items-center gap-1.5 group/tel">
+                <a
+                  href={whatsappUrl(e.whatsapp!)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-xs text-foreground hover:text-emerald-600 transition-colors"
+                  title="WhatsApp e Ligação (mesmo número)"
+                >
+                  <MessageCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                  <span className="font-mono text-[11px] font-medium">{e.whatsapp}</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={(ev) => copiarTel(e.whatsapp!, ev)}
+                  className="opacity-0 group-hover/tel:opacity-100 p-0.5 rounded text-muted-foreground hover:text-foreground transition-opacity"
+                  title="Copiar telefone"
+                >
+                  <Copy className="h-3 w-3" />
+                </button>
+              </div>
+            );
+          }
+
+          return (
+            <div className="flex flex-col gap-1">
+              {hasWhats && (
+                <div className="flex items-center gap-1.5 group/whats">
+                  <a
+                    href={whatsappUrl(e.whatsapp!)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs text-foreground hover:text-emerald-600 transition-colors"
+                    title={`Abrir WhatsApp: ${e.whatsapp}`}
+                  >
+                    <MessageCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                    <span className="font-mono text-[11px] font-medium">{e.whatsapp}</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={(ev) => copiarTel(e.whatsapp!, ev)}
+                    className="opacity-0 group-hover/whats:opacity-100 p-0.5 rounded text-muted-foreground hover:text-foreground transition-opacity"
+                    title="Copiar WhatsApp"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+              {hasTel && (
+                <div className="flex items-center gap-1.5 group/fixo">
+                  <a
+                    href={telUrl(e.telefone!)}
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                    title={`Ligar: ${e.telefone}`}
+                  >
+                    <Phone className="h-3 w-3 text-muted-foreground shrink-0" />
+                    <span className="font-mono text-[11px]">{e.telefone}</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={(ev) => copiarTel(e.telefone!, ev)}
+                    className="opacity-0 group-hover/fixo:opacity-100 p-0.5 rounded text-muted-foreground hover:text-foreground transition-opacity"
+                    title="Copiar telefone fixo"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </td>
 
       {/* Contatos */}
@@ -623,7 +724,8 @@ function EmpresasPage() {
                   </th>
                   <th className="py-2.5 px-2 font-medium">Cidade</th>
                   <th className="py-2.5 px-2 font-medium">Etapa Kanban</th>
-                  <th className="py-2.5 px-2 font-medium">Contatos</th>
+                  <th className="py-2.5 px-2 font-medium">Telefones</th>
+                  <th className="py-2.5 px-2 font-medium">Canais</th>
                   <th className="py-2.5 px-2 font-medium">Site</th>
                   <th className="py-2.5 px-2 font-medium">Instagram</th>
                   <th className="py-2.5 px-2 font-medium">Score</th>
