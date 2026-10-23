@@ -332,36 +332,39 @@ export function EmpresaCadastroModal({
   };
 
   const handleSalvar = () => {
-    if (!nome.trim()) {
+    const nomeLimpo = (nome || "").trim();
+    if (!nomeLimpo) {
       toast.warning("O Nome da empresa é obrigatório.");
       return;
     }
     setSalvando(true);
     try {
       const patch: Partial<Empresa> = {
-        nome: nome.trim(),
-        razaoSocial: razaoSocial.trim() || undefined,
-        cnpj: cnpj.trim() || undefined,
-        segmento: segmento.trim() || "Outros",
-        areaAtuacao: areaAtuacao.trim() || undefined,
-        publicoAlvo: publicoAlvo.trim() || undefined,
-        cidade: cidade.trim() || "Bento Gonçalves",
-        bairro: bairro.trim() || undefined,
-        endereco: endereco.trim() || "",
-        cep: cep.trim() || undefined,
-        telefone: telefone.trim() || undefined,
-        whatsapp: whatsapp.trim() || undefined,
-        email: email.trim() || undefined,
-        site: site.trim() || undefined,
-        instagram: instagram.trim() || undefined,
+        nome: nomeLimpo,
+        razaoSocial: (razaoSocial || "").trim() || undefined,
+        cnpj: (cnpj || "").trim() || undefined,
+        segmento: (segmento || "").trim() || "Outros",
+        areaAtuacao: (areaAtuacao || "").trim() || undefined,
+        publicoAlvo: (publicoAlvo || "").trim() || undefined,
+        cidade: (cidade || "").trim() || "Bento Gonçalves",
+        bairro: (bairro || "").trim() || undefined,
+        endereco: (endereco || "").trim() || "",
+        cep: (cep || "").trim() || undefined,
+        telefone: (telefone || "").trim() || undefined,
+        whatsapp: (whatsapp || "").trim() || undefined,
+        email: (email || "").trim() || undefined,
+        site: (site || "").trim() || undefined,
+        instagram: (instagram || "").trim() || undefined,
         crmStage,
-        observacoes: observacoes.trim() || undefined,
-        buscasPartida: buscasPartida.trim() || undefined,
-        termosEncontrados: termosEncontrados.trim() || undefined,
-        buscaGoogleMaps: buscaGoogleMaps.trim() || undefined,
+        observacoes: (observacoes || "").trim() || undefined,
+        buscasPartida: (buscasPartida || "").trim() || undefined,
+        termosEncontrados: (termosEncontrados || "").trim() || undefined,
+        buscaGoogleMaps: (buscaGoogleMaps || "").trim() || undefined,
       };
 
-      const existe = empresas.some((e) => e.id === empresa.id);
+      const empresaIdStr = String(empresa?.id || "");
+      const existe = empresas.some((e) => String(e.id) === empresaIdStr);
+
       if (!existe) {
         const base = empresaFromRaw({
           nome: patch.nome || "Nova Empresa",
@@ -380,20 +383,23 @@ export function EmpresaCadastroModal({
         const novaEmpresa: Empresa = {
           ...base,
           ...patch,
-          id: empresa.id.startsWith("nova-") || empresa.id.startsWith("empresa-") ? empresa.id : base.id,
+          id: empresaIdStr && (empresaIdStr.startsWith("nova-") || empresaIdStr.startsWith("empresa-"))
+            ? empresaIdStr
+            : base.id,
         };
         addEmpresa(novaEmpresa);
         toast.success(`Empresa "${novaEmpresa.nome}" cadastrada com sucesso!`);
         if (onSaved) onSaved(novaEmpresa);
       } else {
         updateEmpresa(empresa.id, patch);
-        toast.success(`Cadastro de "${nome}" atualizado com sucesso!`);
+        toast.success(`Cadastro de "${nomeLimpo}" atualizado com sucesso!`);
         if (onSaved) onSaved({ ...empresa, ...patch });
       }
 
       onOpenChange(false);
-    } catch {
-      toast.error("Erro ao salvar cadastro.");
+    } catch (err: any) {
+      console.error("Erro ao salvar cadastro:", err);
+      toast.error(`Erro ao salvar cadastro: ${err?.message || "Verifique os dados e tente novamente."}`);
     } finally {
       setSalvando(false);
     }

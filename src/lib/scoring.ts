@@ -41,13 +41,15 @@ export function calcularScore(
   empresa: Empresa,
   weights: ScoreWeights = DEFAULT_WEIGHTS,
 ): { score: number; detalhes: ScoreDetail[] } {
-  const d = empresa.diagnostico || {
+  const diagRaw = (empresa?.diagnostico || {}) as any;
+  const d = {
     site: {
       responsivo: empresa.statusSite !== "nao_responsivo" && empresa.statusSite !== "sem_site",
       carregamentoRapido: true,
       cta: true,
       formularioFuncional: true,
       presencaGoogle: true,
+      ...(diagRaw.site || {}),
     },
     instagram: {
       bioForte: true,
@@ -56,6 +58,7 @@ export function calcularScore(
       frequenciaSemanal: 3,
       consistenciaMarca: 7,
       diasDesdeUltimoPost: empresa.statusInstagram === "parado" ? 100 : 10,
+      ...(diagRaw.instagram || {}),
     },
     atendimento: {
       whatsappVisivel: Boolean(empresa.whatsapp || empresa.telefone),
@@ -64,6 +67,7 @@ export function calcularScore(
       provaSocial: true,
       contatoFacil: true,
       multiplosCanais: true,
+      ...(diagRaw.atendimento || {}),
     },
   };
   const detalhes: ScoreDetail[] = [
@@ -91,20 +95,20 @@ export function calcularScore(
     {
       criterio: "Não responsivo (mobile)",
       peso: weights.naoResponsivo,
-      aplicado: empresa.statusSite === "nao_responsivo" || !d.site.responsivo,
+      aplicado: empresa.statusSite === "nao_responsivo" || !d.site?.responsivo,
       explicacao:
         "Layout quebra em dispositivos móveis — perde a maioria dos acessos atuais.",
     },
     {
       criterio: "Ausência de CTA claro",
       peso: weights.semCTA,
-      aplicado: !d.site.cta && empresa.statusSite !== "sem_site",
+      aplicado: !d.site?.cta && empresa.statusSite !== "sem_site",
       explicacao: "Site não conduz o visitante a uma ação (contato, orçamento, reserva).",
     },
     {
       criterio: "Contato difícil de encontrar",
       peso: weights.contatoDificil,
-      aplicado: !d.atendimento.contatoFacil || !d.atendimento.multiplosCanais,
+      aplicado: !d.atendimento?.contatoFacil || !d.atendimento?.multiplosCanais,
       explicacao:
         "Poucos canais visíveis, sem WhatsApp/telefone direto — atrito na captação.",
     },
@@ -112,41 +116,41 @@ export function calcularScore(
       criterio: "Instagram sem postagem há +90 dias",
       peso: weights.instagramParado,
       aplicado:
-        d.instagram.diasDesdeUltimoPost === null ||
-        (d.instagram.diasDesdeUltimoPost ?? 0) > 90,
+        d.instagram?.diasDesdeUltimoPost === null ||
+        (d.instagram?.diasDesdeUltimoPost ?? 0) > 90,
       explicacao:
         "Perfil parado transmite sensação de negócio inativo para novos clientes.",
     },
     {
       criterio: "Bio fraca / posicionamento pouco claro",
       peso: weights.bioFraca,
-      aplicado: !d.instagram.bioForte,
+      aplicado: !d.instagram?.bioForte,
       explicacao: "Bio não comunica proposta de valor nem direciona para conversão.",
     },
     {
       criterio: "Identidade visual inconsistente",
       peso: weights.identidadeInconsistente,
-      aplicado: d.instagram.consistenciaMarca < 6,
+      aplicado: (d.instagram?.consistenciaMarca ?? 0) < 6,
       explicacao:
         "Feed sem paleta, tipografia ou padrão visual reconhecível — marca fragilizada.",
     },
     {
       criterio: "Comunicação e atendimento fracos",
       peso: weights.atendimentoFraco,
-      aplicado: !d.atendimento.respostaRapida || !d.atendimento.clarezaServicos,
+      aplicado: !d.atendimento?.respostaRapida || !d.atendimento?.clarezaServicos,
       explicacao:
         "Faltam respostas rápidas, clareza sobre serviços e caminhos de conversão.",
     },
     {
       criterio: "Ausência de prova social",
       peso: weights.semProvaSocial,
-      aplicado: !d.atendimento.provaSocial,
+      aplicado: !d.atendimento?.provaSocial,
       explicacao: "Sem depoimentos, portfólio ou avaliações visíveis para novos clientes.",
     },
     {
       criterio: "Presença no Google fraca ou inconsistente",
       peso: weights.presencaGoogleFraca,
-      aplicado: !d.site.presencaGoogle,
+      aplicado: !d.site?.presencaGoogle,
       explicacao:
         "Ficha do Google Meu Negócio ausente ou incompleta reduz descoberta local.",
     },
