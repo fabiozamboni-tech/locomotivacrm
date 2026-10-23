@@ -27,12 +27,22 @@ import {
 import {
   enviarEmailDireto_ServerFn,
   dispararWhatsApp_ServerFn,
+  testarConexaoEvolution_ServerFn,
+  type TesteConexaoEvolutionResult,
 } from "@/lib/comunicacao.functions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   HoverCard,
@@ -77,6 +87,10 @@ import {
   Clock,
   ExternalLink,
   HelpCircle,
+  Copy,
+  Check,
+  BookOpen,
+  Terminal,
 } from "lucide-react";
 
 export const Route = createFileRoute("/configuracoes")({
@@ -111,6 +125,7 @@ function ConfiguracoesPage() {
     lastSyncTime,
     databaseInfo,
     syncNow,
+    kanbanColumns,
   } = useStore();
   const testConn = useServerFn(testApiConnection);
 
@@ -334,6 +349,40 @@ function ConfiguracoesPage() {
     }
   };
 
+  const [modalGuiaEvolutionOpen, setModalGuiaEvolutionOpen] = useState(false);
+  const [testandoConexaoEvolution, setTestandoConexaoEvolution] = useState(false);
+  const [resultadoConexaoEvolution, setResultadoConexaoEvolution] = useState<TesteConexaoEvolutionResult | null>(null);
+
+  // Testar conexão da Evolution API
+  const handleTestarConexaoEvolution = async () => {
+    if (!comunicacao.whatsapp.evolutionUrl || !comunicacao.whatsapp.evolutionInstance) {
+      toast.error("Informe a URL da Evolution API e o Nome da Instância.");
+      return;
+    }
+    setTestandoConexaoEvolution(true);
+    try {
+      const res = await testarConexaoEvolution_ServerFn({
+        data: {
+          evolutionUrl: comunicacao.whatsapp.evolutionUrl,
+          evolutionInstance: comunicacao.whatsapp.evolutionInstance,
+          evolutionApiKey: comunicacao.whatsapp.evolutionApiKey,
+        },
+      });
+      setResultadoConexaoEvolution(res);
+      if (res.conectado) {
+        toast.success(res.detalhes);
+      } else if (res.state === "connecting") {
+        toast.info(res.detalhes);
+      } else {
+        toast.warning(res.detalhes);
+      }
+    } catch (err: any) {
+      toast.error(`Falha no teste: ${err.message}`);
+    } finally {
+      setTestandoConexaoEvolution(false);
+    }
+  };
+
   // Salvar configurações de WhatsApp
   const handleSaveWhatsAppSettings = () => {
     const updated = saveComunicacaoSettings({ whatsapp: comunicacao.whatsapp });
@@ -355,6 +404,10 @@ function ConfiguracoesPage() {
           numero: num,
           mensagem: "Olá! Este é um teste de comunicação da Locomotiva Comunicação. Canal configurado e pronto para prospecção!",
           gatewayTipo: comunicacao.whatsapp.gatewayTipo,
+          evolutionUrl: comunicacao.whatsapp.evolutionUrl,
+          evolutionInstance: comunicacao.whatsapp.evolutionInstance,
+          evolutionApiKey: comunicacao.whatsapp.evolutionApiKey,
+          evolutionFallbackNativo: comunicacao.whatsapp.evolutionFallbackNativo,
           apiUrl: comunicacao.whatsapp.apiUrl,
           apiKey: comunicacao.whatsapp.apiKey,
         },
@@ -645,7 +698,7 @@ function ConfiguracoesPage() {
         </TabsContent>
 
         {/* ------------------------------------------------------------------- */}
-        {/* ABA 2: WHATSAPP & AUTOMAÇÕES */}
+        {/* ABA 2: WHATSAPP & AUTOMAÇÕES (NATIVO & EVOLUTION API) */}
         {/* ------------------------------------------------------------------- */}
         <TabsContent value="whatsapp" className="space-y-4 mt-0">
           <Card className="border-emerald-500/20 bg-gradient-to-br from-card to-emerald-500/5 shadow-sm">
@@ -656,179 +709,294 @@ function ConfiguracoesPage() {
                     <MessageCircle className="h-5 w-5" />
                   </div>
                   <div>
-                    <CardTitle className="text-base font-bold">Canal WhatsApp & Respostas Automáticas</CardTitle>
+                    <CardTitle className="text-base font-bold">Canal WhatsApp & Gateways de Envio</CardTitle>
                     <CardDescription className="text-xs">
-                      Configure o número oficial da Locomotiva Comunicação, gateways e respostas rápidas.
+                      Escolha entre o WhatsApp Web Oficial (Nativo) e a Evolution API para disparos automáticos.
                     </CardDescription>
                   </div>
                 </div>
 
-                <Button onClick={handleAddResposta} size="sm" variant="outline" className="text-xs gap-1 h-8">
-                  <Plus className="h-3 w-3" /> Adicionar Resposta Rápida
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => setModalGuiaEvolutionOpen(true)}
+                    size="sm"
+                    variant="outline"
+                    className="text-xs gap-1.5 h-8 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+                  >
+                    <BookOpen className="h-3.5 w-3.5" /> Guia de Hospedagem Grátis da Evolution
+                  </Button>
+
+                  <Button onClick={handleAddResposta} size="sm" variant="outline" className="text-xs gap-1 h-8">
+                    <Plus className="h-3 w-3" /> Novo Script
+                  </Button>
+                </div>
               </div>
             </CardHeader>
 
-            <CardContent className="space-y-4 pt-2">
-              <div className="grid md:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
-                    Número da Locomotiva (com DDD):
-                  </label>
-                  <Input
-                    value={comunicacao.whatsapp.numeroAgencia}
-                    onChange={(e) =>
-                      setComunicacao((prev) => ({
-                        ...prev,
-                        whatsapp: { ...prev.whatsapp, numeroAgencia: e.target.value },
-                      }))
-                    }
-                    placeholder="Ex: 54999990000"
-                    className="text-xs font-mono"
-                  />
+            <CardContent className="space-y-5 pt-2">
+              {/* Número da Locomotiva */}
+              <div className="max-w-md">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
+                  Número Oficial da Locomotiva (com DDD):
+                </label>
+                <Input
+                  value={comunicacao.whatsapp.numeroAgencia}
+                  onChange={(e) =>
+                    setComunicacao((prev) => ({
+                      ...prev,
+                      whatsapp: { ...prev.whatsapp, numeroAgencia: e.target.value },
+                    }))
+                  }
+                  placeholder="Ex: 54999990000"
+                  className="text-xs font-mono"
+                />
+              </div>
+
+              {/* SELETOR EM 2 CARDS DE GATEWAY */}
+              <div className="space-y-2">
+                <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Selecione o Método Ativo de Envio de WhatsApp:
                 </div>
 
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                      <span>Tipo de Integração / Gateway:</span>
-                    </label>
-                    <HoverCard openDelay={100} closeDelay={200}>
-                      <HoverCardTrigger asChild>
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground font-medium transition-colors cursor-help p-1 rounded-md hover:bg-muted"
-                          title="Como funciona a integração e onde conseguir as API keys / webhooks"
-                        >
-                          <HelpCircle className="h-3.5 w-3.5 text-blue-500" />
-                          <span className="underline decoration-dotted text-blue-600 dark:text-blue-400">Como funciona?</span>
-                        </button>
-                      </HoverCardTrigger>
-                      <HoverCardContent side="top" align="end" className="w-80 sm:w-96 text-xs p-4 space-y-3 z-50 shadow-xl border-border">
-                        <div className="flex items-center gap-2 border-b pb-2">
-                          <MessageCircle className="h-4 w-4 text-emerald-500" />
-                          <h4 className="font-bold text-xs text-foreground">
-                            Guia de Integrações & Gateways de WhatsApp
-                          </h4>
-                        </div>
-                        <div className="space-y-2.5 text-[11px] leading-relaxed max-h-[380px] overflow-y-auto pr-1">
-                          {/* 1. WhatsApp Web */}
-                          <div className="p-2.5 rounded-lg bg-muted/50 border border-border/60 space-y-1">
-                            <div className="flex items-center justify-between gap-1">
-                              <strong className="font-semibold text-foreground">1. WhatsApp Web / Desktop Oficial</strong>
-                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
-                                Sem Chave (Grátis)
-                              </Badge>
-                            </div>
-                            <p className="text-muted-foreground">
-                              <strong>Como funciona:</strong> Abre diretamente a conversa no aplicativo oficial do WhatsApp com a mensagem pronta para revisão e envio em 1 clique.
-                            </p>
-                            <p className="text-muted-foreground">
-                              <strong>API Key / Webhook:</strong> <span className="text-emerald-600 font-semibold">NÃO é necessário</span>. É 100% gratuito, sem custo de mensalidade e com risco zero de banimento do número.
-                            </p>
-                          </div>
-
-                          {/* 2. Z-API */}
-                          <div className="p-2.5 rounded-lg bg-muted/50 border border-border/60 space-y-1">
-                            <div className="flex items-center justify-between gap-1">
-                              <strong className="font-semibold text-foreground">2. Z-API Gateway</strong>
-                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-amber-500/10 text-amber-600 border-amber-500/30">
-                                Requer Chave
-                              </Badge>
-                            </div>
-                            <p className="text-muted-foreground">
-                              <strong>Como funciona:</strong> Disparo automatizado e silencioso em segundo plano através de instâncias do serviço Z-API.
-                            </p>
-                            <p className="text-muted-foreground">
-                              <strong>API Key / Webhook:</strong> <span className="text-amber-600 font-semibold">SIM, obrigatório</span>.
-                            </p>
-                            <p className="text-muted-foreground">
-                              <strong>Onde conseguir:</strong> Crie uma conta em <a href="https://z-api.io" target="_blank" rel="noreferrer" className="text-blue-500 underline">z-api.io</a>, adicione sua instância, escaneie o QR Code no painel e copie a <em>URL da Instância</em> e o <em>Client-Token</em> no campo abaixo.
-                            </p>
-                          </div>
-
-                          {/* 3. Evolution API */}
-                          <div className="p-2.5 rounded-lg bg-muted/50 border border-border/60 space-y-1">
-                            <div className="flex items-center justify-between gap-1">
-                              <strong className="font-semibold text-foreground">3. Evolution API</strong>
-                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-amber-500/10 text-amber-600 border-amber-500/30">
-                                Requer Servidor
-                              </Badge>
-                            </div>
-                            <p className="text-muted-foreground">
-                              <strong>Como funciona:</strong> Gateway open-source para automação auto-hospedada em Docker ou VPS própria.
-                            </p>
-                            <p className="text-muted-foreground">
-                              <strong>API Key / Webhook:</strong> <span className="text-amber-600 font-semibold">SIM, obrigatório</span>.
-                            </p>
-                            <p className="text-muted-foreground">
-                              <strong>Onde conseguir:</strong> No painel da sua Evolution API, gere uma <em>Global API Key</em> e copie o endpoint de envio da sua instância (ex: <code>https://api.seudominio.com/message/sendText/sua-instancia</code>).
-                            </p>
-                          </div>
-
-                          {/* 4. Custom Webhook */}
-                          <div className="p-2.5 rounded-lg bg-muted/50 border border-border/60 space-y-1">
-                            <div className="flex items-center justify-between gap-1">
-                              <strong className="font-semibold text-foreground">4. Webhook Customizado (HTTP POST)</strong>
-                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-purple-500/10 text-purple-600 border-purple-500/30">
-                                n8n / Make / Zapier
-                              </Badge>
-                            </div>
-                            <p className="text-muted-foreground">
-                              <strong>Como funciona:</strong> Dispara um payload JSON completo via requisição HTTP POST para qualquer ferramenta de automação externa.
-                            </p>
-                            <p className="text-muted-foreground">
-                              <strong>API Key / Webhook:</strong> <span className="text-purple-600 font-semibold">SIM, obrigatório</span>.
-                            </p>
-                            <p className="text-muted-foreground">
-                              <strong>Onde conseguir:</strong> Crie um nó de gatilho "Webhook" no seu n8n, Make.com ou Zapier, copie a <em>Webhook URL</em> de produção gerada e cole no campo abaixo. O CRM enviará <code>&#123; telefone, mensagem, nomeEmpresa, contato &#125;</code>.
-                            </p>
-                          </div>
-                        </div>
-                      </HoverCardContent>
-                    </HoverCard>
-                  </div>
-                  <Select
-                    value={comunicacao.whatsapp.gatewayTipo}
-                    onValueChange={(v: any) =>
+                <div className="grid md:grid-cols-2 gap-4">
+                  {/* CARD 1: WHATSAPP WEB / DESKTOP (NATIVO) */}
+                  <div
+                    onClick={() =>
                       setComunicacao((prev) => ({
                         ...prev,
-                        whatsapp: { ...prev.whatsapp, gatewayTipo: v },
+                        whatsapp: { ...prev.whatsapp, gatewayTipo: "web_link" },
                       }))
                     }
+                    className={cn(
+                      "p-4 rounded-xl border bg-card hover:border-primary/50 transition-all cursor-pointer space-y-3 relative shadow-xs",
+                      comunicacao.whatsapp.gatewayTipo === "web_link" &&
+                        "border-primary ring-2 ring-primary/20 bg-primary/5"
+                    )}
                   >
-                    <SelectTrigger className="text-xs h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="web_link">WhatsApp Web / Desktop Oficial</SelectItem>
-                      <SelectItem value="zapi">Z-API Gateway</SelectItem>
-                      <SelectItem value="evolution_api">Evolution API</SelectItem>
-                      <SelectItem value="custom_webhook">Webhook Customizado (HTTP POST)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-md bg-blue-500/10 text-blue-600">
+                          <Globe className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-foreground">1. WhatsApp Web / Desktop (Nativo)</h4>
+                          <p className="text-[11px] text-muted-foreground leading-tight">
+                            Abre a conversa oficial com 1 clique e mensagem pronta
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-600 border-blue-500/30">
+                        Padrão · Custo Zero
+                      </Badge>
+                    </div>
 
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
-                    URL da API / Webhook (se aplicável):
-                  </label>
-                  <Input
-                    value={comunicacao.whatsapp.apiUrl ?? ""}
-                    onChange={(e) =>
+                    <div className="text-xs text-muted-foreground space-y-1 bg-muted/40 p-2.5 rounded-lg border border-border/50">
+                      <p>• <strong>Sem chaves de API nem servidores:</strong> utiliza seu WhatsApp normal no navegador ou app desktop.</p>
+                      <p>• <strong>Risco Zero de bloqueio:</strong> você revisa a mensagem antes de apertar enter.</p>
+                    </div>
+
+                    {/* Opções Avançadas do Modo Nativo */}
+                    <div className="space-y-2 pt-1 border-t border-border/40" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-xs font-medium text-foreground cursor-pointer" htmlFor="auto-move-kanban">
+                          Mover card no Kanban após clicar em disparar:
+                        </label>
+                        <Switch
+                          id="auto-move-kanban"
+                          checked={comunicacao.whatsapp.nativoAutoMoverKanban}
+                          onCheckedChange={(checked) =>
+                            setComunicacao((prev) => ({
+                              ...prev,
+                              whatsapp: { ...prev.whatsapp, nativoAutoMoverKanban: checked },
+                            }))
+                          }
+                        />
+                      </div>
+
+                      {comunicacao.whatsapp.nativoAutoMoverKanban && (
+                        <div className="flex items-center justify-between gap-2 pt-1">
+                          <span className="text-[11px] text-muted-foreground">Etapa destino no Kanban:</span>
+                          <Select
+                            value={comunicacao.whatsapp.nativoKanbanStageDestino || "primeiro_contato"}
+                            onValueChange={(val: any) =>
+                              setComunicacao((prev) => ({
+                                ...prev,
+                                whatsapp: { ...prev.whatsapp, nativoKanbanStageDestino: val },
+                              }))
+                            }
+                          >
+                            <SelectTrigger className="h-7 text-xs w-48">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {kanbanColumns.map((col) => (
+                                <SelectItem key={col.id} value={col.id} className="text-xs">
+                                  {col.titulo}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between gap-2 pt-1">
+                        <label className="text-xs font-medium text-foreground cursor-pointer" htmlFor="prefix-lead">
+                          Prefixar identificador [Lead: Nome] na mensagem:
+                        </label>
+                        <Switch
+                          id="prefix-lead"
+                          checked={comunicacao.whatsapp.nativoIncluirIdentificadorLead}
+                          onCheckedChange={(checked) =>
+                            setComunicacao((prev) => ({
+                              ...prev,
+                              whatsapp: { ...prev.whatsapp, nativoIncluirIdentificadorLead: checked },
+                            }))
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CARD 2: EVOLUTION API (v2) */}
+                  <div
+                    onClick={() =>
                       setComunicacao((prev) => ({
                         ...prev,
-                        whatsapp: { ...prev.whatsapp, apiUrl: e.target.value },
+                        whatsapp: { ...prev.whatsapp, gatewayTipo: "evolution_api" },
                       }))
                     }
-                    placeholder="https://api.gateway.com/send-message"
-                    className="text-xs font-mono"
-                  />
+                    className={cn(
+                      "p-4 rounded-xl border bg-card hover:border-emerald-500/50 transition-all cursor-pointer space-y-3 relative shadow-xs",
+                      comunicacao.whatsapp.gatewayTipo === "evolution_api" &&
+                        "border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-500/5"
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-md bg-emerald-500/10 text-emerald-600">
+                          <Server className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-foreground">2. Evolution API (v2)</h4>
+                          <p className="text-[11px] text-muted-foreground leading-tight">
+                            Disparo 100% automatizado em segundo plano pelo CRM
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+                        Disparo em 2º Plano
+                      </Badge>
+                    </div>
+
+                    {/* Inputs da Evolution */}
+                    <div className="space-y-2.5 pt-1" onClick={(e) => e.stopPropagation()}>
+                      <div>
+                        <label className="text-[11px] font-semibold text-muted-foreground block mb-0.5">
+                          URL da Evolution API (VPS ou Nuvem Grátis):
+                        </label>
+                        <Input
+                          value={comunicacao.whatsapp.evolutionUrl || ""}
+                          onChange={(e) =>
+                            setComunicacao((prev) => ({
+                              ...prev,
+                              whatsapp: { ...prev.whatsapp, evolutionUrl: e.target.value },
+                            }))
+                          }
+                          placeholder="https://sua-evolution.up.railway.app ou http://IP_ORACLE:8080"
+                          className="h-8 text-xs font-mono"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[11px] font-semibold text-muted-foreground block mb-0.5">
+                            Nome da Instância:
+                          </label>
+                          <Input
+                            value={comunicacao.whatsapp.evolutionInstance || ""}
+                            onChange={(e) =>
+                              setComunicacao((prev) => ({
+                                ...prev,
+                                whatsapp: { ...prev.whatsapp, evolutionInstance: e.target.value },
+                              }))
+                            }
+                            placeholder="locomotiva-crm"
+                            className="h-8 text-xs font-mono"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[11px] font-semibold text-muted-foreground block mb-0.5">
+                            API Key (Global ou da Instância):
+                          </label>
+                          <Input
+                            type="password"
+                            value={comunicacao.whatsapp.evolutionApiKey || ""}
+                            onChange={(e) =>
+                              setComunicacao((prev) => ({
+                                ...prev,
+                                whatsapp: { ...prev.whatsapp, evolutionApiKey: e.target.value },
+                              }))
+                            }
+                            placeholder="Chave secreta da API"
+                            className="h-8 text-xs font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/40">
+                        <label className="text-xs font-medium text-foreground cursor-pointer" htmlFor="fallback-evolution">
+                          Fallback automático para WhatsApp Web se a Evolution falhar:
+                        </label>
+                        <Switch
+                          id="fallback-evolution"
+                          checked={comunicacao.whatsapp.evolutionFallbackNativo !== false}
+                          onCheckedChange={(checked) =>
+                            setComunicacao((prev) => ({
+                              ...prev,
+                              whatsapp: { ...prev.whatsapp, evolutionFallbackNativo: checked },
+                            }))
+                          }
+                        />
+                      </div>
+
+                      {/* Botão de Teste de Conexão com a Evolution */}
+                      <div className="flex items-center justify-between gap-2 pt-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleTestarConexaoEvolution}
+                          disabled={testandoConexaoEvolution}
+                          className="h-7 text-xs gap-1.5 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+                        >
+                          <RefreshCw className={`h-3 w-3 ${testandoConexaoEvolution ? "animate-spin" : ""}`} />
+                          {testandoConexaoEvolution ? "Checando status..." : "Testar Conexão / Status da Instância"}
+                        </Button>
+
+                        {resultadoConexaoEvolution && (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[10px] gap-1",
+                              resultadoConexaoEvolution.conectado
+                                ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                                : resultadoConexaoEvolution.state === "connecting"
+                                ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                                : "bg-rose-500/10 text-rose-600 border-rose-500/30"
+                            )}
+                          >
+                            {resultadoConexaoEvolution.conectado ? "🟢 Sessão Ativa" : resultadoConexaoEvolution.state === "connecting" ? "🟡 Conectando..." : "🔴 Desconectado"}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Lista de Respostas Automáticas / Scripts */}
-              <div className="space-y-3 pt-2">
+              <div className="space-y-3 pt-2 border-t">
                 <div className="flex items-center gap-2">
                   <Zap className="h-4 w-4 text-amber-500" />
                   <span className="text-xs font-bold uppercase tracking-wider text-foreground">
@@ -874,8 +1042,9 @@ function ConfiguracoesPage() {
                 </div>
               </div>
 
+              {/* Botão de Salvar & Teste de Disparo */}
               <div className="flex items-center justify-between gap-3 pt-3 border-t flex-wrap">
-                <Button onClick={handleSaveWhatsAppSettings} className="gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white">
+                <Button onClick={handleSaveWhatsAppSettings} className="gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
                   Salvar Configurações de WhatsApp
                 </Button>
 
@@ -901,6 +1070,219 @@ function ConfiguracoesPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* MODAL / GUIA DE HOSPEDAGEM GRATUITA DA EVOLUTION API */}
+          <Dialog open={modalGuiaEvolutionOpen} onOpenChange={setModalGuiaEvolutionOpen}>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600">
+                    <Server className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-lg">
+                      Como Hospedar a Evolution API 100% Grátis na Nuvem
+                    </DialogTitle>
+                    <DialogDescription className="text-xs">
+                      Sem instalar nada no seu computador e com disponibilidade 24 horas por dia.
+                    </DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              <Tabs defaultValue="oracle" className="space-y-4 pt-2">
+                <TabsList className="grid grid-cols-3 h-9 w-full">
+                  <TabsTrigger value="oracle" className="text-xs gap-1.5">
+                    ⭐ Oracle Cloud (VPS Grátis)
+                  </TabsTrigger>
+                  <TabsTrigger value="koyeb" className="text-xs gap-1.5">
+                    🚀 Koyeb (Zero Linux)
+                  </TabsTrigger>
+                  <TabsTrigger value="docker" className="text-xs gap-1.5">
+                    🐳 Docker Compose Pronto
+                  </TabsTrigger>
+                </TabsList>
+
+                {/* ABA 1: ORACLE CLOUD */}
+                <TabsContent value="oracle" className="space-y-3 m-0 text-xs">
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-900 dark:text-amber-200 space-y-1">
+                    <strong className="font-semibold block">Por que é a melhor opção?</strong>
+                    <p className="text-[11px] leading-relaxed">
+                      O programa <strong>Always Free da Oracle Cloud</strong> é vitalício (não expira). Você ganha uma máquina com até <strong>4 núcleos ARM e 24 GB de Memória RAM com IP público fixo</strong>. A Evolution API usa apenas 1 GB de RAM, rodando 365 dias por ano sem custo.
+                    </p>
+                  </div>
+
+                  <ol className="list-decimal pl-4 space-y-2 text-muted-foreground leading-relaxed">
+                    <li>
+                      Crie sua conta em{" "}
+                      <a href="https://www.oracle.com/cloud/free/" target="_blank" rel="noreferrer" className="text-primary font-semibold underline inline-flex items-center gap-0.5">
+                        oracle.com/cloud/free <ExternalLink className="h-3 w-3" />
+                      </a>.
+                    </li>
+                    <li>
+                      Acesse o painel e crie uma <strong>Instância de Computação</strong> (Compute Instance) selecionando o sistema <strong>Ubuntu 22.04 LTS</strong> e forma <strong>VM.Standard.A1.Flex</strong>.
+                    </li>
+                    <li>
+                      Acesse a máquina por SSH e instale o Docker com um único comando:
+                      <div className="p-2 bg-slate-950 text-slate-100 font-mono text-[11px] rounded mt-1 flex items-center justify-between">
+                        <code>curl -fsSL https://get.docker.com | bash</code>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 text-[10px] text-slate-300 hover:text-white"
+                          onClick={() => {
+                            navigator.clipboard.writeText("curl -fsSL https://get.docker.com | bash");
+                            toast.success("Comando copiado!");
+                          }}
+                        >
+                          <Copy className="h-3 w-3 mr-1" /> Copiar
+                        </Button>
+                      </div>
+                    </li>
+                    <li>
+                      Copie o arquivo <code>docker-compose.yml</code> da aba ao lado, cole na máquina e execute:
+                      <div className="p-2 bg-slate-950 text-slate-100 font-mono text-[11px] rounded mt-1 flex items-center justify-between">
+                        <code>docker compose up -d</code>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 text-[10px] text-slate-300 hover:text-white"
+                          onClick={() => {
+                            navigator.clipboard.writeText("docker compose up -d");
+                            toast.success("Comando copiado!");
+                          }}
+                        >
+                          <Copy className="h-3 w-3 mr-1" /> Copiar
+                        </Button>
+                      </div>
+                    </li>
+                    <li>
+                      Abra a porta 8080 nas regras de segurança da Oracle e cole <code>http://IP_DA_ORACLE:8080</code> no campo URL acima!
+                    </li>
+                  </ol>
+                </TabsContent>
+
+                {/* ABA 2: KOYEB (ZERO LINUX) */}
+                <TabsContent value="koyeb" className="space-y-3 m-0 text-xs">
+                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-900 dark:text-blue-200 space-y-1">
+                    <strong className="font-semibold block">Ideal para quem não quer mexer em terminal</strong>
+                    <p className="text-[11px] leading-relaxed">
+                      O <strong>Koyeb.com</strong> possui um plano gratuito permanente para rodar containers Docker com domínio HTTPS e certificado SSL automático.
+                    </p>
+                  </div>
+
+                  <ol className="list-decimal pl-4 space-y-2 text-muted-foreground leading-relaxed">
+                    <li>
+                      Crie um banco de dados PostgreSQL gratuito no{" "}
+                      <a href="https://supabase.com" target="_blank" rel="noreferrer" className="text-primary font-semibold underline inline-flex items-center gap-0.5">
+                        supabase.com <ExternalLink className="h-3 w-3" />
+                      </a> e copie a Connection String (URI).
+                    </li>
+                    <li>
+                      Acesse{" "}
+                      <a href="https://www.koyeb.com" target="_blank" rel="noreferrer" className="text-primary font-semibold underline inline-flex items-center gap-0.5">
+                        koyeb.com <ExternalLink className="h-3 w-3" />
+                      </a> e crie um novo App com a imagem pública do Docker Hub:
+                      <div className="p-2 bg-slate-950 text-slate-100 font-mono text-[11px] rounded mt-1">
+                        <code>atendai/evolution-api:v2.1.2</code>
+                      </div>
+                    </li>
+                    <li>
+                      Defina as variáveis de ambiente no painel do Koyeb:
+                      <ul className="list-disc pl-4 mt-1 space-y-0.5 font-mono text-[11px]">
+                        <li><code>AUTHENTICATION_API_KEY=sua_chave_locomotiva_2026</code></li>
+                        <li><code>DATABASE_ENABLED=true</code></li>
+                        <li><code>DATABASE_PROVIDER=postgresql</code></li>
+                        <li><code>DATABASE_CONNECTION_URI=sua_uri_do_supabase</code></li>
+                      </ul>
+                    </li>
+                    <li>
+                      Clique em <strong>Deploy</strong>. O Koyeb gerará um endereço seguro como <code>https://locomotiva-evolution.koyeb.app</code>. Cole no CRM!
+                    </li>
+                  </ol>
+                </TabsContent>
+
+                {/* ABA 3: DOCKER COMPOSE */}
+                <TabsContent value="docker" className="space-y-3 m-0 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Arquivo pronto com Evolution API + PostgreSQL para qualquer VPS Linux:</span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs gap-1"
+                      onClick={() => {
+                        const dockerCompose = `version: '3.7'
+services:
+  evolution-api:
+    image: atendai/evolution-api:v2.1.2
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_URL=http://localhost:8080
+      - AUTHENTICATION_API_KEY=locomotiva_crm_secret_key_2026
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://postgres:postgres_pass_2026@postgres:5432/evolution
+    volumes:
+      - evolution_instances:/evolution/instances
+    depends_on:
+      - postgres
+  postgres:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres_pass_2026
+      - POSTGRES_DB=evolution
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+volumes:
+  evolution_instances:
+  postgres_data:`;
+                        navigator.clipboard.writeText(dockerCompose);
+                        toast.success("docker-compose.yml copiado!");
+                      }}
+                    >
+                      <Copy className="h-3 w-3" /> Copiar docker-compose.yml
+                    </Button>
+                  </div>
+
+                  <pre className="p-3 bg-slate-950 text-slate-100 font-mono text-[11px] rounded-lg overflow-x-auto leading-relaxed border border-slate-800">
+{`version: '3.7'
+services:
+  evolution-api:
+    image: atendai/evolution-api:v2.1.2
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_URL=http://localhost:8080
+      - AUTHENTICATION_API_KEY=locomotiva_crm_secret_key_2026
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://postgres:postgres_pass_2026@postgres:5432/evolution
+    volumes:
+      - evolution_instances:/evolution/instances
+    depends_on:
+      - postgres
+  postgres:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres_pass_2026
+      - POSTGRES_DB=evolution
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+volumes:
+  evolution_instances:
+  postgres_data:`}
+                  </pre>
+                </TabsContent>
+              </Tabs>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         {/* ------------------------------------------------------------------- */}

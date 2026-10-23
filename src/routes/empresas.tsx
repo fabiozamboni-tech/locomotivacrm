@@ -35,6 +35,7 @@ import {
   Trash2,
   RotateCcw,
   Copy,
+  CheckCheck,
 } from "lucide-react";
 import {
   siteUrl,
@@ -77,6 +78,7 @@ type Filtros = {
   cidade: string;
   etapaKanban: string;
   segmento: string;
+  statusWhats: "todos" | "enviado" | "pendente";
   scoreMin: number;
   soSemSite: boolean;
   soSiteProblema: boolean;
@@ -91,6 +93,7 @@ const INITIAL: Filtros = {
   cidade: "todas",
   etapaKanban: "todas",
   segmento: "todos",
+  statusWhats: "todos",
   scoreMin: 0,
   soSemSite: false,
   soSiteProblema: false,
@@ -107,6 +110,8 @@ function filtrar(list: Empresa[], f: Filtros): Empresa[] {
     if (f.cidade !== "todas" && e.cidade !== f.cidade) return false;
     if (f.etapaKanban !== "todas" && e.crmStage !== f.etapaKanban) return false;
     if (f.segmento !== "todos" && e.segmento !== f.segmento) return false;
+    if (f.statusWhats === "enviado" && e.whatsappStatus !== "enviado") return false;
+    if (f.statusWhats === "pendente" && e.whatsappStatus === "enviado") return false;
     if (e.score < f.scoreMin) return false;
     if (f.soSemSite && e.statusSite !== "sem_site") return false;
     if (
@@ -314,6 +319,18 @@ function SortableEmpresaRow({
                   <MessageCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
                   <span className="font-mono text-[11px] font-medium">{e.whatsapp}</span>
                 </a>
+                {e.whatsappStatus === "enviado" && (
+                  <span
+                    className="inline-flex items-center text-[10px] text-emerald-600 dark:text-emerald-400 font-medium"
+                    title={
+                      e.whatsappUltimoEnvio
+                        ? `WhatsApp enviado em ${new Date(e.whatsappUltimoEnvio).toLocaleDateString("pt-BR")}`
+                        : "WhatsApp enviado"
+                    }
+                  >
+                    <CheckCheck className="h-3 w-3" />
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={(ev) => copiarTel(e.whatsapp!, ev)}
@@ -340,6 +357,18 @@ function SortableEmpresaRow({
                     <MessageCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
                     <span className="font-mono text-[11px] font-medium">{e.whatsapp}</span>
                   </a>
+                  {e.whatsappStatus === "enviado" && (
+                    <span
+                      className="inline-flex items-center text-[10px] text-emerald-600 dark:text-emerald-400 font-medium"
+                      title={
+                        e.whatsappUltimoEnvio
+                          ? `WhatsApp enviado em ${new Date(e.whatsappUltimoEnvio).toLocaleDateString("pt-BR")}`
+                          : "WhatsApp enviado"
+                      }
+                    >
+                      <CheckCheck className="h-3 w-3" />
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={(ev) => copiarTel(e.whatsapp!, ev)}
@@ -671,6 +700,21 @@ function EmpresasPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            {/* Filtro Status WhatsApp */}
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className="text-muted-foreground font-medium">WhatsApp:</span>
+              <Select value={f.statusWhats} onValueChange={(v) => set("statusWhats", v as any)}>
+                <SelectTrigger className="h-7 text-xs w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os status</SelectItem>
+                  <SelectItem value="enviado">🟢 Já abordados (WhatsApp)</SelectItem>
+                  <SelectItem value="pendente">⚪ Pendentes (Não abordados)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {[
               ["soSemSite", "Sem site"],
               ["soSiteProblema", "Site com problemas"],

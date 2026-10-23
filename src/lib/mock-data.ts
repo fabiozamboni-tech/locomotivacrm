@@ -100,6 +100,9 @@ export interface MensagemAbordagemSalva {
   salvoEm: string;
 }
 
+export type WhatsAppStatus = "nao_enviado" | "enviado" | "respondido";
+export type WhatsAppModoEnvio = "nativo" | "evolution";
+
 export interface Empresa {
   id: string;
   nome: string;
@@ -125,6 +128,11 @@ export interface Empresa {
   proximoFollowup?: string;
   naoContatar?: boolean;
   observacoes?: string;
+  // Rastreamento unificado de WhatsApp
+  whatsappStatus?: WhatsAppStatus;
+  whatsappUltimoEnvio?: string;
+  whatsappUltimaMensagem?: string;
+  whatsappModoEnvio?: WhatsAppModoEnvio;
   // Campos estratégicos e de inteligência de busca
   razaoSocial?: string;
   areaAtuacao?: string;

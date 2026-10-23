@@ -10,10 +10,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { MessageCircle, Send, Check, ExternalLink, Sparkles, Settings2, Zap } from "lucide-react";
+import {
+  MessageCircle,
+  Send,
+  Check,
+  ExternalLink,
+  Sparkles,
+  Settings2,
+  Zap,
+  Download,
+  Server,
+  Globe,
+  CheckCheck,
+} from "lucide-react";
 import { toast } from "sonner";
 import { getComunicacaoSettings, type RespostaAutomaticaItem } from "@/lib/comunicacao-settings";
 import { dispararWhatsApp_ServerFn } from "@/lib/comunicacao.functions";
+import { downloadVCardContato } from "@/lib/vcf-generator";
+import { useStore } from "@/lib/store";
 import type { Empresa } from "@/lib/mock-data";
 import { Link } from "@tanstack/react-router";
 
@@ -32,6 +46,7 @@ export function EnviarWhatsAppModal({
   mensagemPadrao = "",
   onSuccess,
 }: EnviarWhatsAppModalProps) {
+  const { updateEmpresa, addHistorico, setStage } = useStore();
   const [numero, setNumero] = useState("");
   const [mensagem, setMensagem] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -42,12 +57,17 @@ export function EnviarWhatsAppModal({
   useEffect(() => {
     if (empresa) {
       setNumero(empresa.whatsapp || empresa.telefone || "");
-      setMensagem(
+      let textoInicial =
         mensagemPadrao ||
-          `Olá! Tudo bem?\n\nMe chamo [Seu Nome], da Locomotiva Comunicação.\n\nAcompanhamos o setor de ${empresa.segmento} em ${empresa.cidade} e identificamos gargalos de captação na presença digital da ${empresa.nome} que estão fazendo orçamentos irem para concorrentes.\n\nPreparamos uma Micro-Auditoria de 2 minutos sobre isso. Posso compartilhar o link com você?\n\nUm abraço!`,
-      );
+        `Olá! Tudo bem?\n\nMe chamo Fábio, da Locomotiva Comunicação.\n\nAcompanhamos o setor de ${empresa.segmento} em ${empresa.cidade} e identificamos oportunidades valiosas na presença digital da ${empresa.nome}.\n\nPreparamos uma Micro-Auditoria de 2 minutos sobre isso. Posso compartilhar o link com você?\n\nUm abraço!`;
+
+      if (config.nativoIncluirIdentificadorLead && !textoInicial.includes(`[Lead: ${empresa.nome}]`)) {
+        textoInicial = `[Lead: ${empresa.nome}]\n${textoInicial}`;
+      }
+
+      setMensagem(textoInicial);
     }
-  }, [empresa, mensagemPadrao, open]);
+  }, [empresa, mensagemPadrao, open, config.nativoIncluirIdentificadorLead]);
 
   if (!empresa) return null;
 
@@ -58,6 +78,21 @@ export function EnviarWhatsAppModal({
     txt = txt.replaceAll("[Cidade]", empresa.cidade);
     setMensagem(txt);
     toast.success(`Modelo "${resp.titulo}" aplicado!`);
+  };
+
+  const handleBaixarVCard = () => {
+    downloadVCardContato({
+      nome: empresa.nome,
+      telefone: empresa.telefone,
+      whatsapp: empresa.whatsapp,
+      cidade: empresa.cidade,
+      segmento: empresa.segmento,
+      email: empresa.email,
+      site: empresa.site,
+      cnpj: empresa.cnpj,
+      endereco: empresa.endereco,
+    });
+    toast.success(`Cartão de contato (.vcf) de "${empresa.nome}" baixado!`);
   };
 
   const handleDisparar = async () => {
@@ -78,15 +113,50 @@ export function EnviarWhatsAppModal({
         data: {
           numero: rawNumber,
           mensagem: mensagem.trim(),
+          empresaId: empresa.id,
+          empresaNome: empresa.nome,
           gatewayTipo: config.gatewayTipo,
+          evolutionUrl: config.evolutionUrl,
+          evolutionInstance: config.evolutionInstance,
+          evolutionApiKey: config.evolutionApiKey,
+          evolutionFallbackNativo: config.evolutionFallbackNativo,
           apiUrl: config.apiUrl,
           apiKey: config.apiKey,
         },
       });
 
+      const modoEnvio = config.gatewayTipo === "evolution_api" && res.modo === "evolution_api" && res.sucesso ? "evolution" : "nativo";
+
+      // 1. Atualiza dados da empresa
+      updateEmpresa(empresa.id, {
+        whatsappStatus: "enviado",
+        whatsappUltimoEnvio: new Date().toISOString(),
+        whatsappUltimaMensagem: mensagem.trim(),
+        whatsappModoEnvio: modoEnvio,
+      });
+
+      // 2. Se configurado, move etapa do kanban
+      if (
+        config.nativoAutoMoverKanban &&
+        (empresa.crmStage === "identificado" || empresa.crmStage === "analisado" || empresa.crmStage === "contato_preparado")
+      ) {
+        setStage(empresa.id, config.nativoKanbanStageDestino || "primeiro_contato");
+      }
+
+      // 3. Registra na timeline do cliente
+      addHistorico(empresa.id, {
+        data: new Date().toISOString().slice(0, 10),
+        tipo: "whatsapp",
+        texto: `WhatsApp disparado via ${
+          modoEnvio === "evolution"
+            ? `Evolution API (Instância: ${config.evolutionInstance})`
+            : "WhatsApp Web Oficial"
+        }.\nMensagem: "${mensagem.slice(0, 160)}${mensagem.length > 160 ? "..." : ""}"`,
+      });
+
       if (res.sucesso) {
-        if (res.modo === "gateway_api") {
-          toast.success(res.detalhes || "Mensagem enviada com sucesso pelo Gateway WhatsApp!");
+        if (res.modo === "evolution_api") {
+          toast.success(res.detalhes || "Mensagem enviada com sucesso em segundo plano via Evolution API!");
         } else {
           toast.success("Abrindo WhatsApp Web / Desktop...");
           if (res.directUrl) {
@@ -96,9 +166,13 @@ export function EnviarWhatsAppModal({
         onSuccess?.();
         onOpenChange(false);
       } else {
-        toast.error(res.erro || "Falha no disparo.");
-        if (res.directUrl) {
+        if (res.fallbackAcionado && res.directUrl) {
+          toast.warning(res.erro || "Falha na Evolution API. Abrindo contingência via WhatsApp Web!");
           window.open(res.directUrl, "_blank");
+          onSuccess?.();
+          onOpenChange(false);
+        } else {
+          toast.error(res.erro || "Falha no disparo.");
         }
       }
     } catch (err: any) {
@@ -122,14 +196,20 @@ export function EnviarWhatsAppModal({
                   Disparo de WhatsApp — {empresa.nome}
                 </DialogTitle>
                 <DialogDescription>
-                  Envio ágil com suporte a respostas automáticas da Locomotiva Comunicação.
+                  Envio ágil com histórico automático no CRM e suporte à Evolution API.
                 </DialogDescription>
               </div>
             </div>
 
-            <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
-              {config.gatewayTipo === "web_link" ? "WhatsApp Web Oficial" : `Gateway ${config.gatewayTipo.toUpperCase()}`}
-            </Badge>
+            {config.gatewayTipo === "evolution_api" ? (
+              <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-600 border-emerald-500/30 gap-1.5 py-1 px-2.5">
+                <Server className="h-3 w-3" /> Evolution API Ativa
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-600 border-blue-500/30 gap-1.5 py-1 px-2.5">
+                <Globe className="h-3 w-3" /> WhatsApp Web Oficial
+              </Badge>
+            )}
           </div>
         </DialogHeader>
 
@@ -157,16 +237,31 @@ export function EnviarWhatsAppModal({
           )}
 
           <div className="space-y-3">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
-                Número do WhatsApp (com DDD):
-              </label>
-              <Input
-                value={numero}
-                onChange={(e) => setNumero(e.target.value)}
-                placeholder="Ex: 54999998888"
-                className="text-sm font-mono"
-              />
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex-1">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
+                  Número do WhatsApp (com DDD):
+                </label>
+                <Input
+                  value={numero}
+                  onChange={(e) => setNumero(e.target.value)}
+                  placeholder="Ex: 54999998888"
+                  className="text-sm font-mono"
+                />
+              </div>
+
+              <div className="pt-5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleBaixarVCard}
+                  className="h-9 text-xs gap-1.5 border-dashed text-muted-foreground hover:text-foreground"
+                  title="Baixa um arquivo .vcf com o nome, telefone e empresa para salvar na agenda do celular"
+                >
+                  <Download className="h-3.5 w-3.5 text-emerald-600" /> Baixar Contato (.vcf)
+                </Button>
+              </div>
             </div>
 
             <div>
@@ -185,7 +280,7 @@ export function EnviarWhatsAppModal({
           <div className="flex items-center justify-between gap-2 pt-2 border-t">
             <Button asChild variant="ghost" size="sm" className="text-xs text-muted-foreground">
               <Link to="/configuracoes" onClick={() => onOpenChange(false)}>
-                <Settings2 className="h-3.5 w-3.5 mr-1" /> Configurar Gateway / Respostas
+                <Settings2 className="h-3.5 w-3.5 mr-1" /> Configurar Gateway / Scripts
               </Link>
             </Button>
 
@@ -204,7 +299,11 @@ export function EnviarWhatsAppModal({
                 className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5 shadow"
               >
                 <Send className={`h-3.5 w-3.5 ${enviando ? "animate-spin" : ""}`} />
-                {enviando ? "Disparando..." : "Disparar no WhatsApp"}
+                {enviando
+                  ? "Disparando..."
+                  : config.gatewayTipo === "evolution_api"
+                  ? "Disparar via Evolution API"
+                  : "Abrir no WhatsApp Web"}
               </Button>
             </div>
           </div>

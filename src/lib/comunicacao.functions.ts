@@ -110,37 +110,122 @@ export const enviarEmailDireto_ServerFn = createServerFn({ method: "POST" })
 export interface DisparoWhatsAppInput {
   numero: string;
   mensagem: string;
-  gatewayTipo?: "web_link" | "zapi" | "evolution_api" | "custom_webhook";
+  empresaId?: string;
+  empresaNome?: string;
+  gatewayTipo?: "web_link" | "evolution_api" | "custom_webhook" | "zapi";
+  // Evolution API
+  evolutionUrl?: string;
+  evolutionInstance?: string;
+  evolutionApiKey?: string;
+  evolutionFallbackNativo?: boolean;
+  // Legado / Genérico
   apiUrl?: string;
   apiKey?: string;
 }
 
 export interface DisparoWhatsAppResult {
   sucesso: boolean;
-  modo: "gateway_api" | "web_link";
+  modo: "evolution_api" | "gateway_api" | "web_link";
+  mensagemId?: string;
   detalhes?: string;
   erro?: string;
   directUrl?: string;
+  fallbackAcionado?: boolean;
 }
 
 export const dispararWhatsApp_ServerFn = createServerFn({ method: "POST" })
   .inputValidator((data: DisparoWhatsAppInput) => data)
   .handler(async ({ data }): Promise<DisparoWhatsAppResult> => {
     const rawNumber = data.numero.replace(/\D/g, "");
-    const formattedNumber = rawNumber.startsWith("55") ? rawNumber : `55${rawNumber}`;
+    // Sanitização para padrão internacional WhatsApp (DDI Brasil 55)
+    let formattedNumber = rawNumber;
+    if (rawNumber.length === 10 || rawNumber.length === 11) {
+      formattedNumber = `55${rawNumber}`;
+    }
+
+    const directWebUrl = `https://api.whatsapp.com/send?phone=${formattedNumber}&text=${encodeURIComponent(data.mensagem)}`;
 
     if (rawNumber.length < 10) {
       return {
         sucesso: false,
         modo: "web_link",
-        erro: "Número de telefone / WhatsApp inválido.",
+        erro: "Número de telefone / WhatsApp inválido (mínimo de 10 dígitos com DDD).",
       };
     }
 
-    // Se estiver configurado com API de Gateway (Z-API / Evolution / Webhook)
-    if (data.gatewayTipo && data.gatewayTipo !== "web_link" && data.apiUrl) {
+    // MODO 1: EVOLUTION API (v2)
+    if (data.gatewayTipo === "evolution_api" && data.evolutionUrl && data.evolutionInstance) {
       try {
-        let headers: Record<string, string> = { "Content-Type": "application/json" };
+        const baseUrl = data.evolutionUrl.replace(/\/+$/, "");
+        const instance = encodeURIComponent(data.evolutionInstance.trim());
+        const endpoint = `${baseUrl}/message/sendText/${instance}`;
+
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        if (data.evolutionApiKey) {
+          headers["apikey"] = data.evolutionApiKey.trim();
+        }
+
+        const bodyPayload = JSON.stringify({
+          number: formattedNumber,
+          text: data.mensagem,
+          linkPreview: true,
+        });
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
+
+        const resp = await fetch(endpoint, {
+          method: "POST",
+          headers,
+          body: bodyPayload,
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (resp.ok) {
+          const respData = await resp.json().catch(() => ({}));
+          const msgId = respData?.key?.id || respData?.messageId || respData?.id;
+          return {
+            sucesso: true,
+            modo: "evolution_api",
+            mensagemId: msgId,
+            detalhes: `Mensagem enviada com sucesso em segundo plano via Evolution API (Instância: ${data.evolutionInstance})!`,
+          };
+        } else {
+          const errText = await resp.text().catch(() => "Sem detalhes");
+          const fallback = data.evolutionFallbackNativo !== false;
+          return {
+            sucesso: false,
+            modo: "evolution_api",
+            erro: `Evolution API retornou status ${resp.status}: ${errText.slice(0, 150)}`,
+            directUrl: fallback ? directWebUrl : undefined,
+            fallbackAcionado: fallback,
+            detalhes: fallback
+              ? "Evolution API indisponível. Abrindo contingência no WhatsApp Web Oficial..."
+              : undefined,
+          };
+        }
+      } catch (err: any) {
+        const fallback = data.evolutionFallbackNativo !== false;
+        return {
+          sucesso: false,
+          modo: "evolution_api",
+          erro: `Falha ao conectar no servidor da Evolution API: ${err.message || "Timeout ou Conexão Recusada"}`,
+          directUrl: fallback ? directWebUrl : undefined,
+          fallbackAcionado: fallback,
+          detalhes: fallback
+            ? "Servidor Evolution API offline. Abrindo contingência no WhatsApp Web Oficial..."
+            : undefined,
+        };
+      }
+    }
+
+    // MODO LEGADO (Webhook Customizado / Z-API)
+    if (data.gatewayTipo && data.gatewayTipo !== "web_link" && data.gatewayTipo !== "evolution_api" && data.apiUrl) {
+      try {
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
         if (data.apiKey) {
           headers["apikey"] = data.apiKey;
           headers["Authorization"] = `Bearer ${data.apiKey}`;
@@ -152,6 +237,8 @@ export const dispararWhatsApp_ServerFn = createServerFn({ method: "POST" })
           number: formattedNumber,
           message: data.mensagem,
           text: data.mensagem,
+          empresaId: data.empresaId,
+          empresaNome: data.empresaNome,
         });
 
         const resp = await fetch(data.apiUrl, {
@@ -164,32 +251,120 @@ export const dispararWhatsApp_ServerFn = createServerFn({ method: "POST" })
           return {
             sucesso: true,
             modo: "gateway_api",
-            detalhes: `Mensagem enviada com sucesso para ${formattedNumber} via Gateway WhatsApp!`,
+            detalhes: `Mensagem enviada com sucesso para ${formattedNumber} via Gateway!`,
           };
         } else {
-          const errText = await resp.text();
+          const errText = await resp.text().catch(() => "");
           return {
             sucesso: false,
             modo: "gateway_api",
-            erro: `O gateway retornou erro HTTP ${resp.status}: ${errText.slice(0, 100)}`,
-            directUrl: `https://api.whatsapp.com/send?phone=${formattedNumber}&text=${encodeURIComponent(data.mensagem)}`,
+            erro: `Gateway retornou erro HTTP ${resp.status}: ${errText.slice(0, 120)}`,
+            directUrl: directWebUrl,
           };
         }
       } catch (err: any) {
         return {
           sucesso: false,
           modo: "gateway_api",
-          erro: `Falha ao conectar no gateway: ${err.message}`,
-          directUrl: `https://api.whatsapp.com/send?phone=${formattedNumber}&text=${encodeURIComponent(data.mensagem)}`,
+          erro: `Falha na requisição ao gateway: ${err.message}`,
+          directUrl: directWebUrl,
         };
       }
     }
 
-    // Fallback padrão web link oficial
+    // MODO PADRÃO: WHATSAPP WEB OFICIAL (NATIVO)
     return {
       sucesso: true,
       modo: "web_link",
-      directUrl: `https://api.whatsapp.com/send?phone=${formattedNumber}&text=${encodeURIComponent(data.mensagem)}`,
-      detalhes: "Link direto oficial do WhatsApp gerado para envio instantâneo.",
+      directUrl: directWebUrl,
+      detalhes: "Link oficial do WhatsApp Web/Desktop gerado para envio imediato.",
     };
+  });
+
+export interface TesteConexaoEvolutionInput {
+  evolutionUrl: string;
+  evolutionInstance: string;
+  evolutionApiKey: string;
+}
+
+export interface TesteConexaoEvolutionResult {
+  conectado: boolean;
+  state: "open" | "connecting" | "close" | "offline";
+  detalhes: string;
+  instanciaNome?: string;
+  profileName?: string;
+}
+
+export const testarConexaoEvolution_ServerFn = createServerFn({ method: "POST" })
+  .inputValidator((data: TesteConexaoEvolutionInput) => data)
+  .handler(async ({ data }): Promise<TesteConexaoEvolutionResult> => {
+    if (!data.evolutionUrl || !data.evolutionInstance) {
+      return {
+        conectado: false,
+        state: "offline",
+        detalhes: "Informe a URL da Evolution API e o Nome da Instância.",
+      };
+    }
+
+    try {
+      const baseUrl = data.evolutionUrl.replace(/\/+$/, "");
+      const instance = encodeURIComponent(data.evolutionInstance.trim());
+      const endpoint = `${baseUrl}/instance/connectionState/${instance}`;
+
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (data.evolutionApiKey) {
+        headers["apikey"] = data.evolutionApiKey.trim();
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      const resp = await fetch(endpoint, {
+        method: "GET",
+        headers,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (resp.ok) {
+        const json = await resp.json().catch(() => ({}));
+        const stateRaw = String(json?.instance?.state || json?.state || "").toLowerCase();
+
+        if (stateRaw === "open") {
+          return {
+            conectado: true,
+            state: "open",
+            instanciaNome: data.evolutionInstance,
+            detalhes: `Instância "${data.evolutionInstance}" conectada com sucesso ao WhatsApp! Sessão ativa e pronta para envios.`,
+          };
+        } else if (stateRaw === "connecting") {
+          return {
+            conectado: false,
+            state: "connecting",
+            instanciaNome: data.evolutionInstance,
+            detalhes: `Instância "${data.evolutionInstance}" está conectando ou aguardando leitura do QR Code.`,
+          };
+        } else {
+          return {
+            conectado: false,
+            state: "close",
+            instanciaNome: data.evolutionInstance,
+            detalhes: `Instância "${data.evolutionInstance}" encontrada, mas o WhatsApp está desconectado (${stateRaw || "close"}). Abra o painel da Evolution e escaneie o QR Code.`,
+          };
+        }
+      } else {
+        const errText = await resp.text().catch(() => "");
+        return {
+          conectado: false,
+          state: "offline",
+          detalhes: `O servidor respondeu com status ${resp.status}: ${errText.slice(0, 100) || "Instância não encontrada ou API Key incorreta."}`,
+        };
+      }
+    } catch (err: any) {
+      return {
+        conectado: false,
+        state: "offline",
+        detalhes: `Não foi possível conectar ao servidor (${err.message || "Timeout"}). Verifique se a URL está correta e com HTTPS acessível.`,
+      };
+    }
   });

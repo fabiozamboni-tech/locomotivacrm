@@ -9,6 +9,7 @@ import {
   Flame,
   SlidersHorizontal,
   EyeOff,
+  CheckCheck,
 } from "lucide-react";
 import { TimingRadarCard } from "@/components/timing-radar-card";
 import { CopilotoObjecoesModal } from "@/components/copiloto-objecoes-modal";
@@ -456,6 +457,18 @@ function KanbanCard({
       <div className="flex flex-wrap gap-1 mt-2">
         <SiteBadge status={empresa.statusSite} />
         <InstagramBadge status={empresa.statusInstagram} />
+        {empresa.whatsappStatus === "enviado" && (
+          <span
+            className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400"
+            title={
+              empresa.whatsappUltimoEnvio
+                ? `WhatsApp enviado em ${new Date(empresa.whatsappUltimoEnvio).toLocaleDateString("pt-BR")} às ${new Date(empresa.whatsappUltimoEnvio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+                : "WhatsApp enviado"
+            }
+          >
+            <CheckCheck className="size-2.5" /> WhatsApp Enviado
+          </span>
+        )}
       </div>
 
       <div className="flex items-center gap-1 mt-3">

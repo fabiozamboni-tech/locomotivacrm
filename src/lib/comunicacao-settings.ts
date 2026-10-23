@@ -1,3 +1,5 @@
+import type { CrmStage } from "./mock-data";
+
 export interface EmailSmtpConfig {
   host: string;
   port: number;
@@ -17,9 +19,24 @@ export interface RespostaAutomaticaItem {
   texto: string;
 }
 
+export type WhatsAppGatewayTipo = "web_link" | "evolution_api" | "custom_webhook";
+
 export interface WhatsAppConfig {
   numeroAgencia: string;
-  gatewayTipo: "web_link" | "zapi" | "evolution_api" | "custom_webhook";
+  gatewayTipo: WhatsAppGatewayTipo;
+
+  // 1. Modo Nativo (WhatsApp Web / Desktop)
+  nativoAutoMoverKanban: boolean;
+  nativoKanbanStageDestino: CrmStage;
+  nativoIncluirIdentificadorLead: boolean;
+
+  // 2. Modo Evolution API (v2)
+  evolutionUrl: string;
+  evolutionInstance: string;
+  evolutionApiKey: string;
+  evolutionFallbackNativo: boolean;
+
+  // Legado / Compatibilidade
   apiUrl?: string;
   apiKey?: string;
   respostasAutomaticas: RespostaAutomaticaItem[];
@@ -56,6 +73,18 @@ export const DEFAULT_EMAIL_SETTINGS: EmailSmtpConfig = {
 export const DEFAULT_WHATSAPP_SETTINGS: WhatsAppConfig = {
   numeroAgencia: "54999990000",
   gatewayTipo: "web_link",
+
+  // Modo Nativo
+  nativoAutoMoverKanban: true,
+  nativoKanbanStageDestino: "primeiro_contato",
+  nativoIncluirIdentificadorLead: false,
+
+  // Modo Evolution API
+  evolutionUrl: "",
+  evolutionInstance: "locomotiva-crm",
+  evolutionApiKey: "",
+  evolutionFallbackNativo: true,
+
   apiUrl: "",
   apiKey: "",
   respostasAutomaticas: [
