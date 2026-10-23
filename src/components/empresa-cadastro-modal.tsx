@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useStore } from "@/lib/store";
-import type { Empresa, CrmStage } from "@/lib/mock-data";
+import { empresaFromRaw, type Empresa, type CrmStage } from "@/lib/mock-data";
 import { CRM_STAGES_ORDER, CRM_STAGE_LABEL } from "@/components/badges";
 import {
   gerarDadosCadastroIA_ServerFn,
@@ -56,6 +56,9 @@ import {
   ChevronUp,
   SearchCode,
   Check,
+  ExternalLink,
+  PhoneCall,
+  Plus,
 } from "lucide-react";
 
 interface EmpresaCadastroModalProps {
@@ -87,7 +90,7 @@ export function EmpresaCadastroModal({
   onOpenChange,
   onSaved,
 }: EmpresaCadastroModalProps) {
-  const { updateEmpresa } = useStore();
+  const { updateEmpresa, addEmpresa, empresas } = useStore();
   const gerarDadosIA = useServerFn(gerarDadosCadastroIA_ServerFn);
   const sugerirPublicoAlvoIA = useServerFn(sugerirPublicoAlvoIA_ServerFn);
   const consultarCnpjBrasilAPI = useServerFn(consultarCnpjBrasilAPI_ServerFn);
@@ -151,39 +154,72 @@ export function EmpresaCadastroModal({
   if (!empresa) return null;
 
   const handlePreencherComIA = async () => {
+    if (!nome.trim()) {
+      toast.warning("Informe o Nome Comercial da empresa para preencher com IA.");
+      return;
+    }
     setGerandoIA(true);
     try {
       const res = await gerarDadosIA({
         data: {
           nome,
           segmento,
-          cidade,
+          cidade: cidade || "Bento Gonçalves",
           bairro,
           endereco,
+          cep,
+          telefone,
+          whatsapp,
+          email,
+          cnpj,
+          razaoSocial,
           site,
           instagram,
           observacoes,
           areaAtuacaoAtual: areaAtuacao,
           publicoAlvoAtual: publicoAlvo,
+          buscaGoogleMapsAtual: buscaGoogleMaps,
+          buscasPartidaAtual: buscasPartida,
         },
       });
 
       if (res) {
+        if (res.nome && (!nome || nome === "Nova Empresa" || nome === res.razaoSocial)) {
+          setNome(res.nome);
+        }
+        if (res.razaoSocial) setRazaoSocial(res.razaoSocial);
+        if (res.cnpj) setCnpj(res.cnpj);
+        if (res.segmentoRefinado) setSegmento(res.segmentoRefinado);
         if (res.areaAtuacao) setAreaAtuacao(res.areaAtuacao);
         if (res.publicoAlvo) setPublicoAlvo(res.publicoAlvo);
+        if (res.cidade) setCidade(res.cidade);
+        if (res.bairro) setBairro(res.bairro);
+        if (res.endereco) setEndereco(res.endereco);
+        if (res.cep) setCep(res.cep);
+        if (res.telefone) setTelefone(res.telefone);
+        if (res.whatsapp) setWhatsapp(res.whatsapp);
+        if (res.email) setEmail(res.email);
+        if (res.site && (!site || site === "https://")) setSite(res.site);
+        if (res.instagram && !instagram) setInstagram(res.instagram);
         if (res.buscasPartida) setBuscasPartida(res.buscasPartida);
         if (res.termosEncontrados) setTermosEncontrados(res.termosEncontrados);
         if (res.buscaGoogleMaps) setBuscaGoogleMaps(res.buscaGoogleMaps);
-        if (res.segmentoRefinado && !segmento) setSegmento(res.segmentoRefinado);
 
+        if (res.dadosReceita) {
+          setDadosReceita(res.dadosReceita);
+          if (res.dadosReceita.qsa && res.dadosReceita.qsa.length > 0) {
+            setMostrarQsa(true);
+          }
+        }
+
+        const fontesStr = res.fontes && res.fontes.length > 0 ? res.fontes.join(", ") : "Google Maps, Receita & IA";
         toast.success(
-          res.modo === "ia"
-            ? "Campos preenchidos com inteligência artificial via ChatGPT!"
-            : "Campos gerados com dados em tempo real do Google Autocomplete!",
+          `Cadastro enriquecido com sucesso! (${fontesStr})`,
+          { duration: 5000 },
         );
       }
     } catch (err: any) {
-      toast.error(err.message || "Erro ao consultar IA.");
+      toast.error(err.message || "Erro ao consultar inteligência artificial.");
     } finally {
       setGerandoIA(false);
     }
@@ -296,37 +332,65 @@ export function EmpresaCadastroModal({
   };
 
   const handleSalvar = () => {
+    if (!nome.trim()) {
+      toast.warning("O Nome da empresa é obrigatório.");
+      return;
+    }
     setSalvando(true);
     try {
       const patch: Partial<Empresa> = {
-        nome,
-        razaoSocial: razaoSocial || undefined,
-        cnpj: cnpj || undefined,
-        segmento,
-        areaAtuacao: areaAtuacao || undefined,
-        publicoAlvo: publicoAlvo || undefined,
-        cidade,
-        bairro: bairro || undefined,
-        endereco,
-        cep: cep || undefined,
-        telefone: telefone || undefined,
-        whatsapp: whatsapp || undefined,
-        email: email || undefined,
-        site: site || undefined,
-        instagram: instagram || undefined,
+        nome: nome.trim(),
+        razaoSocial: razaoSocial.trim() || undefined,
+        cnpj: cnpj.trim() || undefined,
+        segmento: segmento.trim() || "Outros",
+        areaAtuacao: areaAtuacao.trim() || undefined,
+        publicoAlvo: publicoAlvo.trim() || undefined,
+        cidade: cidade.trim() || "Bento Gonçalves",
+        bairro: bairro.trim() || undefined,
+        endereco: endereco.trim() || "",
+        cep: cep.trim() || undefined,
+        telefone: telefone.trim() || undefined,
+        whatsapp: whatsapp.trim() || undefined,
+        email: email.trim() || undefined,
+        site: site.trim() || undefined,
+        instagram: instagram.trim() || undefined,
         crmStage,
-        observacoes: observacoes || undefined,
-        buscasPartida: buscasPartida || undefined,
-        termosEncontrados: termosEncontrados || undefined,
-        buscaGoogleMaps: buscaGoogleMaps || undefined,
+        observacoes: observacoes.trim() || undefined,
+        buscasPartida: buscasPartida.trim() || undefined,
+        termosEncontrados: termosEncontrados.trim() || undefined,
+        buscaGoogleMaps: buscaGoogleMaps.trim() || undefined,
       };
 
-      updateEmpresa(empresa.id, patch);
-      toast.success("Cadastro da empresa salvo com sucesso no banco de dados!");
-
-      if (onSaved) {
-        onSaved({ ...empresa, ...patch });
+      const existe = empresas.some((e) => e.id === empresa.id);
+      if (!existe) {
+        const base = empresaFromRaw({
+          nome: patch.nome || "Nova Empresa",
+          segmento: patch.segmento || "Outros",
+          cidade: patch.cidade || "Bento Gonçalves",
+          endereco: patch.endereco || "",
+          bairro: patch.bairro,
+          telefone: patch.telefone,
+          whatsapp: patch.whatsapp,
+          email: patch.email,
+          site: patch.site,
+          instagram: patch.instagram,
+          observacoes: patch.observacoes,
+          origem: "manual",
+        });
+        const novaEmpresa: Empresa = {
+          ...base,
+          ...patch,
+          id: empresa.id.startsWith("nova-") || empresa.id.startsWith("empresa-") ? empresa.id : base.id,
+        };
+        addEmpresa(novaEmpresa);
+        toast.success(`Empresa "${novaEmpresa.nome}" cadastrada com sucesso!`);
+        if (onSaved) onSaved(novaEmpresa);
+      } else {
+        updateEmpresa(empresa.id, patch);
+        toast.success(`Cadastro de "${nome}" atualizado com sucesso!`);
+        if (onSaved) onSaved({ ...empresa, ...patch });
       }
+
       onOpenChange(false);
     } catch {
       toast.error("Erro ao salvar cadastro.");
@@ -362,13 +426,14 @@ export function EmpresaCadastroModal({
               onClick={handlePreencherComIA}
               disabled={gerandoIA}
               className="gap-1.5 text-xs bg-gradient-to-r from-violet-600 via-indigo-600 to-primary text-white hover:opacity-90 shadow-sm"
+              title="Pesquisa Google Maps, CNPJ na Receita Federal, Telefones, WhatsApp, Buscas de Partida e Inteligência de Mercado"
             >
               {gerandoIA ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <Sparkles className="h-3.5 w-3.5" />
               )}
-              {gerandoIA ? "Pesquisando com IA..." : "Preencher com IA"}
+              {gerandoIA ? "Buscando Maps, CNPJ & IA..." : "Preencher com IA"}
             </Button>
           </div>
         </DialogHeader>
@@ -699,7 +764,20 @@ export function EmpresaCadastroModal({
 
             <div className="grid sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium">Telefone Fixo / Comercial</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-medium flex items-center gap-1.5">
+                    <Phone className="h-3 w-3 text-muted-foreground" />
+                    Telefone Fixo / Comercial
+                  </Label>
+                  {telefone && (
+                    <a
+                      href={`tel:${telefone.replace(/\D/g, "")}`}
+                      className="text-[10px] text-primary hover:underline flex items-center gap-0.5"
+                    >
+                      <PhoneCall className="h-2.5 w-2.5" /> Discar
+                    </a>
+                  )}
+                </div>
                 <Input
                   value={telefone}
                   onChange={(e) => setTelefone(e.target.value)}
@@ -709,17 +787,45 @@ export function EmpresaCadastroModal({
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium">WhatsApp Comercial</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-medium flex items-center gap-1.5">
+                    <Phone className="h-3 w-3 text-emerald-500" />
+                    WhatsApp Comercial
+                  </Label>
+                  {whatsapp && (
+                    <a
+                      href={`https://wa.me/55${whatsapp.replace(/\D/g, "")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5"
+                    >
+                      <ExternalLink className="h-2.5 w-2.5" /> Testar Whats
+                    </a>
+                  )}
+                </div>
                 <Input
                   value={whatsapp}
                   onChange={(e) => setWhatsapp(e.target.value)}
                   placeholder="(54) 99999-0000"
-                  className="text-xs h-9"
+                  className="text-xs h-9 font-medium"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium">E-mail Comercial</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-medium flex items-center gap-1.5">
+                    <Mail className="h-3 w-3 text-muted-foreground" />
+                    E-mail Comercial
+                  </Label>
+                  {email && (
+                    <a
+                      href={`mailto:${email}`}
+                      className="text-[10px] text-primary hover:underline flex items-center gap-0.5"
+                    >
+                      <Mail className="h-2.5 w-2.5" /> Enviar e-mail
+                    </a>
+                  )}
+                </div>
                 <Input
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -729,7 +835,22 @@ export function EmpresaCadastroModal({
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium">Site Oficial</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-medium flex items-center gap-1.5">
+                    <Globe className="h-3 w-3 text-muted-foreground" />
+                    Site Oficial
+                  </Label>
+                  {site && (
+                    <a
+                      href={site.startsWith("http") ? site : `https://${site}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-primary hover:underline flex items-center gap-0.5"
+                    >
+                      <ExternalLink className="h-2.5 w-2.5" /> Acessar site
+                    </a>
+                  )}
+                </div>
                 <Input
                   value={site}
                   onChange={(e) => setSite(e.target.value)}
@@ -739,7 +860,22 @@ export function EmpresaCadastroModal({
               </div>
 
               <div className="sm:col-span-2 space-y-1.5">
-                <Label className="text-xs font-medium">Instagram Oficial (@ ou URL)</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-medium flex items-center gap-1.5">
+                    <Instagram className="h-3 w-3 text-pink-500" />
+                    Instagram Oficial (@ ou URL)
+                  </Label>
+                  {instagram && (
+                    <a
+                      href={instagram.startsWith("http") ? instagram : `https://instagram.com/${instagram.replace(/^@/, "")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-pink-600 dark:text-pink-400 hover:underline flex items-center gap-0.5"
+                    >
+                      <ExternalLink className="h-2.5 w-2.5" /> Ver perfil
+                    </a>
+                  )}
+                </div>
                 <Input
                   value={instagram}
                   onChange={(e) => setInstagram(e.target.value)}
@@ -808,10 +944,21 @@ export function EmpresaCadastroModal({
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium flex items-center gap-1.5">
-                <MapPin className="h-3.5 w-3.5 text-rose-500" />
-                Busca no Google Maps / Google
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-medium flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 text-rose-500" />
+                  Busca no Google Maps / Google
+                </Label>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(buscaGoogleMaps || `${nome} ${segmento} em ${cidade} RS`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1 font-medium"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Ver resultado no Google Maps
+                </a>
+              </div>
               <Input
                 value={buscaGoogleMaps}
                 onChange={(e) => setBuscaGoogleMaps(e.target.value)}

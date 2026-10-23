@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useStore } from "@/lib/store";
-import { CIDADES_RS_FOCO, SEGMENTOS, type Empresa, type CrmStage } from "@/lib/mock-data";
+import { CIDADES_RS_FOCO, SEGMENTOS, empresaFromRaw, type Empresa, type CrmStage } from "@/lib/mock-data";
 import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -36,6 +36,7 @@ import {
   RotateCcw,
   Copy,
   CheckCheck,
+  Plus,
 } from "lucide-react";
 import {
   siteUrl,
@@ -638,6 +639,24 @@ function EmpresasPage() {
           </Tabs>
           <Button variant="outline" size="sm" onClick={() => setF(INITIAL)} className="h-9 text-xs">
             Limpar filtros
+          </Button>
+          <Button
+            size="sm"
+            onClick={() =>
+              setEmpresaCadastro(
+                empresaFromRaw({
+                  nome: "",
+                  segmento: "",
+                  cidade: "Bento Gonçalves",
+                  endereco: "",
+                  origem: "manual",
+                }),
+              )
+            }
+            className="h-9 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Nova Empresa
           </Button>
         </div>
       </div>
