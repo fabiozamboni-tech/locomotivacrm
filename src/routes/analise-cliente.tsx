@@ -119,7 +119,9 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Empresa, ApresentacaoSlidesData, MensagemAbordagemSalva } from "@/lib/mock-data";
+import { cn } from "@/lib/utils";
+import { getKanbanColorPreset } from "@/lib/kanban-config";
+import type { Empresa, ApresentacaoSlidesData, MensagemAbordagemSalva, CrmStage } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/analise-cliente")({
   validateSearch: z.object({
@@ -172,11 +174,18 @@ const TIPOS_PROMPTS: { value: TipoPrompt; label: string; desc: string }[] = [
 function AnaliseClientePage() {
   const search = useSearch({ from: "/analise-cliente" });
   const navigate = useNavigate();
-  const { empresas, empresasAtivas, updateEmpresa, addHistorico } = useStore();
+  const { empresas, empresasAtivas, updateEmpresa, addHistorico, kanbanColumns, isEmpresaExcluida } = useStore();
 
   const empresasFiltradas = useMemo(
-    () => empresasAtivas || empresas.filter((e) => e.crmStage !== "excluidos"),
-    [empresasAtivas, empresas],
+    () =>
+      empresas.filter(
+        (e) =>
+          !isEmpresaExcluida(e) &&
+          e.crmStage !== "excluidos" &&
+          e.crmStage !== "perdido" &&
+          e.crmStage !== "sem_fit",
+      ),
+    [empresas, isEmpresaExcluida],
   );
 
   const [selEmpresaId, setSelEmpresaId] = useState<string>(
@@ -184,7 +193,32 @@ function AnaliseClientePage() {
   );
   const [activeTab, setActiveTab] = useState<TabKey>(search.tab ?? "visao-geral");
 
-  const empresa = empresasFiltradas.find((e) => e.id === selEmpresaId) || empresasFiltradas[0];
+  const empresa = useMemo(
+    () =>
+      empresas.find((e) => e.id === selEmpresaId) ||
+      empresasFiltradas[0] ||
+      empresas[0],
+    [empresas, selEmpresaId, empresasFiltradas],
+  );
+
+  const handleAlterarKanbanStage = (novoStage: CrmStage) => {
+    if (!empresa) return;
+    const stageAnterior = empresa.crmStage;
+    if (stageAnterior === novoStage) return;
+
+    updateEmpresa(empresa.id, { crmStage: novoStage });
+
+    const colNova = kanbanColumns.find((c) => c.id === novoStage);
+    const tituloNova = colNova?.titulo || novoStage;
+
+    addHistorico(empresa.id, {
+      data: new Date().toISOString().slice(0, 10),
+      tipo: "status",
+      texto: `Etapa do Kanban alterada para "${tituloNova}" a partir da Análise do Cliente.`,
+    });
+
+    toast.success(`Etapa do Kanban atualizada para: ${tituloNova}`);
+  };
 
   // Sincroniza query params
   const handleTrocaEmpresa = (novoId: string) => {
@@ -946,6 +980,47 @@ function AnaliseClientePage() {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Seletor de Etapa Kanban */}
+          {empresa && (
+            <div className="w-48 sm:w-56">
+              <Select
+                value={empresa.crmStage}
+                onValueChange={(val) => handleAlterarKanbanStage(val as CrmStage)}
+              >
+                <SelectTrigger className="h-9 text-xs">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span
+                      className={cn(
+                        "size-2 rounded-full shrink-0",
+                        getKanbanColorPreset(
+                          kanbanColumns.find((c) => c.id === empresa.crmStage)?.cor,
+                        ).bgClass,
+                      )}
+                    />
+                    <span className="text-muted-foreground font-normal">Etapa:</span>
+                    <span className="font-medium truncate">
+                      {kanbanColumns.find((c) => c.id === empresa.crmStage)?.titulo ||
+                        empresa.crmStage}
+                    </span>
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  {kanbanColumns.map((col) => {
+                    const preset = getKanbanColorPreset(col.cor);
+                    return (
+                      <SelectItem key={col.id} value={col.id} className="text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className={cn("size-2 rounded-full shrink-0", preset.bgClass)} />
+                          <span>{col.titulo}</span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Seletor Rápido Discreto de Agente IA */}
           <SeletorRapidoAgenteIa
@@ -1823,6 +1898,47 @@ function AnaliseClientePage() {
                         >
                           <Instagram className="h-3 w-3 text-pink-500" /> Abrir Perfil
                         </a>
+                      )}
+
+                      {/* Seletor de Etapa Kanban no Dossiê / Abordagens */}
+                      {empresa && (
+                        <div className="flex items-center gap-1.5 ml-auto sm:ml-1">
+                          <span className="text-[11px] text-muted-foreground font-medium hidden xl:inline">Etapa Kanban:</span>
+                          <Select
+                            value={empresa.crmStage}
+                            onValueChange={(val) => handleAlterarKanbanStage(val as CrmStage)}
+                          >
+                            <SelectTrigger className="h-7 text-xs w-44">
+                              <div className="flex items-center gap-1.5 truncate">
+                                <span
+                                  className={cn(
+                                    "size-2 rounded-full shrink-0",
+                                    getKanbanColorPreset(
+                                      kanbanColumns.find((c) => c.id === empresa.crmStage)?.cor,
+                                    ).bgClass,
+                                  )}
+                                />
+                                <span className="font-medium truncate">
+                                  {kanbanColumns.find((c) => c.id === empresa.crmStage)?.titulo ||
+                                    empresa.crmStage}
+                                </span>
+                              </div>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {kanbanColumns.map((col) => {
+                                const preset = getKanbanColorPreset(col.cor);
+                                return (
+                                  <SelectItem key={col.id} value={col.id} className="text-xs">
+                                    <div className="flex items-center gap-2">
+                                      <span className={cn("size-2 rounded-full shrink-0", preset.bgClass)} />
+                                      <span>{col.titulo}</span>
+                                    </div>
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       )}
                     </div>
                   </CardHeader>

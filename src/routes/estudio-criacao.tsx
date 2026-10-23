@@ -123,11 +123,18 @@ const SUGESTOES_CHAT = [
 function EstudioCriacaoPage() {
   const search = Route.useSearch() as { empresa?: string; tab?: "site" | "paleta" | "prompts" };
   const navigate = useNavigate();
-  const { empresas, empresasAtivas: storeEmpresasAtivas, updateEmpresa, addHistorico } = useStore();
+  const { empresas, empresasAtivas: storeEmpresasAtivas, updateEmpresa, addHistorico, isEmpresaExcluida } = useStore();
 
   const empresasAtivas = React.useMemo(
-    () => storeEmpresasAtivas || empresas.filter((e) => e.crmStage !== "excluidos"),
-    [storeEmpresasAtivas, empresas],
+    () =>
+      empresas.filter(
+        (e) =>
+          !isEmpresaExcluida(e) &&
+          e.crmStage !== "excluidos" &&
+          e.crmStage !== "perdido" &&
+          e.crmStage !== "sem_fit",
+      ),
+    [empresas, isEmpresaExcluida],
   );
 
   const gerarSiteFn = useServerFn(gerarSiteCompletoIA_ServerFn);
@@ -135,7 +142,7 @@ function EstudioCriacaoPage() {
 
   // Empresa ativa (apenas empresas ativas, nunca excluídas)
   const empresaId = search.empresa || empresasAtivas[0]?.id || "";
-  const empresa = empresasAtivas.find((e) => e.id === empresaId) || empresasAtivas[0];
+  const empresa = empresas.find((e) => e.id === empresaId) || empresasAtivas[0] || empresas[0];
 
   // Sub-aba ativa superior
   const [abaAtiva, setAbaAtiva] = useState<"site" | "paleta" | "prompts">(search.tab || "site");

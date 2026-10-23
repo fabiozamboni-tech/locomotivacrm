@@ -1,28 +1,12 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   Globe,
   Instagram,
   MapPin,
-  MessageSquare,
   Sparkles,
-  ExternalLink,
-  Copy,
-  Check,
-  ArrowUpRight,
   GripVertical,
-  Wand2,
-  Save,
-  DollarSign,
-  TrendingUp,
-  TrendingDown,
-  Minus,
   Flame,
-  BrainCircuit,
-  Calendar,
-  Zap,
-  Mail,
-  MessageCircle,
   SlidersHorizontal,
   EyeOff,
 } from "lucide-react";
@@ -50,7 +34,6 @@ import { useStore } from "@/lib/store";
 import {
   CRM_STAGE_LABEL,
   CRM_STAGES_ORDER,
-  getCrmStageLabel,
   ScoreBadge,
   SiteBadge,
   InstagramBadge,
@@ -59,27 +42,13 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { toast } from "sonner";
 import { instagramUrl, siteUrl, googleMapsUrl } from "@/lib/links";
-import { gerarAbordagem, gerarPrompt, type Canal, type Tom, type Foco, type TipoPrompt } from "@/lib/generators";
-import { gerarPromptIA, estimarValorIA, toCtx, type OrcamentoIA } from "@/lib/ai.functions";
-import { Textarea } from "@/components/ui/textarea";
 import type { Empresa, CrmStage } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
@@ -110,7 +79,7 @@ function CrmPage() {
     toggleOcultarColunaKanban,
     restaurarColunasPadrao,
   } = useStore();
-  const [openId, setOpenId] = useState<string | null>(null);
+  const navigate = useNavigate();
   const [promptsId, setPromptsId] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overStage, setOverStage] = useState<string | null>(null);
@@ -126,10 +95,6 @@ function CrmPage() {
   const promptsEmpresa = useMemo(
     () => empresas.find((e) => e.id === promptsId) ?? null,
     [empresas, promptsId],
-  );
-  const openEmpresa = useMemo(
-    () => empresas.find((e) => e.id === openId) ?? null,
-    [empresas, openId],
   );
   const draggingEmpresa = useMemo(
     () => empresas.find((e) => e.id === draggingId) ?? null,
@@ -217,7 +182,7 @@ function CrmPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Funil de prospecção</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Kanban comercial — arraste os cards entre etapas ou use o modal de abordagem.
+            Kanban comercial — arraste os cards entre etapas ou acesse a Análise do Cliente.
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
@@ -257,7 +222,7 @@ function CrmPage() {
       {/* Módulo 4: Radar de Timing Perfeito & Sinais de Compra */}
       {showRadar && (
         <TimingRadarCard
-          onSelectEmpresa={(id) => setOpenId(id)}
+          onSelectEmpresa={(id) => navigate({ to: "/analise-cliente", search: { empresa: id } })}
           onOpenCadencia={(id) => setCadenciaEmpresaId(id)}
         />
       )}
@@ -288,7 +253,6 @@ function CrmPage() {
                   column={col}
                   items={items}
                   isOver={overStage === col.id}
-                  onOpen={setOpenId}
                   onPrompts={setPromptsId}
                   onChangeStage={setStage}
                   onToggleOcultar={() => toggleOcultarColunaKanban(col.id)}
@@ -302,7 +266,6 @@ function CrmPage() {
               <div className="w-[284px] rotate-2 opacity-95">
                 <KanbanCard
                   empresa={draggingEmpresa}
-                  onOpen={() => {}}
                   onPrompts={() => {}}
                   onChangeStage={() => {}}
                   columns={kanbanColumns}
@@ -326,15 +289,6 @@ function CrmPage() {
         onResetDefault={restaurarColunasPadrao}
       />
 
-      <EmpresaModal
-        empresa={openEmpresa}
-        open={!!openEmpresa}
-        onOpenChange={(o) => !o && setOpenId(null)}
-        onOpenCopiloto={(id) => setCopilotoEmpresaId(id)}
-        onOpenCadencia={(id) => setCadenciaEmpresaId(id)}
-        onOpenEmail={(id) => setEmailEmpresaId(id)}
-        onOpenWhats={(id) => setWhatsEmpresaId(id)}
-      />
       <PromptsModal
         empresa={promptsEmpresa}
         open={!!promptsEmpresa}
@@ -372,7 +326,6 @@ function KanbanColumn({
   column,
   items,
   isOver,
-  onOpen,
   onPrompts,
   onChangeStage,
   onToggleOcultar,
@@ -381,7 +334,6 @@ function KanbanColumn({
   column: KanbanColumnConfig;
   items: Empresa[];
   isOver: boolean;
-  onOpen: (id: string) => void;
   onPrompts: (id: string) => void;
   onChangeStage: (id: string, s: CrmStage) => void;
   onToggleOcultar: () => void;
@@ -429,7 +381,6 @@ function KanbanColumn({
           <KanbanCard
             key={e.id}
             empresa={e}
-            onOpen={() => onOpen(e.id)}
             onPrompts={() => onPrompts(e.id)}
             onChangeStage={(s) => onChangeStage(e.id, s)}
             columns={allColumns}
@@ -447,14 +398,12 @@ function KanbanColumn({
 
 function KanbanCard({
   empresa,
-  onOpen,
   onPrompts,
   onChangeStage,
   columns,
   overlay,
 }: {
   empresa: Empresa;
-  onOpen: () => void;
   onPrompts?: () => void;
   onChangeStage: (s: CrmStage) => void;
   columns?: KanbanColumnConfig[];
@@ -490,12 +439,13 @@ function KanbanCard({
           <GripVertical className="size-4" />
         </button>
         <EmpresaLogo site={empresa.site} nome={empresa.nome} size="xs" />
-        <button
-          onClick={onOpen}
+        <Link
+          to="/analise-cliente"
+          search={{ empresa: empresa.id }}
           className="text-sm font-semibold leading-tight text-left hover:text-primary line-clamp-2 flex-1"
         >
           {empresa.nome}
-        </button>
+        </Link>
         <ScoreBadge score={empresa.score} size="sm" />
       </div>
       <div className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
@@ -523,9 +473,11 @@ function KanbanCard({
           size="sm"
           variant="secondary"
           className="h-7 px-2.5 text-[11px] gap-1"
-          onClick={onOpen}
+          asChild
         >
-          <Sparkles className="size-3" /> Abordar
+          <Link to="/analise-cliente" search={{ empresa: empresa.id }}>
+            <Sparkles className="size-3" /> Análise do Cliente
+          </Link>
         </Button>
       </div>
 
@@ -583,593 +535,5 @@ function IconLink({
     >
       {children}
     </a>
-  );
-}
-
-const CANAIS: { value: Canal; label: string }[] = [
-  { value: "whatsapp", label: "WhatsApp" },
-  { value: "email", label: "E-mail" },
-  { value: "instagram", label: "Instagram DM" },
-  { value: "curta", label: "Mensagem curta" },
-  { value: "ligacao", label: "Roteiro de ligação" },
-];
-const TONS: { value: Tom; label: string }[] = [
-  { value: "consultivo", label: "Consultivo" },
-  { value: "amistoso", label: "Amistoso" },
-  { value: "formal", label: "Formal" },
-  { value: "direto", label: "Direto" },
-];
-const FOCOS: { value: Foco; label: string }[] = [
-  { value: "geral", label: "Geral" },
-  { value: "site", label: "Site" },
-  { value: "instagram", label: "Instagram" },
-  { value: "atendimento", label: "Atendimento" },
-];
-
-function EmpresaModal({
-  empresa,
-  open,
-  onOpenChange,
-  onOpenCopiloto,
-  onOpenCadencia,
-  onOpenEmail,
-  onOpenWhats,
-}: {
-  empresa: Empresa | null;
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
-  onOpenCopiloto?: (id: string) => void;
-  onOpenCadencia?: (id: string) => void;
-  onOpenEmail?: (id: string) => void;
-  onOpenWhats?: (id: string) => void;
-}) {
-  const { addHistorico } = useStore();
-  const [canal, setCanal] = useState<Canal>("whatsapp");
-  const [tom, setTom] = useState<Tom>("consultivo");
-  const [foco, setFoco] = useState<Foco>("geral");
-  const [copied, setCopied] = useState(false);
-
-  const texto = useMemo(
-    () => (empresa ? gerarAbordagem(empresa, canal, tom, foco) : ""),
-    [empresa, canal, tom, foco],
-  );
-
-  if (!empresa) return null;
-
-  const copy = async () => {
-    await navigator.clipboard.writeText(texto);
-    setCopied(true);
-    toast.success("Mensagem copiada");
-    setTimeout(() => setCopied(false), 1500);
-  };
-
-  const registrar = () => {
-    addHistorico(empresa.id, {
-      data: new Date().toISOString().slice(0, 10),
-      tipo: canal === "email" ? "email" : canal === "ligacao" ? "ligacao" : "whatsapp",
-      texto: `Abordagem ${CANAIS.find((c) => c.value === canal)?.label} (${tom}, foco ${foco}) preparada.`,
-    });
-    toast.success("Registrado no histórico");
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl p-0 gap-0 overflow-hidden">
-        <DialogHeader className="p-5 pb-3 border-b bg-gradient-to-br from-primary/5 to-transparent">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <DialogTitle className="text-xl truncate">{empresa.nome}</DialogTitle>
-              <DialogDescription className="mt-1">
-                {empresa.segmento} · {empresa.cidade} · {getCrmStageLabel(empresa.crmStage)}
-              </DialogDescription>
-              <div className="flex flex-wrap gap-1.5 mt-3">
-                <SiteBadge status={empresa.statusSite} />
-                <InstagramBadge status={empresa.statusInstagram} />
-                <ScoreBadge score={empresa.score} size="sm" />
-              </div>
-            </div>
-            <Link
-              to="/empresas/$id"
-              params={{ id: empresa.id }}
-              className="inline-flex items-center gap-1 text-xs text-primary hover:underline shrink-0"
-              onClick={() => onOpenChange(false)}
-            >
-              Ver perfil <ArrowUpRight className="size-3" />
-            </Link>
-          </div>
-
-          <div className="flex flex-wrap gap-2 mt-3">
-            <ContactChip href={siteUrl(empresa.site)} icon={<Globe className="size-3" />}>
-              {empresa.site || "sem site"}
-            </ContactChip>
-            <ContactChip href={instagramUrl(empresa.instagram)} icon={<Instagram className="size-3" />}>
-              {empresa.instagram || "sem instagram"}
-            </ContactChip>
-            <ContactChip
-              href={googleMapsUrl(`${empresa.nome} ${empresa.cidade}`)}
-              icon={<MapPin className="size-3" />}
-            >
-              Google Maps
-            </ContactChip>
-          </div>
-
-          {/* BARRA DE ATALHOS ESTRATÉGICOS (MÓDULOS 1, 3, 5 E DISPARO DIRETO) */}
-          <div className="flex items-center gap-2 flex-wrap pt-3 border-t border-border/40 mt-3">
-            {onOpenCopiloto && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  onOpenChange(false);
-                  onOpenCopiloto(empresa.id);
-                }}
-                className="h-7 text-xs gap-1 border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10"
-              >
-                <BrainCircuit className="h-3.5 w-3.5 text-amber-500" />
-                Copiloto Objeções
-              </Button>
-            )}
-
-            {onOpenCadencia && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  onOpenChange(false);
-                  onOpenCadencia(empresa.id);
-                }}
-                className="h-7 text-xs gap-1 border-indigo-500/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/10"
-              >
-                <Calendar className="h-3.5 w-3.5 text-indigo-500" />
-                Cadência D+0 a D+8
-              </Button>
-            )}
-
-            {empresa.email && onOpenEmail && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  onOpenChange(false);
-                  onOpenEmail(empresa.id);
-                }}
-                className="h-7 text-xs gap-1 text-blue-600 border-blue-500/30 hover:bg-blue-500/10"
-              >
-                <Mail className="h-3 w-3 text-blue-500" />
-                Disparar E-mail
-              </Button>
-            )}
-
-            {empresa.whatsapp && onOpenWhats && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  onOpenChange(false);
-                  onOpenWhats(empresa.id);
-                }}
-                className="h-7 text-xs gap-1 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10"
-              >
-                <MessageCircle className="h-3 w-3 text-emerald-500" />
-                WhatsApp Direto
-              </Button>
-            )}
-
-            <Button
-              asChild
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10"
-            >
-              <a href={`/auditoria/${empresa.id}`} target="_blank" rel="noreferrer">
-                <ExternalLink className="h-3 w-3" />
-                Micro-Auditoria
-              </a>
-            </Button>
-
-            <Button
-              asChild
-              size="sm"
-              className="h-7 text-xs gap-1 bg-gradient-to-r from-emerald-600 to-primary text-white"
-            >
-              <Link to="/analise-cliente" search={{ empresa: empresa.id, tab: "dossier" }} onClick={() => onOpenChange(false)}>
-                <Zap className="h-3 w-3" />
-                Dossiê & Abordagem 360
-              </Link>
-            </Button>
-          </div>
-        </DialogHeader>
-
-        <Tabs defaultValue="abordagem" className="w-full">
-          <TabsList className="rounded-none w-full justify-start px-5 h-10 border-b bg-transparent">
-            <TabsTrigger value="abordagem" className="gap-1.5">
-              <Sparkles className="size-3.5" /> Abordagem
-            </TabsTrigger>
-            <TabsTrigger value="historico" className="gap-1.5">
-              <MessageSquare className="size-3.5" /> Histórico
-              <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
-                {empresa.historico.length}
-              </Badge>
-            </TabsTrigger>
-            <TabsTrigger value="orcamento" className="gap-1.5">
-              <DollarSign className="size-3.5" /> Orçamento
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="abordagem" className="m-0 p-5 space-y-3">
-            <div className="grid grid-cols-3 gap-2">
-              <PromptSelect label="Canal" value={canal} onValueChange={(v) => setCanal(v as Canal)} options={CANAIS} />
-              <PromptSelect label="Tom" value={tom} onValueChange={(v) => setTom(v as Tom)} options={TONS} />
-              <PromptSelect label="Foco" value={foco} onValueChange={(v) => setFoco(v as Foco)} options={FOCOS} />
-            </div>
-
-            <div className="relative rounded-lg border bg-muted/30">
-              <ScrollArea className="max-h-[300px]">
-                <pre className="p-4 text-sm whitespace-pre-wrap font-sans leading-relaxed">
-                  {texto}
-                </pre>
-              </ScrollArea>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={copy} size="sm" className="gap-1.5">
-                {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-                {copied ? "Copiado" : "Copiar"}
-              </Button>
-              <Button onClick={registrar} size="sm" variant="secondary" className="gap-1.5">
-                <MessageSquare className="size-3.5" /> Registrar no histórico
-              </Button>
-              <div className="flex-1" />
-              <Link
-                to="/analise-cliente"
-                search={{ empresa: empresa.id, tab: "dossier" }}
-                onClick={() => onOpenChange(false)}
-                className="text-xs text-muted-foreground hover:text-primary inline-flex items-center gap-1"
-              >
-                Abrir na Análise do cliente <ExternalLink className="size-3" />
-              </Link>
-            </div>
-
-            <PromptSugestoes empresa={empresa} onPick={setFoco} />
-          </TabsContent>
-
-          <TabsContent value="historico" className="m-0 p-5">
-            {empresa.historico.length === 0 ? (
-              <div className="text-sm text-muted-foreground border border-dashed rounded-lg p-8 text-center">
-                Nenhuma abordagem registrada ainda. Prepare uma na aba <b>Abordagem</b>.
-              </div>
-            ) : (
-              <ScrollArea className="max-h-[400px]">
-                <ol className="relative border-l border-border/60 ml-2 space-y-4">
-                  {empresa.historico.map((h, i) => (
-                    <li key={i} className="ml-4">
-                      <span className="absolute -left-1.5 mt-1.5 size-3 rounded-full bg-primary border-2 border-background" />
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="tabular-nums">{h.data}</span>
-                        <Separator orientation="vertical" className="h-3" />
-                        <Badge variant="outline" className="text-[10px] py-0 h-4 capitalize">
-                          {h.tipo}
-                        </Badge>
-                      </div>
-                      <p className="text-sm mt-1 leading-relaxed">{h.texto}</p>
-                    </li>
-                  ))}
-                </ol>
-              </ScrollArea>
-            )}
-          </TabsContent>
-
-          <TabsContent value="orcamento" className="m-0 p-5">
-            <OrcamentoTab empresa={empresa} />
-          </TabsContent>
-        </Tabs>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function ContactChip({
-  href,
-  icon,
-  children,
-}: {
-  href?: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  const cls =
-    "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] max-w-[220px] truncate";
-  if (!href) {
-    return (
-      <span className={cn(cls, "border-border/40 text-muted-foreground/60 bg-muted/30")}>
-        {icon}
-        <span className="truncate">{children}</span>
-      </span>
-    );
-  }
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={cn(cls, "border-border/60 hover:border-primary/50 hover:text-primary transition-colors")}
-    >
-      {icon}
-      <span className="truncate">{children}</span>
-    </a>
-  );
-}
-
-function PromptSelect<T extends string>({
-  label,
-  value,
-  onValueChange,
-  options,
-}: {
-  label: string;
-  value: T;
-  onValueChange: (v: string) => void;
-  options: { value: T; label: string }[];
-}) {
-  return (
-    <div className="space-y-1">
-      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-        {label}
-      </label>
-      <Select value={value} onValueChange={onValueChange}>
-        <SelectTrigger className="h-8 text-xs">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((o) => (
-            <SelectItem key={o.value} value={o.value} className="text-xs">
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
-
-function PromptSugestoes({
-  empresa,
-  onPick,
-}: {
-  empresa: Empresa;
-  onPick: (f: Foco) => void;
-}) {
-  const sugestoes: { foco: Foco; titulo: string; motivo: string }[] = [];
-  if (empresa.statusSite === "sem_site" || empresa.statusSite === "desatualizado") {
-    sugestoes.push({
-      foco: "site",
-      titulo: "Falar sobre o site",
-      motivo:
-        empresa.statusSite === "sem_site"
-          ? "Empresa sem site próprio — abertura natural."
-          : "Site com sinais de desatualização.",
-    });
-  }
-  if (empresa.statusInstagram === "parado" || empresa.statusInstagram === "sem_perfil") {
-    sugestoes.push({
-      foco: "instagram",
-      titulo: "Falar sobre o Instagram",
-      motivo: "Presença social fraca — dor comum e fácil de abordar.",
-    });
-  }
-  if (!empresa.diagnostico.atendimento.contatoFacil) {
-    sugestoes.push({
-      foco: "atendimento",
-      titulo: "Falar sobre atendimento",
-      motivo: "Canais de contato pouco claros no site.",
-    });
-  }
-  if (sugestoes.length === 0) {
-    sugestoes.push({
-      foco: "geral",
-      titulo: "Diagnóstico geral",
-      motivo: "Sem gaps críticos — proponha auditoria consultiva.",
-    });
-  }
-
-  return (
-    <div className="rounded-lg border bg-card p-3 space-y-2">
-      <div className="flex items-center gap-1.5 text-xs font-semibold">
-        <Sparkles className="size-3.5 text-primary" /> Sugestões de foco
-      </div>
-      <div className="grid gap-1.5">
-        {sugestoes.map((s) => (
-          <button
-            key={s.foco + s.titulo}
-            onClick={() => onPick(s.foco)}
-            className="text-left rounded-md border border-border/50 hover:border-primary/40 hover:bg-primary/5 transition-colors p-2"
-          >
-            <div className="text-xs font-medium">{s.titulo}</div>
-            <div className="text-[11px] text-muted-foreground">{s.motivo}</div>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function brl(n: number): string {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    maximumFractionDigits: 0,
-  }).format(Number.isFinite(n) ? n : 0);
-}
-
-const NIVEL_UI: Record<string, { label: string; cls: string; Icon: typeof TrendingUp }> = {
-  alto: { label: "Potencial alto", cls: "text-emerald-500", Icon: TrendingUp },
-  medio: { label: "Potencial médio", cls: "text-amber-500", Icon: Minus },
-  baixo: { label: "Potencial baixo", cls: "text-rose-500", Icon: TrendingDown },
-};
-
-const PORTES = [
-  { value: "auto", label: "Inferir com IA" },
-  { value: "microempresa (1-9 colaboradores)", label: "Microempresa" },
-  { value: "pequena empresa (10-49 colaboradores)", label: "Pequena" },
-  { value: "média empresa (50-249 colaboradores)", label: "Média" },
-  { value: "grande empresa (250+ colaboradores)", label: "Grande" },
-];
-
-function OrcamentoTab({ empresa }: { empresa: Empresa }) {
-  const { addHistorico } = useStore();
-  const [porte, setPorte] = useState("auto");
-  const [loading, setLoading] = useState(false);
-  const [orc, setOrc] = useState<OrcamentoIA | null>(null);
-
-  const estimar = async () => {
-    setLoading(true);
-    try {
-      const r = await estimarValorIA({
-        data: {
-          empresa: toCtx(empresa),
-          porteManual: porte === "auto" ? undefined : porte,
-          contextoExtra: empresa.observacoes,
-        },
-      });
-      setOrc(r);
-      toast.success("Estimativa gerada");
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const salvar = () => {
-    if (!orc) return;
-    const linhas = orc.opcoes
-      .filter((o) => o.aplicavel)
-      .map((o) => `${o.titulo}: ${brl(o.minimo)}–${brl(o.maximo)} (sugerido ${brl(o.recomendado)})`)
-      .join(" · ");
-    addHistorico(empresa.id, {
-      data: new Date().toISOString().slice(0, 10),
-      tipo: "nota",
-      texto: `Estimativa de valor (IA) — ${orc.porteEstimado}. ${linhas}. Potencial: ${orc.potencialInvestimento.nivel}.`,
-    });
-    toast.success("Estimativa salva no histórico");
-  };
-
-  const nivel = orc ? NIVEL_UI[orc.potencialInvestimento.nivel] ?? NIVEL_UI.medio : null;
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="w-48">
-          <PromptSelect
-            label="Porte da empresa"
-            value={porte}
-            onValueChange={setPorte}
-            options={PORTES}
-          />
-        </div>
-        <Button size="sm" onClick={estimar} disabled={loading} className="gap-1.5">
-          <Sparkles className="size-3.5" />
-          {loading ? "Calculando..." : orc ? "Recalcular" : "Estimar valor com IA"}
-        </Button>
-        {orc && (
-          <Button size="sm" variant="outline" onClick={salvar} className="gap-1.5">
-            <Save className="size-3.5" /> Salvar no histórico
-          </Button>
-        )}
-      </div>
-
-      {!orc && !loading && (
-        <div className="text-sm text-muted-foreground border border-dashed rounded-lg p-8 text-center">
-          Gere uma estimativa de investimento considerando porte, cidade e média de preços da
-          região — com opções de site estático, site com CRM e loja virtual.
-        </div>
-      )}
-
-      {orc && (
-        <ScrollArea className="max-h-[420px] pr-2">
-          <div className="space-y-4">
-            <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
-              <div className="text-xs font-semibold">Porte estimado</div>
-              <p className="text-sm text-muted-foreground">{orc.porteEstimado}</p>
-              <div className="text-xs font-semibold pt-1">Referência de mercado</div>
-              <p className="text-sm text-muted-foreground">{orc.referenciaMercado}</p>
-            </div>
-
-            <div className="grid gap-2 sm:grid-cols-3">
-              {orc.opcoes.map((o) => (
-                <Card
-                  key={o.tipo}
-                  className={cn(
-                    "p-3 space-y-2",
-                    !o.aplicavel && "opacity-55 border-dashed",
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="text-xs font-semibold leading-tight">{o.titulo}</div>
-                    {!o.aplicavel && (
-                      <Badge variant="outline" className="text-[10px] h-4 px-1">
-                        n/a
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="text-lg font-bold tabular-nums">{brl(o.recomendado)}</div>
-                  <div className="text-[11px] text-muted-foreground tabular-nums">
-                    faixa {brl(o.minimo)} – {brl(o.maximo)}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground">Prazo: {o.prazo}</div>
-                  <ul className="text-[11px] text-muted-foreground space-y-0.5 list-disc pl-4">
-                    {o.escopo?.slice(0, 6).map((s, i) => (
-                      <li key={i}>{s}</li>
-                    ))}
-                  </ul>
-                  <p className="text-[11px] italic text-muted-foreground/80">{o.justificativa}</p>
-                </Card>
-              ))}
-            </div>
-
-            {orc.mensalidadeSugerida && (
-              <div className="rounded-lg border p-3 text-sm">
-                <span className="font-semibold">Mensalidade sugerida: </span>
-                <span className="tabular-nums">
-                  {brl(orc.mensalidadeSugerida.minimo)} – {brl(orc.mensalidadeSugerida.maximo)}
-                </span>
-                <span className="text-muted-foreground"> · {orc.mensalidadeSugerida.descricao}</span>
-              </div>
-            )}
-
-            <div className="rounded-lg border bg-card p-3 space-y-2">
-              {nivel && (
-                <div className={cn("flex items-center gap-1.5 text-sm font-semibold", nivel.cls)}>
-                  <nivel.Icon className="size-4" /> {nivel.label} de investimento
-                </div>
-              )}
-              <p className="text-sm leading-relaxed">{orc.potencialInvestimento.resumo}</p>
-              {orc.potencialInvestimento.sinais?.length > 0 && (
-                <div>
-                  <div className="text-xs font-semibold mt-2">Sinais públicos</div>
-                  <ul className="text-[12px] text-muted-foreground list-disc pl-4 space-y-0.5">
-                    {orc.potencialInvestimento.sinais.map((s, i) => (
-                      <li key={i}>{s}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {orc.potencialInvestimento.riscos?.length > 0 && (
-                <div>
-                  <div className="text-xs font-semibold mt-2">Riscos / objeções</div>
-                  <ul className="text-[12px] text-muted-foreground list-disc pl-4 space-y-0.5">
-                    {orc.potencialInvestimento.riscos.map((s, i) => (
-                      <li key={i}>{s}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-
-            <p className="text-[11px] text-muted-foreground">{orc.observacoes}</p>
-          </div>
-        </ScrollArea>
-      )}
-    </div>
   );
 }

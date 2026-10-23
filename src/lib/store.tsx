@@ -851,7 +851,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const empresasAtivas = useMemo(
-    () => empresas.filter((e) => e.crmStage !== "excluidos" && !isEmpresaExcluida(e)),
+    () =>
+      empresas.filter(
+        (e) =>
+          e.crmStage !== "excluidos" &&
+          e.crmStage !== "perdido" &&
+          e.crmStage !== "sem_fit" &&
+          !isEmpresaExcluida(e),
+      ),
     [empresas, isEmpresaExcluida],
   );
 

@@ -74,6 +74,7 @@ export const Route = createFileRoute("/empresas")({
 type Filtros = {
   q: string;
   cidade: string;
+  etapaKanban: string;
   segmento: string;
   scoreMin: number;
   soSemSite: boolean;
@@ -87,6 +88,7 @@ type Filtros = {
 const INITIAL: Filtros = {
   q: "",
   cidade: "todas",
+  etapaKanban: "todas",
   segmento: "todos",
   scoreMin: 0,
   soSemSite: false,
@@ -102,6 +104,7 @@ function filtrar(list: Empresa[], f: Filtros): Empresa[] {
     if (f.q && !`${e.nome} ${e.segmento} ${e.cidade}`.toLowerCase().includes(f.q.toLowerCase()))
       return false;
     if (f.cidade !== "todas" && e.cidade !== f.cidade) return false;
+    if (f.etapaKanban !== "todas" && e.crmStage !== f.etapaKanban) return false;
     if (f.segmento !== "todos" && e.segmento !== f.segmento) return false;
     if (e.score < f.scoreMin) return false;
     if (f.soSemSite && e.statusSite !== "sem_site") return false;
@@ -451,6 +454,17 @@ function EmpresasPage() {
   const filtradas = useMemo(() => filtrar(listaBase, f), [listaBase, f]);
   const set = <K extends keyof Filtros>(k: K, v: Filtros[K]) => setF((p) => ({ ...p, [k]: v }));
 
+  const cidadesDisponiveis = useMemo(() => {
+    const cidadesSet = new Set<string>();
+    CIDADES_RS_FOCO.forEach((c) => cidadesSet.add(c));
+    empresas.forEach((e) => {
+      if (e.cidade && e.cidade.trim()) {
+        cidadesSet.add(e.cidade.trim());
+      }
+    });
+    return Array.from(cidadesSet).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [empresas]);
+
   const handleChangeStage = (empresaId: string, novoStage: CrmStage) => {
     setStage(empresaId, novoStage);
     toast.success(`Etapa alterada para "${getCrmStageLabel(novoStage)}"`);
@@ -508,25 +522,45 @@ function EmpresasPage() {
 
       <Card className="border-border/60">
         <CardContent className="p-4 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <Input
               placeholder="Buscar empresa, segmento, cidade…"
               value={f.q}
               onChange={(e) => set("q", e.target.value)}
-              className="md:col-span-2"
+              className="sm:col-span-2 lg:col-span-2"
             />
             <Select value={f.cidade} onValueChange={(v) => set("cidade", v)}>
               <SelectTrigger><SelectValue placeholder="Cidade" /></SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-80">
                 <SelectItem value="todas">Todas as cidades</SelectItem>
-                {CIDADES_RS_FOCO.map((c) => (
+                {cidadesDisponiveis.map((c) => (
                   <SelectItem key={c} value={c}>{c}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <Select value={f.etapaKanban} onValueChange={(v) => set("etapaKanban", v)}>
+              <SelectTrigger><SelectValue placeholder="Etapa Kanban" /></SelectTrigger>
+              <SelectContent className="max-h-80">
+                <SelectItem value="todas">Todas as etapas</SelectItem>
+                {(kanbanColumns && kanbanColumns.length > 0
+                  ? kanbanColumns
+                  : CRM_STAGES_ORDER.map((s) => ({ id: s, titulo: getCrmStageLabel(s), cor: "slate" }))
+                ).map((col) => {
+                  const preset = getKanbanColorPreset(col.cor);
+                  return (
+                    <SelectItem key={col.id} value={col.id} className="text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className={cn("size-2 rounded-full shrink-0", preset.bgClass)} />
+                        <span>{col.titulo}</span>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
             <Select value={f.segmento} onValueChange={(v) => set("segmento", v)}>
               <SelectTrigger><SelectValue placeholder="Segmento" /></SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-80">
                 <SelectItem value="todos">Todos os segmentos</SelectItem>
                 {SEGMENTOS.map((s) => (
                   <SelectItem key={s} value={s}>{s}</SelectItem>
