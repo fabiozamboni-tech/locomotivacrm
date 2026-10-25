@@ -8,6 +8,7 @@ import {
   gerarDadosCadastroIA_ServerFn,
   sugerirPublicoAlvoIA_ServerFn,
   cleanDigits,
+  toSafeString,
 } from "@/lib/cadastro-ia.functions";
 import {
   consultarCnpjBrasilAPI_ServerFn,
@@ -84,18 +85,6 @@ const SEGMENTOS_SUGERIDOS = [
   "Tecnologia & Software",
   "Outro",
 ];
-
-function toSafeString(val: unknown): string {
-  if (val === null || val === undefined) return "";
-  if (typeof val === "string") return val.trim();
-  if (Array.isArray(val)) {
-    return val
-      .map((item) => (typeof item === "string" ? item.trim() : String(item ?? "").trim()))
-      .filter(Boolean)
-      .join("\n");
-  }
-  return String(val).trim();
-}
 
 export function EmpresaCadastroModal({
   empresa,
@@ -452,7 +441,7 @@ export function EmpresaCadastroModal({
               ) : (
                 <Sparkles className="h-3.5 w-3.5" />
               )}
-              {gerandoIA ? "Buscando Maps, CNPJ & IA..." : "Preencher com IA"}
+              {gerandoIA ? "Buscando Maps, CNPJ & IA..." : "Análise por IA (Preencher Tudo)"}
             </Button>
           </div>
         </DialogHeader>

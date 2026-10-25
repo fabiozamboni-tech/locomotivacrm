@@ -85,8 +85,10 @@ import {
   type ContactableLinkedInProfile,
 } from "@/components/linkedin-message-modal";
 import { ApiManagerModal } from "@/components/api-manager-modal";
+import { AnaliseTodasIaModal } from "@/components/analise-todas-ia-modal";
+import { executarAnaliseIACadastro } from "@/lib/cadastro-ia.functions";
 import type { InstagramProfile } from "@/lib/store";
-import { empresaFromRaw, CIDADES_RS_FOCO, SEGMENTOS } from "@/lib/mock-data";
+import { empresaFromRaw, CIDADES_RS_FOCO, SEGMENTOS, type Empresa } from "@/lib/mock-data";
 import {
   PAISES,
   REGIOES,
@@ -512,6 +514,7 @@ function ImportarPage() {
   const {
     empresas,
     addEmpresa,
+    updateEmpresa,
     empresasExcluidas,
     excluirEmpresa,
     restaurarEmpresaExcluida,
@@ -525,6 +528,24 @@ function ImportarPage() {
   const [activeTab, setActiveTab] = useState("google_places");
   const [imported, setImported] = useState<Set<string>>(new Set());
   const [buscaExcluidos, setBuscaExcluidos] = useState("");
+
+  // Estado e controle de enriquecimento por IA automático
+  const [autoEnriquecerComIA, setAutoEnriquecerComIA] = useState(true);
+  const [batchModalOpen, setBatchModalOpen] = useState(false);
+  const [batchEmpresasAlvo, setBatchEmpresasAlvo] = useState<Empresa[]>([]);
+
+  const processarEnriquecimentoAssincrono = async (novaEmpresa: Empresa) => {
+    if (!autoEnriquecerComIA) return;
+    toast.info(`Iniciando Análise por IA para "${novaEmpresa.nome}"...`, { duration: 4000 });
+    try {
+      const { patch, resultado } = await executarAnaliseIACadastro(novaEmpresa);
+      updateEmpresa(novaEmpresa.id, patch);
+      const fontes = resultado.fontes?.join(", ") || "Maps, Receita & IA";
+      toast.success(`✨ "${novaEmpresa.nome}" enriquecida com sucesso! (${fontes})`, { duration: 5000 });
+    } catch (err: any) {
+      console.warn(`[importar] Falha na análise por IA para "${novaEmpresa.nome}":`, err);
+    }
+  };
 
   // Modal de primeiro contato via WhatsApp
   const [whatsAppModalOpen, setWhatsAppModalOpen] = useState(false);
@@ -760,8 +781,28 @@ function ImportarPage() {
 
   const importarGooglePlace = (p: PlaceResult) => {
     if (imported.has(p.placeId)) return;
-    addEmpresa(
-      empresaFromRaw({
+    const nova = empresaFromRaw({
+      nome: p.nome,
+      segmento: p.segmento ?? segmento,
+      cidade: p.cidade || cidade,
+      endereco: p.endereco,
+      telefone: p.telefone,
+      site: p.site,
+      origem: "google_places",
+      externalId: p.placeId,
+    });
+    addEmpresa(nova);
+    setImported((s) => new Set(s).add(p.placeId));
+    toast.success(`${p.nome} adicionada ao radar`);
+    processarEnriquecimentoAssincrono(nova);
+  };
+
+  const importarTodosGoogle = () => {
+    let count = 0;
+    const novas: Empresa[] = [];
+    for (const p of resultsGoogleFiltrados) {
+      if (imported.has(p.placeId)) continue;
+      const nova = empresaFromRaw({
         nome: p.nome,
         segmento: p.segmento ?? segmento,
         cidade: p.cidade || cidade,
@@ -770,32 +811,17 @@ function ImportarPage() {
         site: p.site,
         origem: "google_places",
         externalId: p.placeId,
-      }),
-    );
-    setImported((s) => new Set(s).add(p.placeId));
-    toast.success(`${p.nome} adicionada ao radar`);
-  };
-
-  const importarTodosGoogle = () => {
-    let count = 0;
-    for (const p of resultsGoogleFiltrados) {
-      if (imported.has(p.placeId)) continue;
-      addEmpresa(
-        empresaFromRaw({
-          nome: p.nome,
-          segmento: p.segmento ?? segmento,
-          cidade: p.cidade || cidade,
-          endereco: p.endereco,
-          telefone: p.telefone,
-          site: p.site,
-          origem: "google_places",
-          externalId: p.placeId,
-        }),
-      );
+      });
+      addEmpresa(nova);
+      novas.push(nova);
       count++;
     }
     setImported((s) => new Set([...s, ...resultsGoogleFiltrados.map((r) => r.placeId)]));
     toast.success(`${count} empresa(s) adicionada(s)`);
+    if (autoEnriquecerComIA && novas.length > 0) {
+      setBatchEmpresasAlvo(novas);
+      setBatchModalOpen(true);
+    }
   };
 
   // -------------------------------------------------------------------------
@@ -1394,37 +1420,59 @@ function ImportarPage() {
   ]);
 
   const importarInstagramParaRadar = (p: UnifiedProspectResult) => {
-    addEmpresa(
-      empresaFromRaw({
-        nome: p.nome,
-        segmento: p.segmento || segmento || "Outros",
-        cidade: p.cidade || cidade || "—",
-        endereco: p.cidade ? `${p.cidade}, ${p.estado || ""}` : "Endereço não informado",
-        telefone: p.telefone,
-        whatsapp: p.whatsapp,
-        email: p.email,
-        site: p.site,
-        instagram: p.instagram,
-        observacoes: p.detalhesExtras
-          ? `Perfil Instagram: ${p.instagram || ""}\nBio: ${p.detalhesExtras}`
-          : `Perfil Instagram: ${p.instagram || ""}`,
-        origem: "instagram",
-      })
-    );
+    const nova = empresaFromRaw({
+      nome: p.nome,
+      segmento: p.segmento || segmento || "Outros",
+      cidade: p.cidade || cidade || "—",
+      endereco: p.cidade ? `${p.cidade}, ${p.estado || ""}` : "Endereço não informado",
+      telefone: p.telefone,
+      whatsapp: p.whatsapp,
+      email: p.email,
+      site: p.site,
+      instagram: p.instagram,
+      observacoes: p.detalhesExtras
+        ? `Perfil Instagram: ${p.instagram || ""}\nBio: ${p.detalhesExtras}`
+        : `Perfil Instagram: ${p.instagram || ""}`,
+      origem: "instagram",
+    });
+    addEmpresa(nova);
     setImported((prev) => new Set(prev).add(p.id));
     toast.success(`${p.nome} adicionada ao Radar CRM`);
+    processarEnriquecimentoAssincrono(nova);
   };
 
   const importarTodosInstagram = () => {
     let count = 0;
+    const novas: Empresa[] = [];
     for (const p of instagramResultadosFiltrados) {
       if (!imported.has(p.id)) {
-        importarInstagramParaRadar(p);
+        const nova = empresaFromRaw({
+          nome: p.nome,
+          segmento: p.segmento || segmento || "Outros",
+          cidade: p.cidade || cidade || "—",
+          endereco: p.cidade ? `${p.cidade}, ${p.estado || ""}` : "Endereço não informado",
+          telefone: p.telefone,
+          whatsapp: p.whatsapp,
+          email: p.email,
+          site: p.site,
+          instagram: p.instagram,
+          observacoes: p.detalhesExtras
+            ? `Perfil Instagram: ${p.instagram || ""}\nBio: ${p.detalhesExtras}`
+            : `Perfil Instagram: ${p.instagram || ""}`,
+          origem: "instagram",
+        });
+        addEmpresa(nova);
+        novas.push(nova);
+        setImported((prev) => new Set(prev).add(p.id));
         count++;
       }
     }
     if (count > 0) {
       toast.success(`${count} perfis adicionados ao Radar CRM`);
+      if (autoEnriquecerComIA && novas.length > 0) {
+        setBatchEmpresasAlvo(novas);
+        setBatchModalOpen(true);
+      }
     } else {
       toast.info("Todos os perfis listados já foram adicionados");
     }
@@ -1497,27 +1545,27 @@ function ImportarPage() {
 
   const importarLookup = () => {
     if (!lookupResult) return;
-    addEmpresa(
-      empresaFromRaw({
-        nome: lookupResult.nome,
-        segmento: lookupResult.segmento,
-        cidade: lookupResult.cidade || "—",
-        bairro: lookupResult.bairro,
-        endereco: lookupResult.endereco,
-        telefone: lookupResult.telefone,
-        whatsapp: lookupResult.whatsapp,
-        email: lookupResult.email,
-        site: lookupResult.site,
-        instagram: lookupResult.instagram,
-        origem: "enriquecimento",
-        observacoes: lookupResult.resumo
-          ? `Coletado de ${lookupResult.urlAnalisada}\n\n${lookupResult.resumo}`
-          : `Coletado de ${lookupResult.urlAnalisada}`,
-      }),
-    );
+    const nova = empresaFromRaw({
+      nome: lookupResult.nome,
+      segmento: lookupResult.segmento,
+      cidade: lookupResult.cidade || "—",
+      bairro: lookupResult.bairro,
+      endereco: lookupResult.endereco,
+      telefone: lookupResult.telefone,
+      whatsapp: lookupResult.whatsapp,
+      email: lookupResult.email,
+      site: lookupResult.site,
+      instagram: lookupResult.instagram,
+      origem: "enriquecimento",
+      observacoes: lookupResult.resumo
+        ? `Coletado de ${lookupResult.urlAnalisada}\n\n${lookupResult.resumo}`
+        : `Coletado de ${lookupResult.urlAnalisada}`,
+    });
+    addEmpresa(nova);
     toast.success(`${lookupResult.nome} adicionada ao radar`);
     setLookupResult(null);
     setLookupInput("");
+    processarEnriquecimentoAssincrono(nova);
   };
 
   // Google Maps Address / Link Lookup State
@@ -1570,56 +1618,56 @@ function ImportarPage() {
 
   const importarMapsDireto = () => {
     if (!mapsResult) return;
-    addEmpresa(
-      empresaFromRaw({
-        nome: mapsResult.nome,
-        segmento: mapsResult.segmento || "Comércio / Serviços",
-        cidade: mapsResult.cidade || "—",
-        bairro: mapsResult.bairro,
-        endereco: mapsResult.endereco,
-        telefone: mapsResult.telefone || mapsResult.whatsapp,
-        whatsapp: mapsResult.whatsapp,
-        email: mapsResult.email,
-        site: mapsResult.site,
-        origem: "google_maps",
-        observacoes: [
-          mapsResult.resumo,
-          mapsResult.googleMapsUrl ? `Google Maps: ${mapsResult.googleMapsUrl}` : "",
-          mapsResult.rating ? `Avaliação: ⭐ ${mapsResult.rating} (${mapsResult.totalRatings || 0} avaliações)` : "",
-          mapsResult.statusFuncionamento ? `Status: ${mapsResult.statusFuncionamento}` : "",
-          mapsResult.horario ? `Horários: ${mapsResult.horario}` : "",
-        ]
-          .filter(Boolean)
-          .join("\n"),
-      }),
-    );
+    const nova = empresaFromRaw({
+      nome: mapsResult.nome,
+      segmento: mapsResult.segmento || "Comércio / Serviços",
+      cidade: mapsResult.cidade || "—",
+      bairro: mapsResult.bairro,
+      endereco: mapsResult.endereco,
+      telefone: mapsResult.telefone || mapsResult.whatsapp,
+      whatsapp: mapsResult.whatsapp,
+      email: mapsResult.email,
+      site: mapsResult.site,
+      origem: "google_maps",
+      observacoes: [
+        mapsResult.resumo,
+        mapsResult.googleMapsUrl ? `Google Maps: ${mapsResult.googleMapsUrl}` : "",
+        mapsResult.rating ? `Avaliação: ⭐ ${mapsResult.rating} (${mapsResult.totalRatings || 0} avaliações)` : "",
+        mapsResult.statusFuncionamento ? `Status: ${mapsResult.statusFuncionamento}` : "",
+        mapsResult.horario ? `Horários: ${mapsResult.horario}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    });
+    addEmpresa(nova);
     toast.success(`${mapsResult.nome} adicionada ao radar com sucesso!`);
     setMapsResult(null);
     setMapsInput("");
+    processarEnriquecimentoAssincrono(nova);
   };
 
 
   const salvarManual = () => {
     if (!form.nome.trim()) return toast.error("Nome é obrigatório");
     if (!form.cidade.trim()) return toast.error("Cidade é obrigatória");
-    addEmpresa(
-      empresaFromRaw({
-        nome: form.nome.trim(),
-        segmento: form.segmento.trim() || "Outros",
-        cidade: form.cidade.trim(),
-        bairro: form.bairro.trim() || undefined,
-        endereco: form.endereco.trim(),
-        telefone: form.telefone.trim() || undefined,
-        whatsapp: form.whatsapp.trim() || undefined,
-        email: form.email.trim() || undefined,
-        site: form.site.trim() || undefined,
-        instagram: form.instagram.trim() || undefined,
-        observacoes: form.observacoes.trim() || undefined,
-        origem: "manual",
-      }),
-    );
+    const nova = empresaFromRaw({
+      nome: form.nome.trim(),
+      segmento: form.segmento.trim() || "Outros",
+      cidade: form.cidade.trim(),
+      bairro: form.bairro.trim() || undefined,
+      endereco: form.endereco.trim(),
+      telefone: form.telefone.trim() || undefined,
+      whatsapp: form.whatsapp.trim() || undefined,
+      email: form.email.trim() || undefined,
+      site: form.site.trim() || undefined,
+      instagram: form.instagram.trim() || undefined,
+      observacoes: form.observacoes.trim() || undefined,
+      origem: "manual",
+    });
+    addEmpresa(nova);
     toast.success(`${form.nome} adicionada ao radar`);
     setForm(emptyForm);
+    processarEnriquecimentoAssincrono(nova);
   };
 
   const importarCsv = () => {
@@ -1627,6 +1675,7 @@ function ImportarPage() {
     if (lines.length < 2) return toast.error("CSV vazio ou sem cabeçalho");
     const header = lines[0].split(",").map((s) => s.trim().toLowerCase());
     let count = 0;
+    const novas: Empresa[] = [];
     for (let i = 1; i < lines.length; i++) {
       const row = lines[i].split(",").map((s) => s.trim());
       if (row.length < 2) continue;
@@ -1636,23 +1685,27 @@ function ImportarPage() {
       };
       const nome = getVal("nome");
       if (!nome) continue;
-      addEmpresa(
-        empresaFromRaw({
-          nome,
-          segmento: getVal("segmento") || "Outros",
-          cidade: getVal("cidade") || "Caxias do Sul",
-          endereco: getVal("endereco") || "Endereço não informado",
-          telefone: getVal("telefone"),
-          whatsapp: getVal("whatsapp"),
-          email: getVal("email"),
-          site: getVal("site"),
-          instagram: getVal("instagram"),
-          origem: "csv",
-        }),
-      );
+      const nova = empresaFromRaw({
+        nome,
+        segmento: getVal("segmento") || "Outros",
+        cidade: getVal("cidade") || "Caxias do Sul",
+        endereco: getVal("endereco") || "Endereço não informado",
+        telefone: getVal("telefone"),
+        whatsapp: getVal("whatsapp"),
+        email: getVal("email"),
+        site: getVal("site"),
+        instagram: getVal("instagram"),
+        origem: "csv",
+      });
+      addEmpresa(nova);
+      novas.push(nova);
       count++;
     }
     toast.success(`${count} empresa(s) importada(s) do CSV`);
+    if (autoEnriquecerComIA && novas.length > 0) {
+      setBatchEmpresasAlvo(novas);
+      setBatchModalOpen(true);
+    }
   };
 
   const exportarEmpresas = () => {
@@ -1685,8 +1738,40 @@ function ImportarPage() {
   // -------------------------------------------------------------------------
   const importarUnified = (p: UnifiedProspectResult) => {
     if (imported.has(p.id)) return;
-    addEmpresa(
-      empresaFromRaw({
+    const nova = empresaFromRaw({
+      nome: p.nome,
+      segmento: p.segmento || "Outros",
+      cidade: p.cidade || cidade || "—",
+      bairro: p.bairro,
+      endereco: p.endereco || "",
+      telefone: p.telefone,
+      whatsapp: p.whatsapp,
+      email: p.email,
+      site: p.site,
+      instagram: p.instagram,
+      origem: p.origem,
+      externalId: p.id,
+      observacoes: [
+        p.razaoSocial ? `Razão Social: ${p.razaoSocial}` : "",
+        p.cnpj ? `CNPJ: ${p.cnpj}` : "",
+        p.dataInicioAtividade ? `Data Abertura: ${p.dataInicioAtividade}` : "",
+        p.detalhesExtras,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    });
+    addEmpresa(nova);
+    setImported((s) => new Set(s).add(p.id));
+    toast.success(`${p.nome} adicionada ao radar`);
+    processarEnriquecimentoAssincrono(nova);
+  };
+
+  const importarTodasUnified = (items: UnifiedProspectResult[]) => {
+    let count = 0;
+    const novas: Empresa[] = [];
+    for (const p of items) {
+      if (imported.has(p.id)) continue;
+      const nova = empresaFromRaw({
         nome: p.nome,
         segmento: p.segmento || "Outros",
         cidade: p.cidade || cidade || "—",
@@ -1707,44 +1792,17 @@ function ImportarPage() {
         ]
           .filter(Boolean)
           .join("\n"),
-      }),
-    );
-    setImported((s) => new Set(s).add(p.id));
-    toast.success(`${p.nome} adicionada ao radar`);
-  };
-
-  const importarTodasUnified = (items: UnifiedProspectResult[]) => {
-    let count = 0;
-    for (const p of items) {
-      if (imported.has(p.id)) continue;
-      addEmpresa(
-        empresaFromRaw({
-          nome: p.nome,
-          segmento: p.segmento || "Outros",
-          cidade: p.cidade || cidade || "—",
-          bairro: p.bairro,
-          endereco: p.endereco || "",
-          telefone: p.telefone,
-          whatsapp: p.whatsapp,
-          email: p.email,
-          site: p.site,
-          instagram: p.instagram,
-          origem: p.origem,
-          externalId: p.id,
-          observacoes: [
-            p.razaoSocial ? `Razão Social: ${p.razaoSocial}` : "",
-            p.cnpj ? `CNPJ: ${p.cnpj}` : "",
-            p.dataInicioAtividade ? `Data Abertura: ${p.dataInicioAtividade}` : "",
-            p.detalhesExtras,
-          ]
-            .filter(Boolean)
-            .join("\n"),
-        }),
-      );
+      });
+      addEmpresa(nova);
+      novas.push(nova);
       count++;
     }
     setImported((s) => new Set([...s, ...items.map((r) => r.id)]));
-    toast.success(`${count} empresa(s) adicionada(s)`);
+    toast.success(`${count} empresa(s) adicionada(s) ao radar`);
+    if (autoEnriquecerComIA && novas.length > 0) {
+      setBatchEmpresasAlvo(novas);
+      setBatchModalOpen(true);
+    }
   };
 
   // -------------------------------------------------------------------------
@@ -1874,7 +1932,21 @@ function ImportarPage() {
             Capture e enriqueça leads a partir de múltiplas fontes integradas: Google Places, SerpApi, Apollo.io, OpenStreetMap, BrasilAPI ou planilhas.
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <label className="flex items-center gap-2 py-1.5 px-3 rounded-lg border border-violet-500/30 bg-violet-500/10 hover:bg-violet-500/15 text-xs text-violet-950 dark:text-violet-200 cursor-pointer transition select-none shadow-xs">
+            <input
+              type="checkbox"
+              checked={autoEnriquecerComIA}
+              onChange={(e) => setAutoEnriquecerComIA(e.target.checked)}
+              className="rounded border-violet-500 text-violet-600 focus:ring-violet-500 h-3.5 w-3.5"
+            />
+            <Sparkles className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
+            <span className="font-medium">Análise por IA ao adicionar</span>
+            <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-violet-500/20 text-violet-700 dark:text-violet-300">
+              Recomendado
+            </Badge>
+          </label>
+
           <Button
             variant="outline"
             size="sm"
@@ -3962,6 +4034,15 @@ function ImportarPage() {
       <ApiManagerModal
         open={apiModalOpen}
         onOpenChange={setApiModalOpen}
+      />
+
+      {/* MODAL DE ANÁLISE POR IA EM LOTE PARA IMPORTAÇÕES */}
+      <AnaliseTodasIaModal
+        open={batchModalOpen}
+        onOpenChange={setBatchModalOpen}
+        empresasAtivas={batchEmpresasAlvo.length > 0 ? batchEmpresasAlvo : empresas}
+        empresasFiltradas={batchEmpresasAlvo}
+        onAtualizarEmpresa={(id, patch) => updateEmpresa(id, patch)}
       />
     </div>
   );

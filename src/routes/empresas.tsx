@@ -37,6 +37,8 @@ import {
   Copy,
   CheckCheck,
   Plus,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import {
   siteUrl,
@@ -47,6 +49,8 @@ import {
   googleMapsUrl,
 } from "@/lib/links";
 import { EmpresaCadastroModal } from "@/components/empresa-cadastro-modal";
+import { AnaliseTodasIaModal } from "@/components/analise-todas-ia-modal";
+import { executarAnaliseIACadastro } from "@/lib/cadastro-ia.functions";
 import { EmpresaLogo } from "@/components/empresa-logo";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -134,6 +138,8 @@ interface SortableRowProps {
   kanbanColumns: KanbanColumnConfig[];
   onChangeStage: (empresaId: string, novoStage: CrmStage) => void;
   onEditCadastro: (empresa: Empresa) => void;
+  onAnalisarIa?: (empresa: Empresa) => void;
+  isAnalisandoIa?: boolean;
   onMoverExcluidos: (id: string, nome: string) => void;
   onRestaurar: (id: string, nome: string) => void;
   onExcluirDefinitivo: (id: string, nome: string) => void;
@@ -146,6 +152,8 @@ function SortableEmpresaRow({
   kanbanColumns,
   onChangeStage,
   onEditCadastro,
+  onAnalisarIa,
+  isAnalisandoIa,
   onMoverExcluidos,
   onRestaurar,
   onExcluirDefinitivo,
@@ -494,6 +502,24 @@ function SortableEmpresaRow({
                 Cadastro
               </Button>
 
+              {onAnalisarIa && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onAnalisarIa(e)}
+                  disabled={isAnalisandoIa}
+                  className="h-7 text-xs px-2 gap-1 text-violet-600 border-violet-500/30 hover:bg-violet-500/10"
+                  title="Executar Análise por IA (Google Maps, Receita Federal e LLM) para esta empresa"
+                >
+                  {isAnalisandoIa ? (
+                    <Loader2 className="h-3 w-3 animate-spin text-violet-600" />
+                  ) : (
+                    <Sparkles className="h-3 w-3 text-violet-600" />
+                  )}
+                  IA
+                </Button>
+              )}
+
               <Button
                 asChild
                 size="sm"
@@ -556,10 +582,28 @@ function EmpresasPage() {
     restaurarEmpresaDeExcluidos,
     excluirEmpresaDefinitivamente,
     reordenarEmpresas,
+    updateEmpresa,
   } = useStore();
   const [f, setF] = useState<Filtros>(INITIAL);
   const [aba, setAba] = useState<"ativas" | "excluidas">("ativas");
   const [empresaCadastro, setEmpresaCadastro] = useState<Empresa | null>(null);
+  const [modalAnaliseTodasOpen, setModalAnaliseTodasOpen] = useState(false);
+  const [analisandoId, setAnalisandoId] = useState<string | null>(null);
+
+  const handleAnalisarIaLinha = async (empresa: Empresa) => {
+    setAnalisandoId(empresa.id);
+    toast.info(`Iniciando Análise por IA para "${empresa.nome}"...`);
+    try {
+      const { patch, resultado } = await executarAnaliseIACadastro(empresa);
+      updateEmpresa(empresa.id, patch);
+      const fontes = resultado.fontes?.join(", ") || "Maps, Receita & IA";
+      toast.success(`"${empresa.nome}" enriquecida com sucesso! (${fontes})`);
+    } catch (err: any) {
+      toast.error(err.message || `Erro ao analisar "${empresa.nome}".`);
+    } finally {
+      setAnalisandoId(null);
+    }
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -640,6 +684,17 @@ function EmpresasPage() {
           <Button variant="outline" size="sm" onClick={() => setF(INITIAL)} className="h-9 text-xs">
             Limpar filtros
           </Button>
+
+          <Button
+            size="sm"
+            onClick={() => setModalAnaliseTodasOpen(true)}
+            className="h-9 text-xs gap-1.5 bg-gradient-to-r from-violet-600 via-indigo-600 to-primary text-white hover:opacity-90 shadow-sm font-medium"
+            title="Executar análise e enriquecimento cadastral por IA para todas as empresas"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Análise por IA de Todas
+          </Button>
+
           <Button
             size="sm"
             onClick={() =>
@@ -808,6 +863,8 @@ function EmpresasPage() {
                       kanbanColumns={kanbanColumns}
                       onChangeStage={handleChangeStage}
                       onEditCadastro={setEmpresaCadastro}
+                      onAnalisarIa={handleAnalisarIaLinha}
+                      isAnalisandoIa={analisandoId === e.id}
                       onMoverExcluidos={(id, nome) => {
                         moverEmpresaParaExcluidos(id);
                         toast.success(`"${nome}" movida para a lista de excluídos e coluna Excluídos do Kanban.`);
@@ -846,6 +903,15 @@ function EmpresasPage() {
         empresa={empresaCadastro}
         open={Boolean(empresaCadastro)}
         onOpenChange={(o) => !o && setEmpresaCadastro(null)}
+      />
+
+      {/* Modal de Análise por IA de Todas as Empresas em Lote */}
+      <AnaliseTodasIaModal
+        open={modalAnaliseTodasOpen}
+        onOpenChange={setModalAnaliseTodasOpen}
+        empresasAtivas={empresasAtivas}
+        empresasFiltradas={filtradas}
+        onAtualizarEmpresa={(id, patch) => updateEmpresa(id, patch)}
       />
     </div>
   );

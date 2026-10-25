@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { BrasilApiCnpjResult } from "./public-apis.functions";
+import type { Empresa } from "./mock-data";
 
 export interface GerarDadosCadastroInput {
   nome: string;
@@ -55,6 +56,52 @@ export interface DadosCadastroIAResult {
   modo: "ia" | "autocomplete_deterministico";
   fontes: string[];
   dadosReceita?: BrasilApiCnpjResult | null;
+}
+
+export function toSafeString(val: unknown): string {
+  if (val === null || val === undefined) return "";
+  if (typeof val === "string") return val.trim();
+  if (Array.isArray(val)) {
+    return val
+      .map((item) => (typeof item === "string" ? item.trim() : String(item ?? "").trim()))
+      .filter(Boolean)
+      .join("\n");
+  }
+  return String(val).trim();
+}
+
+export function mesclarDadosIAnEmpresa(
+  empresaBase: Partial<Empresa>,
+  res: DadosCadastroIAResult,
+): Partial<Empresa> {
+  const patch: Partial<Empresa> = {};
+
+  if (res.nome && (!empresaBase.nome || empresaBase.nome === "Nova Empresa" || empresaBase.nome === "Empresa")) {
+    patch.nome = toSafeString(res.nome);
+  }
+  if (res.razaoSocial) patch.razaoSocial = toSafeString(res.razaoSocial);
+  if (res.cnpj) patch.cnpj = toSafeString(res.cnpj);
+  if (res.segmentoRefinado) patch.segmento = toSafeString(res.segmentoRefinado);
+  if (res.areaAtuacao) patch.areaAtuacao = toSafeString(res.areaAtuacao);
+  if (res.publicoAlvo) patch.publicoAlvo = toSafeString(res.publicoAlvo);
+  if (res.cidade && (!empresaBase.cidade || empresaBase.cidade === "—" || empresaBase.cidade === "Não informada")) {
+    patch.cidade = toSafeString(res.cidade);
+  }
+  if (res.bairro && !empresaBase.bairro) patch.bairro = toSafeString(res.bairro);
+  if (res.endereco && (!empresaBase.endereco || empresaBase.endereco === "Endereço não informado" || empresaBase.endereco === "")) {
+    patch.endereco = toSafeString(res.endereco);
+  }
+  if (res.cep && !empresaBase.cep) patch.cep = toSafeString(res.cep);
+  if (res.telefone) patch.telefone = toSafeString(res.telefone);
+  if (res.whatsapp) patch.whatsapp = toSafeString(res.whatsapp);
+  if (res.email && !empresaBase.email) patch.email = toSafeString(res.email);
+  if (res.site && (!empresaBase.site || empresaBase.site === "https://")) patch.site = toSafeString(res.site);
+  if (res.instagram && !empresaBase.instagram) patch.instagram = toSafeString(res.instagram);
+  if (res.buscasPartida) patch.buscasPartida = toSafeString(res.buscasPartida);
+  if (res.termosEncontrados) patch.termosEncontrados = toSafeString(res.termosEncontrados);
+  if (res.buscaGoogleMaps) patch.buscaGoogleMaps = toSafeString(res.buscaGoogleMaps);
+
+  return patch;
 }
 
 export function cleanDigits(val?: string | null): string {
@@ -731,6 +778,41 @@ Retorne EXATAMENTE este JSON:
       dadosReceita,
     };
   });
+
+export async function executarAnaliseIACadastro(
+  empresa: Partial<Empresa>,
+): Promise<{ patch: Partial<Empresa>; resultado: DadosCadastroIAResult }> {
+  const nome = toSafeString(empresa.nome);
+  if (!nome) {
+    throw new Error("Nome da empresa é obrigatório para análise por IA");
+  }
+
+  const res = await gerarDadosCadastroIA_ServerFn({
+    data: {
+      nome,
+      segmento: toSafeString(empresa.segmento),
+      cidade: toSafeString(empresa.cidade) || "Bento Gonçalves",
+      bairro: toSafeString(empresa.bairro),
+      endereco: toSafeString(empresa.endereco),
+      cep: toSafeString(empresa.cep),
+      telefone: toSafeString(empresa.telefone),
+      whatsapp: toSafeString(empresa.whatsapp),
+      email: toSafeString(empresa.email),
+      cnpj: toSafeString(empresa.cnpj),
+      razaoSocial: toSafeString(empresa.razaoSocial),
+      site: toSafeString(empresa.site),
+      instagram: toSafeString(empresa.instagram),
+      observacoes: toSafeString(empresa.observacoes),
+      areaAtuacaoAtual: toSafeString(empresa.areaAtuacao),
+      publicoAlvoAtual: toSafeString(empresa.publicoAlvo),
+      buscaGoogleMapsAtual: toSafeString(empresa.buscaGoogleMaps),
+      buscasPartidaAtual: toSafeString(empresa.buscasPartida),
+    },
+  });
+
+  const patch = mesclarDadosIAnEmpresa(empresa, res);
+  return { patch, resultado: res };
+}
 
 export const sugerirPublicoAlvoIA_ServerFn = createServerFn({ method: "POST" })
   .validator(
