@@ -1933,16 +1933,16 @@ function ImportarPage() {
           </p>
         </div>
         <div className="flex items-center gap-2.5 flex-wrap">
-          <label className="flex items-center gap-2 py-1.5 px-3 rounded-lg border border-violet-500/30 bg-violet-500/10 hover:bg-violet-500/15 text-xs text-violet-950 dark:text-violet-200 cursor-pointer transition select-none shadow-xs">
+          <label className="flex items-center gap-2 py-1.5 px-3 rounded-lg border border-primary/30 bg-primary/10 hover:bg-primary/15 text-xs text-foreground cursor-pointer transition select-none shadow-xs">
             <input
               type="checkbox"
               checked={autoEnriquecerComIA}
               onChange={(e) => setAutoEnriquecerComIA(e.target.checked)}
-              className="rounded border-violet-500 text-violet-600 focus:ring-violet-500 h-3.5 w-3.5"
+              className="rounded border-primary text-primary focus:ring-primary h-3.5 w-3.5"
             />
-            <Sparkles className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
             <span className="font-medium">Análise por IA ao adicionar</span>
-            <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-violet-500/20 text-violet-700 dark:text-violet-300">
+            <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-primary/20 text-primary font-semibold">
               Recomendado
             </Badge>
           </label>

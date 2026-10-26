@@ -205,7 +205,7 @@ export function AnaliseTodasIaModal({
       <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-6 overflow-hidden">
         <DialogHeader className="space-y-2">
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-gradient-to-br from-violet-600 to-indigo-600 text-white rounded-lg shadow-sm">
+            <div className="p-2 bg-gradient-to-br from-primary to-rose-600 text-primary-foreground rounded-lg shadow-sm">
               <Sparkles className="h-5 w-5" />
             </div>
             <div>
@@ -334,9 +334,9 @@ export function AnaliseTodasIaModal({
 
               {/* Empresa Atual */}
               {executando && empresaAtualNome && (
-                <div className="p-3.5 bg-gradient-to-r from-violet-500/10 via-indigo-500/10 to-transparent border border-violet-500/30 rounded-xl flex items-center justify-between gap-3 animate-fade-in">
+                <div className="p-3.5 bg-gradient-to-r from-primary/10 via-rose-500/10 to-transparent border border-primary/30 rounded-xl flex items-center justify-between gap-3 animate-fade-in">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <Loader2 className="h-4 w-4 animate-spin text-violet-600 shrink-0" />
+                    <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
                     <div className="min-w-0">
                       <p className="text-xs font-semibold truncate text-foreground">
                         {empresaAtualNome}
@@ -441,7 +441,7 @@ export function AnaliseTodasIaModal({
                 size="sm"
                 onClick={handleIniciar}
                 disabled={listaAlvo.length === 0}
-                className="text-xs gap-1.5 bg-gradient-to-r from-violet-600 via-indigo-600 to-primary text-white hover:opacity-90 shadow-sm"
+                className="text-xs gap-1.5 bg-gradient-to-r from-primary via-rose-600 to-pink-600 text-primary-foreground hover:opacity-90 shadow-sm"
               >
                 <Sparkles className="h-3.5 w-3.5" />
                 {progressoIdx > 0 ? "Reiniciar Análise" : `Iniciar Análise (${listaAlvo.length} empresas)`}

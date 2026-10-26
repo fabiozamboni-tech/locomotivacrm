@@ -1,6 +1,7 @@
 import { FileText } from "lucide-react";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
+import { LocomotivaLogo } from "@/components/locomotiva-logo";
 import {
   LayoutDashboard,
   Building2,
@@ -67,14 +68,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen w-full bg-background text-foreground">
       <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border/60 bg-sidebar text-sidebar-foreground">
-        <div className="flex items-center gap-2 px-5 py-5 border-b border-sidebar-border/60">
-          <div className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground">
-            <Radar className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <div className="text-sm font-semibold leading-tight truncate">Radar</div>
-            <div className="text-[11px] text-muted-foreground leading-tight">Presença Digital · RS</div>
-          </div>
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-sidebar-border/60">
+          <LocomotivaLogo size="md" showText subtitulo="Presença Digital · RS" />
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
           {NAV.map((n) => {
@@ -107,6 +102,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-border/60 bg-background/80 backdrop-blur px-4 md:px-6 h-14">
+          <div className="md:hidden flex items-center shrink-0">
+            <LocomotivaLogo size="sm" />
+          </div>
           <button
             onClick={() => setOpenSearch(true)}
             className="flex-1 flex items-center gap-2 rounded-md border border-input bg-muted/40 px-3 h-9 text-sm text-muted-foreground max-w-md hover:bg-muted/70 transition"

@@ -126,6 +126,7 @@ const LS_KEY = "radar.empresas.v1";
 const LS_WEIGHTS = "radar.weights.v1";
 const LS_EXCLUIDOS = "radar.excluidos.v1";
 const LS_INSTAGRAM_DB = "radar.instagram.db.v1";
+const LS_THEME = "radar.theme.v1";
 
 function cleanDigits(str?: string): string {
   if (!str) return "";
@@ -223,7 +224,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [empresasExcluidas, setEmpresasExcluidas] = useState<EmpresaExcluida[]>([]);
   const [instagramProfilesDb, setInstagramProfilesDb] = useState<InstagramProfile[]>([]);
   const [kanbanColumns, setKanbanColumnsState] = useState<KanbanColumnConfig[]>(DEFAULT_KANBAN_COLUMNS);
-  const [theme, setTheme] = useState<"light" | "dark">("dark");
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = window.localStorage.getItem(LS_THEME);
+        if (saved === "light" || saved === "dark") return saved;
+      } catch { /* noop */ }
+    }
+    return "light";
+  });
   const [hydrated, setHydrated] = useState(false);
   const [dbSyncStatus, setDbSyncStatus] = useState<DbSyncStatus>("idle");
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
@@ -325,6 +334,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (typeof document !== "undefined") {
       document.documentElement.classList.toggle("dark", theme === "dark");
     }
+    try { window.localStorage.setItem(LS_THEME, theme); } catch { /* noop */ }
   }, [theme]);
 
   const isEmpresaExcluida = useCallback((item: {

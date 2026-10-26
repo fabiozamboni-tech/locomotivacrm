@@ -508,13 +508,13 @@ function SortableEmpresaRow({
                   size="sm"
                   onClick={() => onAnalisarIa(e)}
                   disabled={isAnalisandoIa}
-                  className="h-7 text-xs px-2 gap-1 text-violet-600 border-violet-500/30 hover:bg-violet-500/10"
+                  className="h-7 text-xs px-2 gap-1 text-primary border-primary/30 hover:bg-primary/10"
                   title="Executar Análise por IA (Google Maps, Receita Federal e LLM) para esta empresa"
                 >
                   {isAnalisandoIa ? (
-                    <Loader2 className="h-3 w-3 animate-spin text-violet-600" />
+                    <Loader2 className="h-3 w-3 animate-spin text-primary" />
                   ) : (
-                    <Sparkles className="h-3 w-3 text-violet-600" />
+                    <Sparkles className="h-3 w-3 text-primary" />
                   )}
                   IA
                 </Button>
@@ -688,7 +688,7 @@ function EmpresasPage() {
           <Button
             size="sm"
             onClick={() => setModalAnaliseTodasOpen(true)}
-            className="h-9 text-xs gap-1.5 bg-gradient-to-r from-violet-600 via-indigo-600 to-primary text-white hover:opacity-90 shadow-sm font-medium"
+            className="h-9 text-xs gap-1.5 bg-gradient-to-r from-primary via-rose-600 to-pink-600 text-primary-foreground hover:opacity-90 shadow-sm font-medium"
             title="Executar análise e enriquecimento cadastral por IA para todas as empresas"
           >
             <Sparkles className="h-3.5 w-3.5" />

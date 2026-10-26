@@ -433,7 +433,7 @@ export function EmpresaCadastroModal({
               size="sm"
               onClick={handlePreencherComIA}
               disabled={gerandoIA}
-              className="gap-1.5 text-xs bg-gradient-to-r from-violet-600 via-indigo-600 to-primary text-white hover:opacity-90 shadow-sm"
+              className="gap-1.5 text-xs bg-gradient-to-r from-primary via-rose-600 to-pink-600 text-primary-foreground hover:opacity-90 shadow-sm font-medium"
               title="Pesquisa Google Maps, CNPJ na Receita Federal, Telefones, WhatsApp, Buscas de Partida e Inteligência de Mercado"
             >
               {gerandoIA ? (

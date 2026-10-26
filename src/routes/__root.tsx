@@ -141,29 +141,30 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Radar de Presença Digital · Inteligência de prospecção RS" },
+      { title: "Locomotiva CRM · Radar de Presença Digital" },
       {
         name: "description",
         content:
-          "Plataforma interna de prospecção comercial e diagnóstico de presença digital para empresas do Rio Grande do Sul, com foco na Serra Gaúcha.",
+          "Plataforma de inteligência comercial, CRM e diagnóstico de presença digital da Locomotiva Comunicação para empresas do Rio Grande do Sul e Serra Gaúcha.",
       },
-      { name: "author", content: "Radar de Presença Digital" },
-      { property: "og:title", content: "Radar de Presença Digital · Inteligência de prospecção RS" },
+      { name: "author", content: "Locomotiva Comunicação" },
+      { property: "og:title", content: "Locomotiva CRM · Radar de Presença Digital" },
       {
         property: "og:description",
         content:
-          "Plataforma interna de prospecção comercial e diagnóstico de presença digital para empresas do Rio Grande do Sul, com foco na Serra Gaúcha.",
+          "Plataforma de inteligência comercial, CRM e diagnóstico de presença digital da Locomotiva Comunicação para empresas do Rio Grande do Sul e Serra Gaúcha.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "Radar de Presença Digital · Inteligência de prospecção RS" },
-      { name: "twitter:description", content: "Plataforma interna de prospecção comercial e diagnóstico de presença digital para empresas do Rio Grande do Sul, com foco na Serra Gaúcha." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/901d62c4-c977-4b0c-b7c4-1b0800b02c70/id-preview-0052b9d3--727eea5c-b737-4a4d-82ef-bb0b2d8e971b.lovable.app-1784811519292.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/901d62c4-c977-4b0c-b7c4-1b0800b02c70/id-preview-0052b9d3--727eea5c-b737-4a4d-82ef-bb0b2d8e971b.lovable.app-1784811519292.png" },
+      { name: "twitter:title", content: "Locomotiva CRM · Radar de Presença Digital" },
+      { name: "twitter:description", content: "Plataforma de inteligência comercial, CRM e diagnóstico de presença digital da Locomotiva Comunicação para empresas do Rio Grande do Sul e Serra Gaúcha." },
+      { property: "og:image", content: "/logo.png" },
+      { name: "twitter:image", content: "/logo.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/favicon.png", type: "image/png" },
+      { rel: "apple-touch-icon", href: "/logo.png" },
     ],
   }),
   shellComponent: RootShell,
@@ -174,7 +175,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="pt-BR" className="dark">
+    <html lang="pt-BR">
       <head>
         <HeadContent />
       </head>
