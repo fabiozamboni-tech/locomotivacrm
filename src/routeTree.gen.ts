@@ -20,6 +20,7 @@ import { Route as EstudioCriacaoRouteImport } from './routes/estudio-criacao'
 import { Route as ImportarRouteImport } from './routes/importar'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as McpRouteImport } from './routes/mcp'
+import { Route as NavegarMapsRouteImport } from './routes/navegar-maps'
 import { Route as PromptsRouteImport } from './routes/prompts'
 import { Route as RelatorioRouteImport } from './routes/relatorio'
 import { Route as UnlockRouteImport } from './routes/unlock'
@@ -84,6 +85,11 @@ const McpRoute = McpRouteImport.update({
   path: '/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
+const NavegarMapsRoute = NavegarMapsRouteImport.update({
+  id: '/navegar-maps',
+  path: '/navegar-maps',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PromptsRoute = PromptsRouteImport.update({
   id: '/prompts',
   path: '/prompts',
@@ -140,6 +146,7 @@ export interface FileRoutesByFullPath {
   '/importar': typeof ImportarRoute
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
+  '/navegar-maps': typeof NavegarMapsRoute
   '/prompts': typeof PromptsRoute
   '/relatorio': typeof RelatorioRoute
   '/unlock': typeof UnlockRoute
@@ -161,6 +168,7 @@ export interface FileRoutesByTo {
   '/importar': typeof ImportarRoute
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
+  '/navegar-maps': typeof NavegarMapsRoute
   '/prompts': typeof PromptsRoute
   '/relatorio': typeof RelatorioRoute
   '/unlock': typeof UnlockRoute
@@ -183,6 +191,7 @@ export interface FileRoutesById {
   '/importar': typeof ImportarRoute
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
+  '/navegar-maps': typeof NavegarMapsRoute
   '/prompts': typeof PromptsRoute
   '/relatorio': typeof RelatorioRoute
   '/unlock': typeof UnlockRoute
@@ -206,6 +215,7 @@ export interface FileRouteTypes {
     | '/importar'
     | '/login'
     | '/mcp'
+    | '/navegar-maps'
     | '/prompts'
     | '/relatorio'
     | '/unlock'
@@ -227,6 +237,7 @@ export interface FileRouteTypes {
     | '/importar'
     | '/login'
     | '/mcp'
+    | '/navegar-maps'
     | '/prompts'
     | '/relatorio'
     | '/unlock'
@@ -248,6 +259,7 @@ export interface FileRouteTypes {
     | '/importar'
     | '/login'
     | '/mcp'
+    | '/navegar-maps'
     | '/prompts'
     | '/relatorio'
     | '/unlock'
@@ -270,6 +282,7 @@ export interface RootRouteChildren {
   ImportarRoute: typeof ImportarRoute
   LoginRoute: typeof LoginRoute
   McpRoute: typeof McpRoute
+  NavegarMapsRoute: typeof NavegarMapsRoute
   PromptsRoute: typeof PromptsRoute
   RelatorioRoute: typeof RelatorioRoute
   UnlockRoute: typeof UnlockRoute
@@ -358,6 +371,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof McpRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/navegar-maps': {
+      id: '/navegar-maps'
+      path: '/navegar-maps'
+      fullPath: '/navegar-maps'
+      preLoaderRoute: typeof NavegarMapsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/prompts': {
       id: '/prompts'
       path: '/prompts'
@@ -441,6 +461,7 @@ const rootRouteChildren: RootRouteChildren = {
   ImportarRoute: ImportarRoute,
   LoginRoute: LoginRoute,
   McpRoute: McpRoute,
+  NavegarMapsRoute: NavegarMapsRoute,
   PromptsRoute: PromptsRoute,
   RelatorioRoute: RelatorioRoute,
   UnlockRoute: UnlockRoute,
