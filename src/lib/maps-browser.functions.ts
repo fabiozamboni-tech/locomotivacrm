@@ -420,3 +420,138 @@ export const geocodificarLocalizacao_ServerFn = createServerFn({ method: "POST" 
 
     return null;
   });
+
+export const identificarEmpresaPorCoordenada_ServerFn = createServerFn({ method: "POST" })
+  .validator((data: { lat: number; lng: number }) => data)
+  .handler(async ({ data }): Promise<MapPlaceResult | null> => {
+    const lat = Number(data.lat);
+    const lng = Number(data.lng);
+    if (!lat || !lng) return null;
+
+    // 1. Consulta empresas já no CRM para ver se o clique foi próximo a alguma empresa cadastrada
+    const crmState = await getDbState().catch(() => null);
+    const crmEmpresas = crmState?.empresas || [];
+
+    // 2. Tenta SerpApi Google Maps na coordenada exata
+    const apiKey = getSerpApiKey();
+    if (apiKey && apiKey.length > 20) {
+      try {
+        const serpUrl = new URL("https://serpapi.com/search.json");
+        serpUrl.searchParams.set("engine", "google_maps");
+        serpUrl.searchParams.set("q", "estabelecimentos");
+        serpUrl.searchParams.set("ll", `@${lat.toFixed(6)},${lng.toFixed(6)},18z`);
+        serpUrl.searchParams.set("api_key", apiKey);
+        serpUrl.searchParams.set("hl", "pt-br");
+        serpUrl.searchParams.set("gl", "br");
+
+        const resp = await fetch(serpUrl.toString(), {
+          headers: { "User-Agent": "LocomotivaCRM/1.0" },
+        });
+
+        if (resp.ok) {
+          const json = await resp.json();
+          const results = Array.isArray(json.local_results) ? json.local_results : [];
+          if (results.length > 0) {
+            const item = results[0];
+            const title = String(item.title || "").trim();
+            const rawAddr = String(item.address || "").trim();
+            const phone = item.phone ? String(item.phone).trim() : undefined;
+            const website = item.website ? String(item.website).trim() : undefined;
+            const category = item.type ? String(item.type).trim() : undefined;
+            const gpsLat = Number(item.gps_coordinates?.latitude) || lat;
+            const gpsLng = Number(item.gps_coordinates?.longitude) || lng;
+
+            let cidade = "Serra Gaúcha";
+            for (const c of Object.keys(CIDADES_RS_COORDENADAS)) {
+              if (rawAddr.toLowerCase().includes(c.toLowerCase())) {
+                cidade = c;
+                break;
+              }
+            }
+
+            const normTitle = normalizeText(title);
+            const empCrm = crmEmpresas.find(
+              (e) =>
+                normalizeText(e.nome) === normTitle ||
+                (phone && e.telefone && cleanDigits(e.telefone).slice(-8) === cleanDigits(phone).slice(-8))
+            );
+
+            const placeId = item.place_id || `place_${gpsLat.toFixed(4)}_${gpsLng.toFixed(4)}`;
+            const googleMapsUri =
+              item.link ||
+              (item.place_id ? `https://www.google.com/maps/place/?q=place_id:${item.place_id}` : undefined) ||
+              `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${title} ${rawAddr}`)}`;
+
+            return {
+              id: placeId,
+              title,
+              category,
+              segmentoSugerido: category || "Comércio & Serviços",
+              address: rawAddr || `${title}, ${cidade}`,
+              cidade,
+              phone,
+              website,
+              rating: typeof item.rating === "number" ? item.rating : undefined,
+              reviews: typeof item.reviews === "number" ? item.reviews : undefined,
+              placeId: item.place_id,
+              latitude: gpsLat,
+              longitude: gpsLng,
+              thumbnail: item.thumbnail,
+              googleMapsUri,
+              source: "serpapi",
+              jaNoCrm: Boolean(empCrm),
+              crmId: empCrm?.id,
+              crmStage: empCrm?.crmStage,
+              crmScore: empCrm?.score,
+            };
+          }
+        }
+      } catch (err: any) {
+        console.warn("[MapsBrowser] Erro ao identificar por coordenada via SerpApi:", err.message);
+      }
+    }
+
+    // 3. Fallback: Reverse geocoding via Nominatim OpenStreetMap
+    try {
+      const nomUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
+      const resp = await fetch(nomUrl, {
+        headers: { "User-Agent": "LocomotivaCRM/1.0" },
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const addr = data.address || {};
+        const title =
+          data.name ||
+          addr.shop ||
+          addr.amenity ||
+          addr.commercial ||
+          addr.industrial ||
+          addr.road ||
+          "Local no Google Maps";
+        const cidade = addr.city || addr.town || addr.municipality || "Serra Gaúcha";
+        const rawAddr = data.display_name || `${title}, ${cidade}`;
+
+        const placeId = `osm_rev_${lat.toFixed(5)}_${lng.toFixed(5)}`;
+        const googleMapsUri = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${title} ${rawAddr}`)}`;
+
+        return {
+          id: placeId,
+          title,
+          category: addr.shop || addr.amenity || "Comércio Local",
+          segmentoSugerido: addr.shop || addr.amenity || "Comércio & Serviços",
+          address: rawAddr,
+          cidade,
+          bairro: addr.suburb || addr.neighbourhood,
+          latitude: lat,
+          longitude: lng,
+          googleMapsUri,
+          source: "osm",
+          jaNoCrm: false,
+        };
+      }
+    } catch (osmErr: any) {
+      console.warn("[MapsBrowser] Erro ao fazer reverse geocoding via OSM:", osmErr.message);
+    }
+
+    return null;
+  });
