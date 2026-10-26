@@ -14,7 +14,120 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      crm_empresas: {
+        Row: {
+          id: string
+          nome: string
+          segmento: string | null
+          cidade: string | null
+          crm_stage: string | null
+          score: number | null
+          dados: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          nome: string
+          segmento?: string | null
+          cidade?: string | null
+          crm_stage?: string | null
+          score?: number | null
+          dados: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          nome?: string
+          segmento?: string | null
+          cidade?: string | null
+          crm_stage?: string | null
+          score?: number | null
+          dados?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      crm_configuracoes: {
+        Row: {
+          id: string
+          weights: Json | null
+          kanban_columns: Json | null
+          comunicacao_settings: Json | null
+          api_settings: Json | null
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          weights?: Json | null
+          kanban_columns?: Json | null
+          comunicacao_settings?: Json | null
+          api_settings?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          weights?: Json | null
+          kanban_columns?: Json | null
+          comunicacao_settings?: Json | null
+          api_settings?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      crm_empresas_excluidas: {
+        Row: {
+          id: string
+          nome: string
+          cnpj: string | null
+          place_id: string | null
+          dados: Json
+          excluido_em: string
+        }
+        Insert: {
+          id: string
+          nome: string
+          cnpj?: string | null
+          place_id?: string | null
+          dados: Json
+          excluido_em?: string
+        }
+        Update: {
+          id?: string
+          nome?: string
+          cnpj?: string | null
+          place_id?: string | null
+          dados?: Json
+          excluido_em?: string
+        }
+        Relationships: []
+      }
+      crm_instagram_profiles: {
+        Row: {
+          id: string
+          handle: string
+          nome: string | null
+          dados: Json
+          salvo_em: string
+        }
+        Insert: {
+          id: string
+          handle: string
+          nome?: string | null
+          dados: Json
+          salvo_em?: string
+        }
+        Update: {
+          id?: string
+          handle?: string
+          nome?: string | null
+          dados?: Json
+          salvo_em?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

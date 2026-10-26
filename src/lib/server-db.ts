@@ -1,5 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "../integrations/supabase/types";
 import { EMPRESAS_INICIAIS, type Empresa } from "./mock-data";
 import { DEFAULT_WEIGHTS, type ScoreWeights, calcularScore } from "./scoring";
 import {
@@ -77,6 +79,38 @@ const DB_TMP_FILE = path.join(DATA_DIR, "crm-database.json.tmp");
 
 let memoryStateCache: CrmDatabaseState | null = null;
 let writeQueue = Promise.resolve();
+let _cachedSupabase: SupabaseClient<Database> | null | undefined = undefined;
+
+export function getSupabaseClient(): SupabaseClient<Database> | null {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_PUBLISHABLE_KEY ||
+    process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+  if (!url || !key) {
+    return null;
+  }
+
+  if (_cachedSupabase !== undefined) {
+    return _cachedSupabase;
+  }
+
+  try {
+    _cachedSupabase = createClient<Database>(url, key, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+    return _cachedSupabase;
+  } catch (err: any) {
+    console.warn("[ServerDB] Falha ao inicializar Supabase client:", err.message);
+    _cachedSupabase = null;
+    return null;
+  }
+}
 
 function getDefaultState(): CrmDatabaseState {
   return {
@@ -136,7 +170,7 @@ async function readFromDisk(): Promise<CrmDatabaseState> {
       await writeToDisk(initial);
       return initial;
     }
-    console.warn("Falha ao ler crm-database.json, usando padrão:", err.message);
+    console.warn("[ServerDB] Falha ao ler crm-database.json, usando padrão:", err.message);
     return getDefaultState();
   }
 }
@@ -167,10 +201,91 @@ function queueWrite(mutator: (state: CrmDatabaseState) => CrmDatabaseState | Pro
 }
 
 // -----------------------------------------------------------------------------
-// OPERAÇÕES DO BANCO DE DADOS
+// OPERAÇÕES DO BANCO DE DADOS (SUPABASE POSTGRESQL + DISK FALLBACK)
 // -----------------------------------------------------------------------------
 
 export async function getDbState(): Promise<CrmDatabaseState> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      const [empresasRes, configRes, excluidasRes, instagramRes] = await Promise.all([
+        supabase.from("crm_empresas").select("*").order("updated_at", { ascending: false }),
+        supabase.from("crm_configuracoes").select("*").eq("id", "global").maybeSingle(),
+        supabase.from("crm_empresas_excluidas").select("*").order("excluido_em", { ascending: false }),
+        supabase.from("crm_instagram_profiles").select("*").order("salvo_em", { ascending: false }),
+      ]);
+
+      if (!empresasRes.error) {
+        const defaultState = getDefaultState();
+        const config = configRes.data;
+
+        const weights: ScoreWeights =
+          (config?.weights as unknown as ScoreWeights) || defaultState.weights;
+        const comunicacaoSettings: ComunicacaoSettings =
+          (config?.comunicacao_settings as unknown as ComunicacaoSettings) || defaultState.comunicacaoSettings;
+        const apiSettings = (config?.api_settings as unknown as Partial<ApiSettingsMap>) || undefined;
+
+        const empresas: Empresa[] = (empresasRes.data || []).map((row) => {
+          const raw = (row.dados && typeof row.dados === "object" ? row.dados : {}) as Partial<Empresa>;
+          return {
+            ...raw,
+            id: row.id,
+            nome: row.nome || raw.nome || "Sem nome",
+            segmento: (row.segmento || raw.segmento || "") as any,
+            cidade: row.cidade || raw.cidade || "",
+            crmStage: (row.crm_stage as any) || raw.crmStage || "identificado",
+            score: typeof row.score === "number" && row.score > 0
+              ? row.score
+              : calcularScore(raw as Empresa, weights).score,
+            ultimaAnalise: raw.ultimaAnalise || row.updated_at || new Date().toISOString(),
+          } as Empresa;
+        });
+
+        const empresasExcluidas: EmpresaExcluida[] = (excluidasRes.data || []).map((row) => {
+          const raw = (row.dados && typeof row.dados === "object" ? row.dados : {}) as Partial<EmpresaExcluida>;
+          return {
+            ...raw,
+            id: row.id,
+            nome: row.nome || raw.nome || "",
+            cnpj: row.cnpj || raw.cnpj,
+            placeId: row.place_id || raw.placeId,
+            excluidoEm: row.excluido_em || raw.excluidoEm || new Date().toISOString(),
+          } as EmpresaExcluida;
+        });
+
+        const instagramProfilesDb: InstagramProfile[] = (instagramRes.data || []).map((row) => {
+          const raw = (row.dados && typeof row.dados === "object" ? row.dados : {}) as Partial<InstagramProfile>;
+          return {
+            ...raw,
+            id: row.id,
+            handle: row.handle || raw.handle || "",
+            nome: row.nome || raw.nome || "",
+            salvoEm: row.salvo_em || raw.salvoEm || new Date().toISOString(),
+          } as InstagramProfile;
+        });
+
+        const state: CrmDatabaseState = {
+          version: 1,
+          lastUpdated: config?.updated_at || new Date().toISOString(),
+          empresas,
+          empresasExcluidas,
+          instagramProfilesDb,
+          weights,
+          comunicacaoSettings,
+          apiSettings,
+        };
+
+        memoryStateCache = state;
+        void writeToDisk(state);
+        return state;
+      } else {
+        console.warn("[ServerDB] Resposta com erro ao buscar crm_empresas no Supabase:", empresasRes.error.message);
+      }
+    } catch (err: any) {
+      console.warn("[ServerDB] Exceção ao ler do Supabase, utilizando fallback de disco:", err.message);
+    }
+  }
+
   if (!memoryStateCache) {
     memoryStateCache = await readFromDisk();
   }
@@ -183,16 +298,40 @@ export async function getEmpresas(): Promise<Empresa[]> {
 }
 
 export async function saveEmpresa(empresa: Empresa): Promise<Empresa> {
-  let saved: Empresa = empresa;
+  const currentState = memoryStateCache || (await getDbState());
+  const now = new Date().toISOString();
+  const scoredEmpresa: Empresa = {
+    ...empresa,
+    score: calcularScore(empresa, currentState.weights).score,
+    ultimaAnalise: empresa.ultimaAnalise || now,
+  };
+
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      const { error } = await supabase.from("crm_empresas").upsert(
+        {
+          id: scoredEmpresa.id,
+          nome: scoredEmpresa.nome,
+          segmento: scoredEmpresa.segmento || null,
+          cidade: scoredEmpresa.cidade || null,
+          crm_stage: scoredEmpresa.crmStage || "identificado",
+          score: scoredEmpresa.score || 0,
+          dados: scoredEmpresa as any,
+          updated_at: now,
+        },
+        { onConflict: "id" }
+      );
+      if (error) {
+        console.warn("[ServerDB] Erro ao salvar empresa no Supabase:", error.message);
+      }
+    } catch (err: any) {
+      console.warn("[ServerDB] Exceção ao salvar empresa no Supabase:", err.message);
+    }
+  }
+
   await queueWrite((state) => {
     const existingIndex = state.empresas.findIndex((e) => e.id === empresa.id);
-    const scoredEmpresa = {
-      ...empresa,
-      score: calcularScore(empresa, state.weights).score,
-      updatedAt: new Date().toISOString(),
-    };
-    saved = scoredEmpresa;
-
     if (existingIndex >= 0) {
       const copy = [...state.empresas];
       copy[existingIndex] = scoredEmpresa;
@@ -201,17 +340,53 @@ export async function saveEmpresa(empresa: Empresa): Promise<Empresa> {
       return { ...state, empresas: [scoredEmpresa, ...state.empresas] };
     }
   });
-  return saved;
+
+  return scoredEmpresa;
 }
 
 export async function saveAllEmpresas(empresasNovas: Empresa[], merge = true): Promise<Empresa[]> {
+  const currentState = memoryStateCache || (await getDbState());
+  const now = new Date().toISOString();
+  const scoredNovas = empresasNovas.map((e) => ({
+    ...e,
+    score: calcularScore(e, currentState.weights).score,
+    ultimaAnalise: e.ultimaAnalise || now,
+  }));
+
+  const supabase = getSupabaseClient();
+  if (supabase && scoredNovas.length > 0) {
+    try {
+      if (!merge) {
+        await supabase.from("crm_empresas").delete().neq("id", "___keep_none___");
+      }
+      const records = scoredNovas.map((e) => ({
+        id: e.id,
+        nome: e.nome,
+        segmento: e.segmento || null,
+        cidade: e.cidade || null,
+        crm_stage: e.crmStage || "identificado",
+        score: e.score || 0,
+        dados: e as any,
+        updated_at: now,
+      }));
+
+      // Lote de até 100 para evitar limites de payload
+      for (let i = 0; i < records.length; i += 100) {
+        const batch = records.slice(i, i + 100);
+        const { error } = await supabase.from("crm_empresas").upsert(batch, { onConflict: "id" });
+        if (error) {
+          console.warn("[ServerDB] Erro ao salvar lote no Supabase:", error.message);
+        }
+      }
+    } catch (err: any) {
+      console.warn("[ServerDB] Exceção ao salvar lote no Supabase:", err.message);
+    }
+  }
+
   let result: Empresa[] = [];
   await queueWrite((state) => {
     if (!merge) {
-      result = empresasNovas.map((e) => ({
-        ...e,
-        score: calcularScore(e, state.weights).score,
-      }));
+      result = scoredNovas;
       return { ...state, empresas: result };
     }
 
@@ -219,7 +394,7 @@ export async function saveAllEmpresas(empresasNovas: Empresa[], merge = true): P
     for (const e of state.empresas) {
       map.set(e.id, e);
     }
-    for (const n of empresasNovas) {
+    for (const n of scoredNovas) {
       const existing = map.get(n.id);
       map.set(n.id, {
         ...(existing || {}),
@@ -231,10 +406,23 @@ export async function saveAllEmpresas(empresasNovas: Empresa[], merge = true): P
     result = Array.from(map.values());
     return { ...state, empresas: result };
   });
+
   return result;
 }
 
 export async function deleteEmpresa(id: string): Promise<boolean> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      const { error } = await supabase.from("crm_empresas").delete().eq("id", id);
+      if (error) {
+        console.warn("[ServerDB] Erro ao deletar empresa no Supabase:", error.message);
+      }
+    } catch (err: any) {
+      console.warn("[ServerDB] Exceção ao deletar empresa no Supabase:", err.message);
+    }
+  }
+
   let found = false;
   await queueWrite((state) => {
     const filtered = state.empresas.filter((e) => {
@@ -250,6 +438,25 @@ export async function deleteEmpresa(id: string): Promise<boolean> {
 }
 
 export async function saveEmpresaExcluida(item: EmpresaExcluida): Promise<EmpresaExcluida> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from("crm_empresas_excluidas").upsert(
+        {
+          id: item.id,
+          nome: item.nome,
+          cnpj: item.cnpj || null,
+          place_id: item.placeId || null,
+          dados: item as any,
+          excluido_em: item.excluidoEm || new Date().toISOString(),
+        },
+        { onConflict: "id" }
+      );
+    } catch (err: any) {
+      console.warn("[ServerDB] Erro ao salvar excluída no Supabase:", err.message);
+    }
+  }
+
   await queueWrite((state) => {
     const filtered = state.empresasExcluidas.filter((ex) => ex.id !== item.id);
     return {
@@ -261,6 +468,15 @@ export async function saveEmpresaExcluida(item: EmpresaExcluida): Promise<Empres
 }
 
 export async function deleteEmpresaExcluida(id: string): Promise<boolean> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from("crm_empresas_excluidas").delete().eq("id", id);
+    } catch (err: any) {
+      console.warn("[ServerDB] Erro ao deletar excluída no Supabase:", err.message);
+    }
+  }
+
   await queueWrite((state) => ({
     ...state,
     empresasExcluidas: state.empresasExcluidas.filter((ex) => ex.id !== id),
@@ -269,19 +485,46 @@ export async function deleteEmpresaExcluida(id: string): Promise<boolean> {
 }
 
 export async function clearEmpresasExcluidas(): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from("crm_empresas_excluidas").delete().neq("id", "___keep_none___");
+    } catch (err: any) {
+      console.warn("[ServerDB] Erro ao limpar excluídas no Supabase:", err.message);
+    }
+  }
+
   await queueWrite((state) => ({
     ...state,
     empresasExcluidas: [],
   }));
 }
 
-export async function saveInstagramProfiles(novos: InstagramProfile[]): Promise<{ adicionados: number; duplicados: number }> {
+export async function saveInstagramProfiles(
+  novos: InstagramProfile[]
+): Promise<{ adicionados: number; duplicados: number }> {
   let adicionados = 0;
   let duplicados = 0;
 
+  const supabase = getSupabaseClient();
+  if (supabase && novos.length > 0) {
+    try {
+      const records = novos.map((p) => ({
+        id: p.id,
+        handle: String(p.handle || "").toLowerCase().replace(/^@/, ""),
+        nome: p.nome || null,
+        dados: p as any,
+        salvo_em: p.salvoEm || new Date().toISOString(),
+      }));
+      await supabase.from("crm_instagram_profiles").upsert(records, { onConflict: "handle" });
+    } catch (err: any) {
+      console.warn("[ServerDB] Erro ao salvar perfis instagram no Supabase:", err.message);
+    }
+  }
+
   await queueWrite((state) => {
     const existingHandles = new Set(
-      state.instagramProfilesDb.map((p) => String(p.handle || "").toLowerCase().replace(/^@/, "")),
+      state.instagramProfilesDb.map((p) => String(p.handle || "").toLowerCase().replace(/^@/, ""))
     );
     const uniqueNovos: InstagramProfile[] = [];
 
@@ -309,6 +552,15 @@ export async function saveInstagramProfiles(novos: InstagramProfile[]): Promise<
 }
 
 export async function deleteInstagramProfile(id: string): Promise<boolean> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from("crm_instagram_profiles").delete().or(`id.eq.${id},handle.eq.${id}`);
+    } catch (err: any) {
+      console.warn("[ServerDB] Erro ao deletar perfil instagram no Supabase:", err.message);
+    }
+  }
+
   await queueWrite((state) => ({
     ...state,
     instagramProfilesDb: state.instagramProfilesDb.filter((p) => p.id !== id && p.handle !== id),
@@ -317,6 +569,15 @@ export async function deleteInstagramProfile(id: string): Promise<boolean> {
 }
 
 export async function clearInstagramProfiles(): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from("crm_instagram_profiles").delete().neq("id", "___keep_none___");
+    } catch (err: any) {
+      console.warn("[ServerDB] Erro ao limpar perfis instagram no Supabase:", err.message);
+    }
+  }
+
   await queueWrite((state) => ({
     ...state,
     instagramProfilesDb: [],
@@ -324,6 +585,22 @@ export async function clearInstagramProfiles(): Promise<void> {
 }
 
 export async function saveWeights(weights: ScoreWeights): Promise<ScoreWeights> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from("crm_configuracoes").upsert(
+        {
+          id: "global",
+          weights: weights as any,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "id" }
+      );
+    } catch (err: any) {
+      console.warn("[ServerDB] Erro ao salvar pesos no Supabase:", err.message);
+    }
+  }
+
   await queueWrite((state) => {
     const recomputedEmpresas = state.empresas.map((e) => ({
       ...e,
@@ -339,34 +616,78 @@ export async function saveWeights(weights: ScoreWeights): Promise<ScoreWeights> 
 }
 
 export async function saveComunicacaoSettings(
-  partial: Partial<ComunicacaoSettings>,
+  partial: Partial<ComunicacaoSettings>
 ): Promise<ComunicacaoSettings> {
   let result = {
     email: DEFAULT_EMAIL_SETTINGS,
     whatsapp: DEFAULT_WHATSAPP_SETTINGS,
   };
 
-  await queueWrite((state) => {
-    result = {
-      email: { ...state.comunicacaoSettings.email, ...(partial.email || {}) },
-      whatsapp: { ...state.comunicacaoSettings.whatsapp, ...(partial.whatsapp || {}) },
-    };
-    return {
-      ...state,
-      comunicacaoSettings: result,
-    };
-  });
+  const currentState = memoryStateCache || (await getDbState());
+  result = {
+    email: { ...currentState.comunicacaoSettings.email, ...(partial.email || {}) },
+    whatsapp: { ...currentState.comunicacaoSettings.whatsapp, ...(partial.whatsapp || {}) },
+  };
+
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from("crm_configuracoes").upsert(
+        {
+          id: "global",
+          comunicacao_settings: result as any,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "id" }
+      );
+    } catch (err: any) {
+      console.warn("[ServerDB] Erro ao salvar configurações de comunicação no Supabase:", err.message);
+    }
+  }
+
+  await queueWrite((state) => ({
+    ...state,
+    comunicacaoSettings: result,
+  }));
 
   return result;
 }
 
 export async function resetDatabaseToDefaults(): Promise<CrmDatabaseState> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await Promise.all([
+        supabase.from("crm_empresas").delete().neq("id", "___keep_none___"),
+        supabase.from("crm_empresas_excluidas").delete().neq("id", "___keep_none___"),
+        supabase.from("crm_instagram_profiles").delete().neq("id", "___keep_none___"),
+        supabase.from("crm_configuracoes").upsert(
+          {
+            id: "global",
+            weights: DEFAULT_WEIGHTS as any,
+            comunicacao_settings: {
+              email: DEFAULT_EMAIL_SETTINGS,
+              whatsapp: DEFAULT_WHATSAPP_SETTINGS,
+            } as any,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "id" }
+        ),
+      ]);
+    } catch (err: any) {
+      console.warn("[ServerDB] Erro ao resetar banco Supabase:", err.message);
+    }
+  }
+
   const defaults = getDefaultState();
   await queueWrite(() => defaults);
   return defaults;
 }
 
 export async function getDatabaseInfo(): Promise<DatabaseInfo> {
+  const supabase = getSupabaseClient();
+  const hasSupabase = Boolean(supabase);
+
   const state = await getDbState();
   let fileSizeBytes = 0;
   try {
@@ -376,11 +697,6 @@ export async function getDatabaseInfo(): Promise<DatabaseInfo> {
     fileSizeBytes = 0;
   }
 
-  const hasSupabase = Boolean(
-    (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL) &&
-    (process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
-  );
-
   return {
     mode: hasSupabase ? "supabase" : "server_persistent",
     isSupabaseConfigured: hasSupabase,
@@ -388,7 +704,7 @@ export async function getDatabaseInfo(): Promise<DatabaseInfo> {
     totalExcluidas: state.empresasExcluidas.length,
     totalInstagram: state.instagramProfilesDb.length,
     lastSaved: state.lastUpdated,
-    storagePath: DB_FILE,
+    storagePath: hasSupabase ? "Supabase PostgreSQL (Cloud - Sincronizado)" : DB_FILE,
     fileSizeBytes,
   };
 }

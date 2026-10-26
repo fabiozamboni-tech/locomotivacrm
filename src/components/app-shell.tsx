@@ -131,7 +131,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           >
             <Database className={cn("h-3.5 w-3.5", dbSyncStatus === "syncing" && "animate-spin")} />
             <span className="font-medium">
-              {dbSyncStatus === "syncing" ? "Salvando no Banco..." : "Banco Conectado"}
+              {dbSyncStatus === "syncing"
+                ? "Sincronizando..."
+                : databaseInfo?.mode === "supabase"
+                  ? "Nuvem Conectada"
+                  : "Banco Conectado"}
             </span>
             <span
               className={cn(

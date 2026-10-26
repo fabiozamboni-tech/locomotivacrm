@@ -251,16 +251,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const localEmpresas = loadEmpresasLocal();
         const serverEmpresas = dbState.empresas || [];
 
-        // Se o cliente tem mais empresas ou modificações locais que ainda não estão no banco,
-        // sincroniza em lote para o banco sem perder nada
-        const serverIds = new Set(serverEmpresas.map((e) => e.id));
-        const missingOnServer = localEmpresas.filter((e) => !serverIds.has(e.id));
-
         let finalEmpresas = serverEmpresas;
-        if (missingOnServer.length > 0) {
-          finalEmpresas = await saveAllEmpresas_ServerFn({
-            data: { empresas: [...serverEmpresas, ...missingOnServer], merge: true },
-          });
+
+        // Se o banco na nuvem estiver vazio (primeiro acesso) e houver dados locais, migra para a nuvem
+        if (serverEmpresas.length === 0 && localEmpresas.length > 0) {
+          try {
+            finalEmpresas = await saveAllEmpresas_ServerFn({
+              data: { empresas: localEmpresas, merge: true },
+            });
+          } catch (migErr) {
+            console.warn("Falha ao migrar empresas locais para a nuvem:", migErr);
+            finalEmpresas = localEmpresas;
+          }
         }
 
         const effectiveWeights = dbState.weights || DEFAULT_WEIGHTS;
@@ -302,6 +304,33 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     // Carrega do banco de dados imediatamente
     syncWithDatabase();
+  }, [syncWithDatabase]);
+
+  // Sincronização automática ao focar na janela ou alternar de aba/navegador
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleFocus = () => {
+      void syncWithDatabase();
+    };
+
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        void syncWithDatabase();
+      }
+    });
+
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        void syncWithDatabase();
+      }
+    }, 30000);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      clearInterval(interval);
+    };
   }, [syncWithDatabase]);
 
   // Sincroniza com localStorage para resiliência offline contínua
