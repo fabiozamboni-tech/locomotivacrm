@@ -1,4 +1,4 @@
-import { PROMPT_BLOCO_SKILLS_CLAUDE } from "./skills-claude-prompt";
+import { PROMPT_PADRAO_BASE } from "./prompt-padrao-config";
 
 export interface MontarPromptSiteParams {
   empresa: {
@@ -15,31 +15,31 @@ export interface MontarPromptSiteParams {
   diagnostico?: any;
   dossier360?: any;
   relatorio?: any;
-  usarAntiIaBespoke?: boolean;
-  usarSkillsClaude?: boolean;
-  motorScroll?: "nenhum" | "gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional";
-  skillsAdicionais?: Array<{ id: string; nome: string; prompt: string }>;
+  promptPadrao?: string;
   siteConteudoCustomizado?: string;
   logoBase64?: string;
   logoNomeArquivo?: string;
   instrucoesDesignMd?: string;
   pesquisaSnippets?: string[];
   diferenciaisDetectados?: string[];
+  // Campos legados opcionais para retrocompatibilidade
+  usarAntiIaBespoke?: boolean;
+  usarSkillsClaude?: boolean;
+  motorScroll?: string;
+  skillsAdicionais?: any[];
 }
 
 export function montarPromptSiteCompleto(params: MontarPromptSiteParams): {
   promptSystem: string;
   promptUser: string;
+  promptFinal: string;
 } {
   const {
     empresa,
     diagnostico,
     dossier360,
     relatorio,
-    usarAntiIaBespoke = true,
-    usarSkillsClaude = false,
-    motorScroll = "nenhum",
-    skillsAdicionais = [],
+    promptPadrao,
     siteConteudoCustomizado,
     logoBase64,
     logoNomeArquivo,
@@ -96,55 +96,15 @@ export function montarPromptSiteCompleto(params: MontarPromptSiteParams): {
   const dossierObjecoes = dossier360?.objecoes || [];
   const dossierDiferenciais = dossier360?.diferenciais || [];
 
-  // 2. Bloco de Skills Selecionadas pelo Usuário (incluindo Skill Padrão e customizadas)
-  const blocosSkills: string[] = [];
-  if (skillsAdicionais && skillsAdicionais.length > 0) {
-    skillsAdicionais.forEach((s) => {
-      blocosSkills.push(`[SKILL: ${s.nome.toUpperCase()}]\n${s.prompt.trim()}`);
-    });
-  } else if (usarSkillsClaude) {
-    blocosSkills.push(PROMPT_BLOCO_SKILLS_CLAUDE.trim());
-  }
+  // 2. Montagem do System Prompt (Baseado estritamente no Prompt Padrão salvo pelo usuário)
+  const baseSystem = promptPadrao && promptPadrao.trim().length > 0 ? promptPadrao.trim() : PROMPT_PADRAO_BASE.trim();
+  const partesSystem: string[] = [baseSystem];
 
-  // 3. Montagem do System Prompt (sem prompt base hardcoded - estritamente opções do usuário)
-  const partesSystem: string[] = [];
-
-  partesSystem.push(`[INSTRUÇÕES DO SISTEMA - DIRETRIZES DEFINIDAS PELO USUÁRIO]
-Sua missão é desenvolver o código HTML5 completo, responsivo e profissional de uma Landing Page ONE-PAGE de alto padrão para a empresa especificada a seguir.`);
-
-  if (blocosSkills.length > 0) {
-    partesSystem.push(`[SKILLS E DIRETRIZES DE DESIGN ATIVAS PELO USUÁRIO]\n${blocosSkills.join("\n\n")}`);
-  }
-
-  // Motor de rolagem definido pelo usuário
-  if (motorScroll === "scrollcraft_canvas") {
-    partesSystem.push(`[MOTOR DE ROLAGEM SELECIONADO: SCROLLCRAFT CANVAS SCRUBBED TIMELINE (singhharsh1708/scrollcraft)]
-- Implemente uma experiência de rolagem imersiva estilo Apple com estágio fixado (<div class="pinned-stage sticky top-0 h-screen w-full overflow-hidden">) e <canvas id="hero-canvas" class="w-full h-full object-cover"> responsivo.
-- GSAP ScrollTrigger Pinned Timeline: sincronize a rotação, escala e animação gráfica com o scroll do usuário via 'scrub: 1'.
-- Overlays narrativos em 3 etapas progressivas (0-30%, 30-65%, 65-100%) com cards flutuantes, backdrop-blur e CTA para WhatsApp.`);
-  } else if (motorScroll === "scrollcraft_dimensional") {
-    partesSystem.push(`[MOTOR DE ROLAGEM SELECIONADO: SCROLL-CRAFT DIMENSIONAL SCROLLYTELLING (nateherkai/scroll-craft)]
-- Camadas dimensionais com oclusão real: Hero em 3 planos independentes (z-0 fundo nobre com parallax, z-10 sujeito principal com perspectiva, z-20 primeiro plano com tipografia editorial que passa sobre/sob o sujeito).
-- Curva de sentimento em 4 atos emocionais (Curiosidade -> Tensão Técnica -> Revelação -> Resolução no WhatsApp).
-- Signature move espacial marcante.`);
-  } else if (motorScroll === "gsap_lenis_split") {
-    partesSystem.push(`[MOTOR DE ROLAGEM SELECIONADO: GSAP + LENIS + SPLITTYPE]
-- Rolagem suave a 60fps sincronizada via Lenis e GSAP ScrollTrigger.
-- SplitType com TextGenerateEffect nos títulos da Hero.`);
-  } else {
-    // motorScroll === "nenhum"
-    partesSystem.push(`[MOTOR DE ROLAGEM: NENHUM (ROLAGEM NATIVA)]
-- Não utilize Lenis, ScrollCraft ou bibliotecas pesadas de terceiros para controle de rolagem.
-- Utilize a rolagem nativa suave do navegador através de CSS puro (html { scroll-behavior: smooth; }) e transições CSS leves e rápidas.`);
-  }
-
-  // Logo anexado pelo usuário
   if (logoBase64) {
     partesSystem.push(`[LOGO OFICIAL DA MARCA FORNECIDO PELO USUÁRIO]
 O cliente anexou o arquivo de logo '${logoNomeArquivo || "logo"}'. No cabeçalho (navbar) e no rodapé (footer), UTILIZE A IMAGEM DO LOGO via <img src="${logoBase64}" alt="${empresa.nome}" class="h-10 sm:h-12 w-auto object-contain" /> em vez de texto tipográfico.`);
   }
 
-  // Diretrizes de design em Markdown anexadas pelo usuário
   if (instrucoesDesignMd) {
     partesSystem.push(`[DIRETRIZES DE DESIGN E BRANDING DO CLIENTE (.MD)]
 ${instrucoesDesignMd}`);
@@ -155,7 +115,7 @@ Retorne APENAS o código HTML5 completo (começando em <!DOCTYPE html> e termina
 
   const promptSystem = partesSystem.join("\n\n");
 
-  // 4. Montagem do User Prompt
+  // 3. Montagem do User Prompt (Dados da Empresa + Estrutura & Copys do Botão Conteúdo)
   const partesUser: string[] = [];
 
   partesUser.push(`[DADOS DA EMPRESA E LOCALIZAÇÃO]
@@ -198,6 +158,7 @@ ${instrucoesDesignMd}`);
   partesUser.push(`Gere agora o código HTML5 completo do site ONE-PAGE seguindo rigorosamente todas as regras e opções definidas acima.`);
 
   const promptUser = partesUser.join("\n\n");
+  const promptFinal = `=== PROMPT DO SISTEMA (PROMPT PADRÃO) ===\n\n${promptSystem}\n\n=== PROMPT DO USUÁRIO (CONTEÚDO & BRIEFING) ===\n\n${promptUser}`;
 
-  return { promptSystem, promptUser };
+  return { promptSystem, promptUser, promptFinal };
 }

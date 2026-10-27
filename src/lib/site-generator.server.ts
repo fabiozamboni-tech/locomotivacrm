@@ -45,6 +45,7 @@ export interface GerarSiteInput {
     | "anthropic"
     | "perplexity";
   modeloPreferencial?: string;
+  promptPadrao?: string;
   usarAntiIaBespoke?: boolean;
   usarSkillsClaude?: boolean;
   motorScroll?: "nenhum" | "gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional";
@@ -100,6 +101,7 @@ export interface RefinarSiteInput {
     | "anthropic"
     | "perplexity";
   modeloPreferencial?: string;
+  promptPadrao?: string;
   usarAntiIaBespoke?: boolean;
   usarSkillsClaude?: boolean;
   motorScroll?: "nenhum" | "gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional";
@@ -1316,10 +1318,7 @@ export const gerarSiteCompletoIA_ServerFn = createServerFn({ method: "POST" })
         diagnostico: data.diagnostico,
         dossier360: data.dossier360,
         relatorio: data.relatorio,
-        usarAntiIaBespoke: data.usarAntiIaBespoke,
-        usarSkillsClaude: data.usarSkillsClaude,
-        motorScroll: data.motorScroll,
-        skillsAdicionais: data.skillsAdicionais,
+        promptPadrao: data.promptPadrao,
         siteConteudoCustomizado: data.siteConteudoCustomizado,
         logoBase64: data.logoBase64,
         logoNomeArquivo: data.logoNomeArquivo,

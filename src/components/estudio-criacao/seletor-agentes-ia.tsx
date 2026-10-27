@@ -47,21 +47,7 @@ export interface AgenteIaOption {
 }
 
 export const AGENTES_IA_CATALOGO: AgenteIaOption[] = [
-  // 1. MOTOR EDITORIAL LOCOMOTIVA (ANTI-IA BESPOKE)
-  {
-    id: "bespoke_anti_ia",
-    provider: "bespoke",
-    nome: "Motor Editorial Locomotiva",
-    modelo: "GSAP Anti-IA Bespoke Engine",
-    descricao: "Design editorial contemporâneo sem vieses de IA. Fundo claro, grid assimétrico e GSAP ScrollTrigger calibrado.",
-    icone: Palette,
-    badge: "100% Anti-IA",
-    badgeVariant: "default",
-    destaque: true,
-    categoria: "editorial",
-  },
-
-  // 2. OPENROUTER - ANTHROPIC CLAUDE 3.5 SONNET
+  // 1. OPENROUTER - ANTHROPIC CLAUDE 3.5 SONNET
   {
     id: "openrouter_claude_35_sonnet",
     provider: "openrouter",

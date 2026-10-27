@@ -19,14 +19,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import {
@@ -44,6 +36,7 @@ import {
   Layers,
   Archive,
   ArrowRight,
+  ArrowLeft,
   Maximize2,
   Minimize2,
   Upload,
@@ -68,6 +61,8 @@ import {
   RefreshCw,
   X,
   Info,
+  Search,
+  Sliders,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -78,19 +73,13 @@ import {
   AGENTES_IA_CATALOGO,
   type AgenteIaOption,
 } from "@/components/estudio-criacao/seletor-agentes-ia";
-import { SeletorRapidoAgenteIa } from "@/components/seletor-rapido-agente-ia";
 import { ModalComparadorVersoes } from "@/components/estudio-criacao/modal-comparador-versoes";
 import { ExportarGithubModal } from "@/components/estudio-criacao/exportar-github-modal";
 import { PaletaCoresCard } from "@/components/paleta-cores-card";
 import { PainelImagensSite } from "@/components/estudio-criacao/painel-imagens-site";
-import { PROMPT_BLOCO_SKILLS_CLAUDE } from "@/lib/skills-claude-prompt";
-import {
-  loadSkillsLocais,
-  saveSkillsLocais,
-  type CustomSkill,
-} from "@/lib/skills-config";
 import { montarPromptSiteCompleto } from "@/lib/site-generator-prompt";
-import { ModalGerenciarSkills } from "@/components/estudio-criacao/modal-gerenciar-skills";
+import { loadPromptPadrao, savePromptPadrao } from "@/lib/prompt-padrao-config";
+import { ModalPromptPadrao } from "@/components/estudio-criacao/modal-prompt-padrao";
 import { ModalRefinarPromptIa } from "@/components/estudio-criacao/modal-refinar-prompt-ia";
 import { ModalConteudoSite } from "@/components/estudio-criacao/modal-conteudo-site";
 import { GeradorIdentidadeVisual } from "@/components/estudio-criacao/gerador-identidade-visual";
@@ -99,19 +88,10 @@ import { checarCotaDiaria, registrarConsumoDiario } from "@/lib/ai-quota-guard";
 export const Route = createFileRoute("/estudio-criacao")({
   validateSearch: z.object({
     empresa: z.string().optional().catch(undefined),
-    tab: z.enum(["site", "paleta", "prompts"]).optional().catch(undefined),
+    tab: z.enum(["site", "paleta"]).optional().catch(undefined),
   }),
   component: EstudioCriacaoPage,
 });
-
-const TIPOS_PROMPTS = [
-  { value: "anti_ia_master", label: "Prompt Base Anti-IA (GSAP Master)" },
-  { value: "abordagem_primeiro_contato", label: "Prompt Base Abordagem (Primeiro Contato + PDF)" },
-  { value: "site_geral", label: "Briefing de Arquitetura & UX" },
-  { value: "copy_vendas", label: "Copywriting de Conversão (Sem Clichês)" },
-  { value: "google_ads", label: "Campanha Google Ads (Busca Local)" },
-  { value: "redes_sociais", label: "Linha Editorial Redes Sociais" },
-];
 
 const SUGESTOES_CHAT = [
   "🎨 Ajustar paleta de cores para tons editoriais de linho e verde oliva",
@@ -122,7 +102,7 @@ const SUGESTOES_CHAT = [
 ];
 
 function EstudioCriacaoPage() {
-  const search = Route.useSearch() as { empresa?: string; tab?: "site" | "paleta" | "prompts" };
+  const search = Route.useSearch() as { empresa?: string; tab?: "site" | "paleta" };
   const navigate = useNavigate();
   const { empresas, empresasAtivas: storeEmpresasAtivas, updateEmpresa, addHistorico, isEmpresaExcluida } = useStore();
 
@@ -141,12 +121,18 @@ function EstudioCriacaoPage() {
   const gerarSiteFn = useServerFn(gerarSiteCompletoIA_ServerFn);
   const refinarSiteFn = useServerFn(refinarSiteComIa_ServerFn);
 
-  // Empresa ativa (apenas empresas ativas, nunca excluídas)
-  const empresaId = search.empresa || empresasAtivas[0]?.id || "";
-  const empresa = empresas.find((e) => e.id === empresaId) || empresasAtivas[0] || empresas[0];
+  // Estados de busca e filtros para a tela inicial de seleção de leads
+  const [buscaLead, setBuscaLead] = useState("");
+  const [filtroSite, setFiltroSite] = useState<"todos" | "com_site" | "sem_site">("todos");
+
+  // Empresa ativa (apenas se 'empresa' estiver na URL)
+  const empresaId = search.empresa;
+  const empresa = empresaId
+    ? empresasAtivas.find((e) => e.id === empresaId) || empresas.find((e) => e.id === empresaId)
+    : undefined;
 
   // Sub-aba ativa superior
-  const [abaAtiva, setAbaAtiva] = useState<"site" | "paleta" | "prompts">(search.tab || "site");
+  const [abaAtiva, setAbaAtiva] = useState<"site" | "paleta">(search.tab || "site");
 
   // Barra lateral retrátil (duas colunas)
   const [painelEsquerdoAberto, setPainelEsquerdoAberto] = useState(true);
@@ -154,27 +140,14 @@ function EstudioCriacaoPage() {
   // Sub-aba dentro do painel esquerdo: Chat, Imagens por IA ou Histórico
   const [abaPainelEsquerdo, setAbaPainelEsquerdo] = useState<"chat" | "imagens" | "historico">("chat");
 
-  // Diretrizes Anti-IA Bespoke (combo-box global para todas as APIs)
-  const [usarAntiIaBespoke, setUsarAntiIaBespoke] = useState<boolean>(
-    empresa?.estudioUsarAntiIaBespoke ?? true,
-  );
-
-  // Skills Claude (Anthropic Frontend Design)
-  const [usarSkillsClaude, setUsarSkillsClaude] = useState<boolean>(
-    empresa?.estudioUsarSkillsClaude ?? true,
-  );
-
-  // Arquitetura & Motor de Rolagem (Nenhum, GSAP, ScrollCraft Canvas singhharsh1708, ou Scroll-Craft Dimensional nateherkai)
-  const [motorScroll, setMotorScroll] = useState<"nenhum" | "gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional">(
-    empresa?.estudioMotorScroll || "nenhum",
-  );
+  // Prompt Padrão configurável
+  const [promptPadrao, setPromptPadrao] = useState<string>(() => loadPromptPadrao());
+  const [modalPromptPadraoOpen, setModalPromptPadraoOpen] = useState(false);
 
   // Cor primária ativa selecionada na paleta cromática
   const [corPrimariaHex, setCorPrimariaHex] = useState<string>("#722F37");
 
-  // Gestão de Skills (Anthropic Claude + Customizadas)
-  const [skills, setSkills] = useState<CustomSkill[]>(() => loadSkillsLocais());
-  const [modalSkillsOpen, setModalSkillsOpen] = useState(false);
+  // Modais de prompt e conteúdo
   const [modalPromptOpen, setModalPromptOpen] = useState(false);
   const [modalConteudoOpen, setModalConteudoOpen] = useState(false);
 
@@ -218,9 +191,6 @@ function EstudioCriacaoPage() {
   const [modalGithubOpen, setModalGithubOpen] = useState(false);
   const [mdModalOpen, setMdModalOpen] = useState(false);
 
-  // Aba de Prompts Textuais
-  const [tipoPrompt, setTipoPrompt] = useState("anti_ia_master");
-
   // Sincroniza ao trocar de empresa
   useEffect(() => {
     if (empresa) {
@@ -229,9 +199,6 @@ function EstudioCriacaoPage() {
       setLogoAnexo(empresa.estudioLogoAnexo || null);
       setDesignMdAnexo(empresa.estudioDesignMdAnexo || null);
       setChatMensagens(empresa.estudioChatMensagens || []);
-      setUsarAntiIaBespoke(empresa.estudioUsarAntiIaBespoke ?? true);
-      setUsarSkillsClaude(empresa.estudioUsarSkillsClaude ?? true);
-      setMotorScroll(empresa.estudioMotorScroll || "nenhum");
     }
   }, [
     empresa?.id,
@@ -240,9 +207,6 @@ function EstudioCriacaoPage() {
     empresa?.estudioLogoAnexo,
     empresa?.estudioDesignMdAnexo,
     empresa?.estudioChatMensagens,
-    empresa?.estudioUsarAntiIaBespoke,
-    empresa?.estudioUsarSkillsClaude,
-    empresa?.estudioMotorScroll,
     empresa?.siteConteudoCustomizado,
   ]);
 
@@ -252,15 +216,6 @@ function EstudioCriacaoPage() {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
   }, [chatMensagens, refinandoSite]);
-
-  const handleTrocarEmpresa = (novaId: string) => {
-    navigate({
-      search: {
-        empresa: novaId,
-        tab: abaAtiva,
-      } as never,
-    });
-  };
 
   const handleUploadLogo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -333,27 +288,14 @@ function EstudioCriacaoPage() {
     toast.info("Diretrizes de design (.md) removidas.");
   };
 
-  const handleSkillsChange = (novasSkills: CustomSkill[]) => {
-    setSkills(novasSkills);
-    saveSkillsLocais(novasSkills);
-    const claudeSkill = novasSkills.find((s) => s.id === "claude-frontend-design");
-    if (claudeSkill) {
-      setUsarSkillsClaude(claudeSkill.ativa);
-      if (empresa) updateEmpresa(empresa.id, { estudioUsarSkillsClaude: claudeSkill.ativa });
-    }
-  };
-
   const promptMontado = React.useMemo(() => {
-    if (!empresa) return { promptSystem: "", promptUser: "" };
+    if (!empresa) return { promptSystem: "", promptUser: "", promptFinal: "" };
     return montarPromptSiteCompleto({
       empresa: toCtx(empresa),
       diagnostico: empresa.diagnostico,
       dossier360: empresa.dossier360,
       relatorio: empresa.relatorioLead,
-      usarAntiIaBespoke,
-      usarSkillsClaude,
-      motorScroll,
-      skillsAdicionais: skills.filter((s) => s.ativa),
+      promptPadrao,
       siteConteudoCustomizado: empresa.siteConteudoCustomizado,
       logoBase64: logoAnexo?.dataUrl,
       logoNomeArquivo: logoAnexo?.nome,
@@ -361,10 +303,7 @@ function EstudioCriacaoPage() {
     });
   }, [
     empresa,
-    usarAntiIaBespoke,
-    usarSkillsClaude,
-    motorScroll,
-    skills,
+    promptPadrao,
     logoAnexo,
     designMdAnexo,
     empresa?.siteConteudoCustomizado,
@@ -400,11 +339,7 @@ function EstudioCriacaoPage() {
 
     try {
       setGerandoSite(true);
-      toast.info(
-        `Iniciando criação com ${agenteSelecionado.nome} (${agenteSelecionado.modelo})${
-          usarAntiIaBespoke ? " com diretrizes Anti-IA ativadas" : ""
-        }...`,
-      );
+      toast.info(`Iniciando criação com ${agenteSelecionado.nome} (${agenteSelecionado.modelo})...`);
 
       const customKeys = {
         groq: apiSettings.groq.key,
@@ -423,10 +358,7 @@ function EstudioCriacaoPage() {
           empresa: toCtx(empresa),
           provedorPreferencial: agenteSelecionado.provider,
           modeloPreferencial: agenteSelecionado.modelo,
-          usarAntiIaBespoke,
-          usarSkillsClaude,
-          motorScroll,
-          skillsAdicionais: skills.filter((s) => s.ativa),
+          promptPadrao,
           siteConteudoCustomizado: empresa.siteConteudoCustomizado,
           customPromptOverride,
           customKeys,
@@ -471,11 +403,7 @@ function EstudioCriacaoPage() {
         id: `msg_init_${Date.now()}`,
         data: new Date().toISOString(),
         role: "assistant",
-        texto: `Site completo gerado com sucesso por ${agenteSelecionado.nome} (${agenteSelecionado.modelo})${
-          usarAntiIaBespoke ? " seguindo as diretrizes Anti-IA Bespoke" : ""
-        }${
-          usarSkillsClaude ? " e Skills Claude da Anthropic" : ""
-        }. Você pode agora me enviar instruções neste chat para alterar cores, textos, seções ou animações!`,
+        texto: `Site completo gerado com sucesso por ${agenteSelecionado.nome} (${agenteSelecionado.modelo}) com Prompt Padrão configurado. Você pode agora me enviar instruções neste chat para alterar cores, textos, seções ou animações!`,
         modelo: agenteSelecionado.nome,
         versaoGeradaId: novaVersaoId,
       };
@@ -489,9 +417,6 @@ function EstudioCriacaoPage() {
         siteGeradoData: res.geradoEm,
         siteVersoes: novasVersoes,
         estudioChatMensagens: novoChat,
-        estudioUsarAntiIaBespoke: usarAntiIaBespoke,
-        estudioUsarSkillsClaude: usarSkillsClaude,
-        estudioMotorScroll: motorScroll,
         analiseAtualizadaEm: new Date().toISOString(),
       });
 
@@ -558,10 +483,7 @@ function EstudioCriacaoPage() {
           customKeys,
           provedorPreferencial: agenteSelecionado.provider,
           modeloPreferencial: agenteSelecionado.modelo,
-          usarAntiIaBespoke,
-          usarSkillsClaude,
-          motorScroll,
-          skillsAdicionais: skills.filter((s) => s.ativa && s.id !== "claude-frontend-design"),
+          promptPadrao,
           logoBase64: logoAnexo?.dataUrl,
           logoNomeArquivo: logoAnexo?.nome,
           instrucoesDesignMd: designMdAnexo?.conteudo,
@@ -601,9 +523,6 @@ function EstudioCriacaoPage() {
         siteGeradoData: res.geradoEm,
         siteVersoes: novasVersoes,
         estudioChatMensagens: chatAtualizado,
-        estudioUsarAntiIaBespoke: usarAntiIaBespoke,
-        estudioUsarSkillsClaude: usarSkillsClaude,
-        estudioMotorScroll: motorScroll,
         analiseAtualizadaEm: new Date().toISOString(),
       });
 
@@ -701,8 +620,8 @@ function EstudioCriacaoPage() {
     const novaVersao: SiteVersaoGerada = {
       id: novaVersaoId,
       data: new Date().toISOString(),
-      provedor: "Galeria de Imagens IA",
-      modelo: "FLUX.1 / Imagen 3",
+      provedor: "Galeria de Imagens FLUX.1",
+      modelo: "FLUX.1 Pollinations",
       html: novoHtml,
       ativa: true,
     };
@@ -720,32 +639,33 @@ function EstudioCriacaoPage() {
     addHistorico(empresa.id, {
       data: new Date().toISOString(),
       tipo: "nota",
-      texto: `Imagem do site atualizada: ${descricao}`,
+      texto: `Imagem aplicada ao site via Galeria IA: "${descricao.slice(0, 50)}..."`,
     });
+
+    toast.success("Imagem substituída e nova versão do site salva!");
   };
 
-  // 5. ATIVAR VERSÃO ESPECÍFICA COMO OFICIAL
+  // 5. RESTAURAR/ATIVAR UMA VERSÃO ESPECÍFICA DO HISTÓRICO
   const handleSelecionarVersaoAtiva = (versao: SiteVersaoGerada) => {
     if (!empresa) return;
     setSiteHtml(versao.html);
 
-    const atualizadas = versoes.map((v) => ({
+    const novasVersoes = (versoes || []).map((v) => ({
       ...v,
       ativa: v.id === versao.id,
     }));
-    setVersoes(atualizadas);
+    setVersoes(novasVersoes);
 
     updateEmpresa(empresa.id, {
       siteGeradoHtml: versao.html,
       siteGeradoData: versao.data,
-      siteVersoes: atualizadas,
-      analiseAtualizadaEm: new Date().toISOString(),
+      siteVersoes: novasVersoes,
     });
 
-    toast.success(`Versão criada por ${versao.provedor} definida como o site oficial!`);
+    toast.success(`Versão gerada em ${format(new Date(versao.data), "dd/MM/yyyy HH:mm")} ativada na tela.`);
   };
 
-  // 6. EXPORTAÇÕES
+  // 6. DOWNLOAD E EXPORTAÇÕES
   const handleBaixarHtml = () => {
     if (!siteHtml || !empresa) return;
     const blob = new Blob([siteHtml], { type: "text/html" });
@@ -792,176 +712,213 @@ function EstudioCriacaoPage() {
     toast.success("Código HTML copiado para a área de transferência!");
   };
 
-  const gerarPromptTexto = (tipo: string): string => {
-    if (!empresa) return "";
+  // Filtros da tela de seleção de leads
+  const leadsFiltrados = React.useMemo(() => {
+    return empresasAtivas.filter((lead) => {
+      if (buscaLead.trim()) {
+        const termo = buscaLead.toLowerCase();
+        const nomeMatch = lead.nome.toLowerCase().includes(termo);
+        const cidadeMatch = (lead.cidade || "").toLowerCase().includes(termo);
+        const segmentoMatch = (lead.segmento || "").toLowerCase().includes(termo);
+        if (!nomeMatch && !cidadeMatch && !segmentoMatch) return false;
+      }
 
-    const diagnosticoSite = empresa.diagnostico?.site || {};
-    const relatorioLead = empresa.relatorioLead || {};
-    const dossierPersonas = empresa.dossier360?.personas || [];
-    const dossierObjecoes = empresa.dossier360?.objecoes || [];
+      const temSite = Boolean(
+        lead.siteGeradoHtml || (lead.siteVersoes && lead.siteVersoes.length > 0)
+      );
 
-    if (tipo === "anti_ia_master") {
-      return `[Contexto do Sistema]
-Atue como um Desenvolvedor Frontend Sênior e UI/UX Designer de Elite. Sua missão é criar a estrutura, o layout e o código de um site profissional completo para o nicho que será especificado.
-${
-  usarSkillsClaude
-    ? PROMPT_BLOCO_SKILLS_CLAUDE
-    : ""
-}
-${
-  usarAntiIaBespoke
-    ? `[Regras de Design - Anti-IA Bespoke Obrigatórias]
-Proibições Absolutas:
-- Não utilize fundos pretos ou roxos com luzes neon artificiais.
-- Não utilize gradientes genéricos em botões.
-- Não utilize grids repetitivos em loop (como o padrão de 3 cards idênticos lado a lado).
-- Evite ilustrações 3D genéricas ou ícones flutuantes sem propósito funcional.
-- PROIBIÇÃO ABSOLUTA DE MARQUEE: É terminantemente proibido utilizar qualquer efeito de marquee.
-Arquitetura Visual: Priorize minimalismo premium e design editorial com whitespace generoso.
-Paleta de Cores e Tipografia: Combinação contida de no máximo 3 cores e hierarquia tipográfica marcante.`
-    : `[Regras de Design Moderno]
-Crie um design moderno com Tailwind CSS, 100% responsivo e elegante.`
-}
+      if (filtroSite === "com_site") return temSite;
+      if (filtroSite === "sem_site") return !temSite;
+      return true;
+    });
+  }, [empresasAtivas, buscaLead, filtroSite]);
 
-[Estrutura e Elementos Obrigatórios - Formato ONE-PAGE (Landing Page Cinematográfica)]
-1. Home / Hero de alto impacto (Aceternity Spotlight, shadcn/ui badge, SplitType TextGenerateEffect e CTA direto para WhatsApp).
-2. Quem Somos / Sobre a Empresa (História autêntica, valores e autoridade local).
-3. Serviços & Especialidades (Catálogo detalhado de soluções, benefícios técnicos e cards minimalistas).
-4. Portfólio / Projetos Realizados (Galeria de casos de sucesso com imagens geradas por IA via FLUX.1).
-5. Diferenciais, Normas Técnicas & Garantias.
-6. Contato, Localização & Orçamento (Formulário e link de WhatsApp).
+  const totalComSite = React.useMemo(
+    () =>
+      empresasAtivas.filter(
+        (e) => Boolean(e.siteGeradoHtml || (e.siteVersoes && e.siteVersoes.length > 0))
+      ).length,
+    [empresasAtivas]
+  );
+  const totalSemSite = empresasAtivas.length - totalComSite;
 
-[Experiência Scroll-Driven e Bibliotecas Visuais]
-- GSAP + ScrollTrigger + Lenis: rolagem cinematográfica a 60fps sincronizada.
-- SplitType (~3kb): divisão de títulos por caracteres/palavras com TextGenerateEffect.
-- Aceternity UI: Spotlight na Hero e texturas sutis de fundo.
-- shadcn/ui: Badges minimalistas em pílula, cards elegantes e tipografia precisa.
-- FLUX.1: Imagens 100% ativas via https://image.pollinations.ai/prompt/...
-
-[Texto e Conteúdo]
-Tom de voz humano, direto e focado em benefícios reais. Sem jargões de IA.
-
-[Especificação do Nicho]
-- Empresa: ${empresa.nome}
-- Segmento: ${empresa.segmento}
-- Área de Atuação: ${empresa.areaAtuacao || empresa.segmento}
-- Cidade: ${empresa.cidade}/RS (Serra Gaúcha)
-- Telefone / WhatsApp: ${empresa.whatsapp || empresa.telefone || ""}
-- E-mail: ${empresa.email || ""}
-
-[Dados do Diagnóstico do Cliente]
-- Velocidade anterior: ${diagnosticoSite.velocidade || "não avaliada"}
-- Responsivo: ${diagnosticoSite.responsivo ? "Sim" : "Não"}
-- Resumo do Lead: ${relatorioLead.resumo || "Presença digital necessita de autoridade e acabamento nobre."}
-
-Gere o código HTML5 completo do site ONE-PAGE cinematográfico pronto para produção com todas as seções e imagens geradas por FLUX.1.`;
-    }
-
-    if (tipo === "abordagem_primeiro_contato") {
-      const termosDiag = (empresa.termosEncontrados || empresa.buscasPartida || `${empresa.segmento} em ${empresa.cidade}`).replace(/\n/g, ", ");
-      return `[Contexto do Sistema]
-Você é um consultor e estrategista da Locomotiva Comunicação, agência de comunicação e tecnologia da Serra Gaúcha (RS).
-Sua missão é redigir uma mensagem de PRIMEIRO CONTATO com um potencial cliente (${empresa.nome}, em ${empresa.cidade}/RS, do segmento de ${empresa.segmento}).
-
-[Diretrizes Rígidas de Redação e Tom de Voz - Prompt Base Anti-Vício de I.A.]
-1. ZERO PUXA-SAQUISMO E ZERO ELOGIOS FORÇADOS:
-   - Você NÃO conhece o trabalho da empresa a fundo e nunca comprou deles.
-   - É expressamente proibido tecer elogios exagerados ou bajulações (proibido dizer "admiro seu trabalho impecável", "fiquei encantado com a qualidade", "vocês são os melhores da cidade").
-   - Mantenha uma postura honesta, profissional, sóbria e cordial: mencione apenas que acompanha o mercado local e identificou a atuação da empresa no segmento em que ela atua.
-
-2. PROIBIÇÃO ABSOLUTA DE VÍCIOS DE I.A. (SEM EMOJIS E SEM TRAVESSÕES):
-   - PROIBIDO O USO DE QUALQUER EMOJI OU EMOTICON: Não utilize nenhum emoji no texto (zero emojis, nada de emojis ou emoticons).
-   - PROIBIDO O USO DE TRAVESSÕES: Não use travessões ("—" ou "--") no meio ou no fim de frases. Utilize pontuação humana natural: vírgula, ponto final ou quebra de linha.
-   - PROIBIDO O USO DE JARGÕES CORPORATIVOS VAZIOS: Banidas expressões como "espero que esta mensagem o encontre bem", "venho por meio desta", "alavancar", "no mundo dinâmico de hoje", "revolucionário".
-   - Não utilize listas com marcadores artificiais nem formatação excessiva em negrito.
-
-3. CONEXÃO COM AS PALAVRAS-CHAVE DA ABA DIAGNÓSTICO:
-   - Cite com naturalidade 1 ou 2 termos reais de busca no Google levantados no diagnóstico (${termosDiag}) que os clientes utilizam para encontrar o serviço na cidade.
-   - Mostre que foi realizado um levantamento sobre como o público local pesquisa na internet por esses serviços na região.
-
-4. OBJETIVO ÚNICO: ABRIR CANAL E ENVIAR O PDF DO LEVANTAMENTO:
-   - Não tente vender nada na primeira mensagem, não mencione preços e não force reuniões de uma hora.
-   - O intuito exclusivo é abrir um canal amigável de conversa e pedir autorização para enviar o documento em PDF gerado na apresentação de slides (Levantamento sobre a presença digital e comunicação da empresa na região).
-   - Fechamento leve e educado pedindo permissão para o envio do arquivo.
-
-[Dados do Lead]
-- Empresa: ${empresa.nome}
-- Cidade: ${empresa.cidade}/RS (Serra Gaúcha)
-- Segmento: ${empresa.areaAtuacao || empresa.segmento}
-- Palavras-chave do Diagnóstico: ${termosDiag}
-- Situação da Presença: ${empresa.site ? "Possui site" : "Sem site próprio"} · Instagram: ${empresa.instagram || "Sem arroba informado"}
-
-Escreva agora a mensagem pronta para envio no WhatsApp.`;
-    }
-
-    if (tipo === "site_geral") {
-      return `[Briefing de Arquitetura & UX Frontend]
-Empresa: ${empresa.nome} (${empresa.cidade}/RS)
-Setor: ${empresa.segmento}
-
-Objetivo: Estruturar a árvore de páginas e fluxo do usuário (UX) para um site institucional de alto padrão.
-1. Mapeamento de Personas e Dores:
-${dossierPersonas.map((p: any) => `- ${p.nome || "Persona"}: ${p.perfil || p.dorPrincipal || ""}`).join("\n") || "- Clientes que buscam pontualidade, acabamento impecável e segurança contratual."}
-2. Soluções e Portfólio a Evidenciar:
-- Destaque para projetos executados na Serra Gaúcha.
-- Detalhamento de materiais nobres e garantias técnicas.
-3. Fluxo de Conversão:
-- CTAs em pontos estratégicos para contato direto via WhatsApp comercial.`;
-    }
-
-    if (tipo === "copy_vendas") {
-      return `[Copywriting de Conversão e Vendas - Anti-Clichês]
-Empresa: ${empresa.nome} (${empresa.cidade}/RS) · Nicho: ${empresa.segmento}
-
-Diretrizes:
-- Escreva copies persuasivas e autênticas em português brasileiro.
-- PROIBIDO: Usar jargões como "revolucionário", "a solução definitiva", "no mundo dinâmico de hoje", "empresa líder" sem prova documental.
-- FOCO: Redigir benefícios tangíveis, materiais utilizados, prazos cumpridos e tranquilidade pós-venda.
-- Objeções a contornar:
-${dossierObjecoes.map((o: any) => `- ${o.objecao || o.titulo || ""}`).join("\n") || "- Preço vs. valor entregue, cumprimento de prazos de entrega e procedência de matérias-primas."}`;
-    }
-
-    if (tipo === "google_ads") {
-      return `[Campanha Google Ads - Rede de Pesquisa Local]
-Empresa: ${empresa.nome} · Cidade: ${empresa.cidade}/RS
-Segmento: ${empresa.segmento}
-
-Palavras-chave prioritárias:
-${empresa.termosEncontrados || `${empresa.segmento} em ${empresa.cidade}, projetos ${empresa.segmento}, orçamento ${empresa.segmento}`}
-
-Estrutura de Anúncios Responsivos de Busca (RSA):
-- 15 Títulos com foco local, diferenciais de acabamento e pontualidade.
-- 4 Descrições ressaltando atendimento presencial em ${empresa.cidade} e Serra Gaúcha.
-- Extensões recomendadas: Chamada telefônica, Sitelinks para Portfólio e Especialidades, e Localização física.`;
-    }
-
-    if (tipo === "redes_sociais") {
-      return `[Linha Editorial para Redes Sociais - Instagram & LinkedIn]
-Marca: ${empresa.nome} (${empresa.segmento} em ${empresa.cidade}/RS)
-
-Pilares de Conteúdo:
-1. Autoridade Técnica: Bastidores da produção, seleção de materiais e rigor nas normas.
-2. Prova Social: Obras e projetos entregues na região com depoimento do cliente.
-3. Educação de Valor: Dicas de manutenção, planejamento e tendências estéticas contemporâneas.
-4. Conexão Local: Valorização da cultura e raízes da Serra Gaúcha.`;
-    }
-
-    return siteHtml;
-  };
-
+  // =========================================================================
+  // TELA DE SELEÇÃO INICIAL DE LEADS (QUANDO NENHUMA EMPRESA ESTIVER SELECIONADA)
+  // =========================================================================
   if (!empresa) {
     return (
-      <div className="p-8 text-center space-y-4">
-        <Building2 className="h-12 w-12 text-muted-foreground mx-auto" />
-        <h2 className="text-lg font-bold">Nenhuma empresa encontrada</h2>
-        <p className="text-xs text-muted-foreground">Cadastre ou importe empresas para acessar o Estúdio de Criação.</p>
-        <Button size="sm" onClick={() => navigate({ to: "/empresas" })}>
-          Ver Lista de Empresas
-        </Button>
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-6xl mx-auto min-h-screen">
+        {/* CABEÇALHO */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-border/80">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Badge variant="outline" className="text-[11px] gap-1 font-semibold text-primary border-primary/30">
+                <Sparkles className="h-3 w-3" />
+                Estúdio de Criação
+              </Badge>
+              <Badge variant="secondary" className="text-[10px] text-muted-foreground">
+                Seleção de Lead
+              </Badge>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight flex items-center gap-2.5">
+              <Palette className="h-7 w-7 text-primary shrink-0" />
+              <span>Escolha a Empresa para Criar o Site</span>
+            </h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+              Selecione um cliente para abrir o estúdio de criação, estruturar o conteúdo e gerar a landing page com IA.
+            </p>
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate({ to: "/empresas" })}
+            className="text-xs gap-1.5 self-start md:self-auto"
+          >
+            <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+            <span>Gerenciar Empresas</span>
+          </Button>
+        </div>
+
+        {/* BARRA DE FILTROS & BUSCA */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-card p-3 rounded-xl border shadow-xs">
+          {/* Campo de Busca por Nome */}
+          <div className="relative flex-1">
+            <Search className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+            <Input
+              value={buscaLead}
+              onChange={(e) => setBuscaLead(e.target.value)}
+              placeholder="Buscar empresa por nome, cidade ou segmento..."
+              className="pl-9 pr-8 text-xs h-9 bg-background"
+            />
+            {buscaLead && (
+              <button
+                type="button"
+                onClick={() => setBuscaLead("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Filtros por Status de Site Criado */}
+          <div className="flex items-center gap-1.5 bg-muted/60 p-1 rounded-lg shrink-0">
+            <Button
+              type="button"
+              variant={filtroSite === "todos" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setFiltroSite("todos")}
+              className="text-xs h-7 px-3"
+            >
+              Todos ({empresasAtivas.length})
+            </Button>
+            <Button
+              type="button"
+              variant={filtroSite === "com_site" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setFiltroSite("com_site")}
+              className="text-xs h-7 px-3 gap-1"
+            >
+              <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+              <span>Com Site ({totalComSite})</span>
+            </Button>
+            <Button
+              type="button"
+              variant={filtroSite === "sem_site" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setFiltroSite("sem_site")}
+              className="text-xs h-7 px-3"
+            >
+              Sem Site ({totalSemSite})
+            </Button>
+          </div>
+        </div>
+
+        {/* LISTAGEM DE LEADS */}
+        {leadsFiltrados.length === 0 ? (
+          <div className="p-12 text-center space-y-3 bg-card rounded-xl border border-dashed">
+            <Building2 className="h-10 w-10 text-muted-foreground/60 mx-auto" />
+            <h3 className="text-base font-bold text-foreground">Nenhuma empresa encontrada</h3>
+            <p className="text-xs text-muted-foreground max-w-md mx-auto">
+              Nenhum lead corresponde aos critérios de busca ou filtros aplicados. Tente alterar o texto de busca ou o filtro de status.
+            </p>
+            {buscaLead && (
+              <Button size="sm" variant="outline" onClick={() => setBuscaLead("")} className="text-xs">
+                Limpar busca
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {leadsFiltrados.map((lead) => {
+              const temSite = Boolean(
+                lead.siteGeradoHtml || (lead.siteVersoes && lead.siteVersoes.length > 0)
+              );
+              const qtdVersoes = lead.siteVersoes?.length || (lead.siteGeradoHtml ? 1 : 0);
+
+              return (
+                <div
+                  key={lead.id}
+                  onClick={() =>
+                    navigate({
+                      search: {
+                        empresa: lead.id,
+                        tab: "site",
+                      } as never,
+                    })
+                  }
+                  className="group relative flex flex-col justify-between p-4 rounded-xl border border-border/80 bg-card hover:bg-accent/40 hover:border-primary/40 transition-all cursor-pointer shadow-xs hover:shadow-md"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-bold text-sm sm:text-base text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                        {lead.nome}
+                      </h3>
+                      {temSite ? (
+                        <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-[10px] shrink-0 font-medium gap-1">
+                          <CheckCircle2 className="h-3 w-3" />
+                          <span>Site Criado</span>
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground text-[10px] shrink-0 font-normal">
+                          Sem Site
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <span className="truncate">{lead.cidade || "Sem cidade"}</span>
+                      {lead.segmento && (
+                        <>
+                          <span>•</span>
+                          <span className="truncate">{lead.segmento}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3 mt-3 border-t border-border/50 text-xs">
+                    <span className="text-[11px] text-muted-foreground">
+                      {temSite ? `${qtdVersoes} versão(ões)` : "Pronto para criar"}
+                    </span>
+                    <span className="text-primary font-semibold text-xs flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                      Abrir Estúdio
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   }
 
+  // =========================================================================
+  // TELA DO ESTÚDIO DE CRIAÇÃO (COM EMPRESA SELECIONADA)
+  // =========================================================================
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-5 max-w-[1700px] mx-auto min-h-screen flex flex-col">
       {/* CABEÇALHO SUPERIOR */}
@@ -973,7 +930,7 @@ Pilares de Conteúdo:
               Estúdio de Criação Profissional
             </Badge>
             <Badge variant="secondary" className="text-[10px] text-muted-foreground">
-              Multi-IAs · GSAP ScrollTrigger · Anti-IA Bespoke
+              Multi-IAs · Prompt Padrão · One-Page
             </Badge>
           </div>
           <div className="flex items-center gap-2.5 flex-wrap">
@@ -981,50 +938,45 @@ Pilares de Conteúdo:
               <Palette className="h-6 w-6 text-primary shrink-0" />
               <span>Estúdio de Criação</span>
             </h1>
-            {empresa && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-muted-foreground/40 font-light text-xl">/</span>
-                <span className="text-xl sm:text-2xl font-extrabold bg-gradient-to-r from-primary via-indigo-600 to-violet-600 bg-clip-text text-transparent">
-                  {empresa.nome}
-                </span>
-                <Badge variant="outline" className="text-xs font-normal border-primary/30 text-muted-foreground">
-                  {empresa.cidade} · {empresa.segmento}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-muted-foreground/40 font-light text-xl">/</span>
+              <span className="text-xl sm:text-2xl font-extrabold bg-gradient-to-r from-primary via-indigo-600 to-violet-600 bg-clip-text text-transparent">
+                {empresa.nome}
+              </span>
+              <Badge variant="outline" className="text-xs font-normal border-primary/30 text-muted-foreground">
+                {empresa.cidade} · {empresa.segmento}
+              </Badge>
+              {versoes.length > 0 && (
+                <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-xs font-medium gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Site Ativo ({versoes.length} versão{versoes.length === 1 ? "" : "ões"})
                 </Badge>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Criação e refinamento de sites profissionais com GSAP, chat de prompts iterativos, paletas cromáticas e briefings.
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Criação e refinamento de sites profissionais com IA, controle de prompt mestre, copys contextuais e chat interativo.
           </p>
         </div>
 
-        {/* SELETOR DE EMPRESA RÁPIDO & AGENTE IA */}
+        {/* BOTÃO PARA ESCOLHER OUTRA EMPRESA */}
         <div className="flex items-center gap-2.5 flex-wrap">
-          <SeletorRapidoAgenteIa
-            agenteId={agenteSelecionado.id}
-            onSelecionarAgente={setAgenteSelecionado}
-            labelPre="Agente Ativo:"
-          />
-
-          <div className="flex items-center gap-2 bg-card p-2 rounded-xl border shadow-xs min-w-[260px]">
-            <Building2 className="h-4 w-4 text-primary shrink-0 ml-1" />
-            <div className="flex-1 min-w-0">
-              <label className="text-[10px] font-semibold uppercase text-muted-foreground block leading-none">
-                Empresa Ativa
-              </label>
-              <select
-                value={empresa.id}
-                onChange={(e) => handleTrocarEmpresa(e.target.value)}
-                className="w-full bg-transparent text-xs font-bold text-foreground focus:outline-none truncate pt-0.5 cursor-pointer"
-              >
-                {empresasAtivas.map((e) => (
-                  <option key={e.id} value={e.id} className="bg-popover text-popover-foreground">
-                    {e.nome} ({e.cidade} · {e.segmento})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              navigate({
+                search: {
+                  empresa: undefined,
+                  tab: abaAtiva,
+                } as never,
+              })
+            }
+            className="text-xs gap-1.5 border-border hover:bg-muted font-medium h-9"
+          >
+            <ArrowLeft className="h-3.5 w-3.5 text-muted-foreground" />
+            <span>Escolher Outra Empresa</span>
+          </Button>
         </div>
       </div>
 
@@ -1048,15 +1000,6 @@ Pilares de Conteúdo:
           >
             <Palette className="h-3.5 w-3.5 text-pink-500" />
             <span>Identidade Visual & Paleta Cromática</span>
-          </Button>
-          <Button
-            variant={abaAtiva === "prompts" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setAbaAtiva("prompts")}
-            className="text-xs gap-1.5"
-          >
-            <FileText className="h-3.5 w-3.5 text-blue-500" />
-            <span>Prompts & Briefings Textuais</span>
           </Button>
         </div>
 
@@ -1111,179 +1054,8 @@ Pilares de Conteúdo:
                   onSelecionarAgente={setAgenteSelecionado}
                 />
 
-                {/* 2. COMBO-BOX GLOBAL: DIRETRIZES ANTI-IA BESPOKE */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                      <ShieldCheck className={`h-3.5 w-3.5 ${usarAntiIaBespoke ? "text-emerald-600" : "text-muted-foreground"}`} />
-                      <span>Diretrizes Anti-IA Bespoke</span>
-                    </label>
-                    <Badge
-                      variant={usarAntiIaBespoke ? "default" : "outline"}
-                      className="text-[9px] px-1.5 py-0 h-4 font-normal"
-                    >
-                      {usarAntiIaBespoke ? "Ativado" : "Desativado"}
-                    </Badge>
-                  </div>
-                  <Select
-                    value={usarAntiIaBespoke ? "ativado" : "desativado"}
-                    onValueChange={(val) => {
-                      const ativo = val === "ativado";
-                      setUsarAntiIaBespoke(ativo);
-                      if (empresa) updateEmpresa(empresa.id, { estudioUsarAntiIaBespoke: ativo });
-                      toast.info(ativo ? "Diretrizes Anti-IA Bespoke ativadas para todas as IAs." : "Diretrizes Anti-IA desativadas (geração livre).");
-                    }}
-                  >
-                    <SelectTrigger className="h-8 text-xs bg-background font-medium">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ativado" className="text-xs">
-                        🛡️ Ativado — 100% Anti-IA (Sem neon, sem marquee, GSAP clean)
-                      </SelectItem>
-                      <SelectItem value="desativado" className="text-xs">
-                        ⚪ Desativado — Geração Livre (Sem restrições estritas)
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* 2.1 ARQUITETURA & MOTOR DE ROLAGEM (SCROLL ENGINE) */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                      <Layers className="h-3.5 w-3.5 text-blue-500" />
-                      <span>Motor de Rolagem & Arquitetura</span>
-                    </label>
-                    <Badge
-                      variant="outline"
-                      className="text-[9px] px-1.5 py-0 h-4 font-normal border-blue-500/30 text-blue-600 dark:text-blue-400"
-                    >
-                      {motorScroll === "scrollcraft_canvas"
-                        ? "Apple Canvas"
-                        : motorScroll === "scrollcraft_dimensional"
-                        ? "Dimensional"
-                        : motorScroll === "gsap_lenis_split"
-                        ? "GSAP Lenis"
-                        : "Nenhum"}
-                    </Badge>
-                  </div>
-                  <Select
-                    value={motorScroll}
-                    onValueChange={(val: any) => {
-                      setMotorScroll(val);
-                      if (empresa) updateEmpresa(empresa.id, { estudioMotorScroll: val });
-                      toast.info(
-                        val === "scrollcraft_canvas"
-                          ? "Motor ScrollCraft Canvas ativado (estilo Apple / singhharsh1708)."
-                          : val === "scrollcraft_dimensional"
-                          ? "Motor Scroll-Craft Dimensional ativado (scrollytelling nateherkai)."
-                          : val === "gsap_lenis_split"
-                          ? "Motor GSAP + Lenis + SplitType ativado (padrão editorial)."
-                          : "Motor de rolagem desativado (Rolagem Nativa).",
-                      );
-                    }}
-                  >
-                    <SelectTrigger className="h-8 text-xs bg-background font-medium">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="nenhum" className="text-xs">
-                        <div className="space-y-0.5">
-                          <p className="font-semibold">Nenhum</p>
-                          <p className="text-[10px] text-muted-foreground">Rolagem nativa do navegador sem bibliotecas externas</p>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="gsap_lenis_split" className="text-xs">
-                        <div className="space-y-0.5">
-                          <p className="font-semibold">GSAP + Lenis + SplitType (Padrão Editorial)</p>
-                          <p className="text-[10px] text-muted-foreground">Rolagem a 60fps com tipografia staggered e Spotlight</p>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="scrollcraft_canvas" className="text-xs">
-                        <div className="space-y-0.5">
-                          <p className="font-semibold text-blue-600 dark:text-blue-400">ScrollCraft Canvas Scrubbing (Apple-Style)</p>
-                          <p className="text-[10px] text-muted-foreground">Canvas pinned timeline do singhharsh1708 com overlays em etapas</p>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="scrollcraft_dimensional" className="text-xs">
-                        <div className="space-y-0.5">
-                          <p className="font-semibold text-purple-600 dark:text-purple-400">Scroll-Craft Dimensional Hero (nateherkai)</p>
-                          <p className="text-[10px] text-muted-foreground">3 planos de profundidade com oclusão real e signature move</p>
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* 2.2 GESTÃO DE SKILLS DE IA & DIRETRIZES DA ANTHROPIC */}
-                <div className="rounded-md border border-border/70 bg-background/80 p-2.5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <Sparkles className="h-3.5 w-3.5 text-primary" />
-                      <span className="text-xs font-semibold text-foreground">Skills de IA</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-primary/30 text-primary">
-                        {skills.filter((s) => s.ativa).length} ativa{skills.filter((s) => s.ativa).length === 1 ? "" : "s"}
-                      </Badge>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setModalSkillsOpen(true)}
-                        className="h-5 px-1.5 text-[10px] text-primary hover:bg-primary/10"
-                        title="Gerenciar e adicionar novas skills"
-                      >
-                        + Nova Skill
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5 pt-0.5">
-                    {skills.slice(0, 3).map((s) => (
-                      <div key={s.id} className="flex items-center justify-between gap-2 text-xs">
-                        <label className="flex items-center gap-2 cursor-pointer truncate flex-1">
-                          <Checkbox
-                            checked={s.ativa}
-                            onCheckedChange={(checked) => {
-                              const ativo = checked === true;
-                              const atualizadas = skills.map((sk) =>
-                                sk.id === s.id ? { ...sk, ativa: ativo } : sk,
-                              );
-                              handleSkillsChange(atualizadas);
-                            }}
-                            className="h-3.5 w-3.5"
-                          />
-                          <span className="truncate text-[11px] text-foreground font-medium">
-                            {s.nome}
-                          </span>
-                        </label>
-                        {s.sistema ? (
-                          <Badge variant="secondary" className="text-[8px] px-1 py-0 h-3 font-normal shrink-0">
-                            {s.categoria || "sistema"}
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-[8px] px-1 py-0 h-3 font-normal text-primary border-primary/30 shrink-0">
-                            custom
-                          </Badge>
-                        )}
-                      </div>
-                    ))}
-                    {skills.length > 3 && (
-                      <button
-                        type="button"
-                        onClick={() => setModalSkillsOpen(true)}
-                        className="text-[10px] text-primary hover:underline block pt-0.5 font-medium"
-                      >
-                        + ver mais {skills.length - 3} skill{skills.length - 3 === 1 ? "" : "s"}...
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* 3. UPLOADS COMPACTOS (LOGO & DIRETRIZES .MD) */}
-                <div className="grid grid-cols-2 gap-2 pt-1">
+                {/* 2. UPLOADS COMPACTOS (LOGO & DIRETRIZES .MD) */}
+                <div className="grid grid-cols-2 gap-2 pt-0.5">
                   {/* Upload de Logo */}
                   <div className="border border-border/80 rounded-md p-2 bg-background flex flex-col justify-between text-xs space-y-1">
                     <div className="flex items-center justify-between">
@@ -1365,13 +1137,13 @@ Pilares de Conteúdo:
                   </div>
                 </div>
 
-                {/* BOTÕES DE GERAÇÃO: GERAR DIRETO OU VISUALIZAR & REFINAR PROMPT */}
-                <div className="space-y-1.5 pt-0.5">
+                {/* BOTÕES DE GERAÇÃO E CONTROLE DE PROMPTS */}
+                <div className="space-y-2 pt-1">
                   <Button
                     onClick={() => handleGerarSite()}
                     disabled={gerandoSite || refinandoSite}
                     size="sm"
-                    className="w-full text-xs h-9 gap-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-primary text-white hover:opacity-90 shadow-xs"
+                    className="w-full text-xs h-9 gap-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-primary text-white hover:opacity-90 shadow-xs font-semibold"
                   >
                     {gerandoSite ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1385,20 +1157,34 @@ Pilares de Conteúdo:
                     </span>
                   </Button>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  {/* 3 BOTÕES ALINHADOS: PROMPT PADRÃO, CONTEÚDO, VISUALIZAR E REFINAR */}
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setModalPromptPadraoOpen(true)}
+                      disabled={gerandoSite || refinandoSite}
+                      className="text-[11px] h-8 px-1 gap-1 border-primary/30 text-primary hover:bg-primary/5 font-medium truncate"
+                      title="Editar o Prompt Padrão mestre utilizado na geração"
+                    >
+                      <Sliders className="h-3 w-3 shrink-0" />
+                      <span className="truncate">Prompt Padrão</span>
+                    </Button>
+
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       onClick={() => setModalConteudoOpen(true)}
                       disabled={gerandoSite || refinandoSite}
-                      className="text-xs h-8 gap-1.5 border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 font-medium"
+                      className="text-[11px] h-8 px-1 gap-1 border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 font-medium truncate relative"
                       title="Definir estrutura de seções e copys do site"
                     >
-                      <FileText className="h-3.5 w-3.5" />
-                      <span>Conteúdo</span>
+                      <FileText className="h-3 w-3 shrink-0" />
+                      <span className="truncate">Conteúdo</span>
                       {empresa?.siteConteudoCustomizado && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 ml-0.5" title="Conteúdo customizado salvo" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 ml-0.5 shrink-0" title="Conteúdo customizado salvo" />
                       )}
                     </Button>
 
@@ -1408,11 +1194,11 @@ Pilares de Conteúdo:
                       size="sm"
                       onClick={() => setModalPromptOpen(true)}
                       disabled={gerandoSite || refinandoSite}
-                      className="text-xs h-8 gap-1.5 border-primary/30 text-primary hover:bg-primary/5"
-                      title="Visualizar e refinar o prompt da IA antes de enviar"
+                      className="text-[11px] h-8 px-1 gap-1 border-indigo-500/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10 font-medium truncate"
+                      title="Visualizar e refinar o prompt final completo enviado à IA"
                     >
-                      <Eye className="h-3.5 w-3.5" />
-                      <span>Visualizar & Refinar</span>
+                      <Eye className="h-3 w-3 shrink-0" />
+                      <span className="truncate">Visualizar & Refinar</span>
                     </Button>
                   </div>
                 </div>
@@ -1551,104 +1337,78 @@ Pilares de Conteúdo:
                 </TabsContent>
 
                 {/* ================================= */}
-                {/* ABA 3: HISTÓRICO & EXCLUSÃO DE VERSÕES */}
+                {/* ABA 3: HISTÓRICO DE VERSÕES       */}
                 {/* ================================= */}
-                <TabsContent value="historico" className="flex-1 flex flex-col min-h-0 pt-2 space-y-2.5 mt-0">
-                  <div className="flex items-center justify-between gap-2 shrink-0">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setModalComparadorOpen(true)}
-                      disabled={versoes.length < 2}
-                      className="text-xs h-7 gap-1 border-primary/30 text-primary hover:bg-primary/5 flex-1"
-                    >
-                      <Columns className="h-3 w-3" />
-                      <span>Comparar Versões em Modal</span>
-                    </Button>
-
+                <TabsContent value="historico" className="flex-1 flex flex-col min-h-0 pt-2 space-y-2 mt-0">
+                  <div className="flex items-center justify-between px-1">
+                    <span className="text-[11px] font-semibold text-muted-foreground">
+                      {versoes.length} versão{versoes.length === 1 ? "" : "ões"} gerada{versoes.length === 1 ? "" : "s"}
+                    </span>
                     {versoes.length > 0 && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
+                      <button
+                        type="button"
                         onClick={handleLimparTodosSites}
-                        className="text-xs h-7 text-destructive hover:bg-destructive/10 px-2"
-                        title="Apagar todas as versões"
+                        className="text-[10px] text-destructive hover:underline flex items-center gap-1"
                       >
                         <Trash2 className="h-3 w-3" />
-                      </Button>
+                        Limpar Tudo
+                      </button>
                     )}
                   </div>
 
-                  {/* LISTA DAS VERSÕES SALVAS COM BOTÃO DE LIXEIRA */}
-                  <div className="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[380px]">
+                  <div className="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[360px] text-xs">
                     {versoes.length === 0 ? (
-                      <div className="p-4 text-center text-xs text-muted-foreground border border-dashed rounded-lg">
-                        Nenhuma versão gerada ainda. Clique em "Gerar Novo Site".
+                      <div className="p-4 text-center text-muted-foreground border border-dashed rounded-lg bg-muted/10">
+                        Nenhuma versão anterior gravada.
                       </div>
                     ) : (
-                      versoes.map((v, i) => {
-                        const isOficial = siteHtml === v.html;
-                        return (
-                          <div
-                            key={v.id || i}
-                            className={`p-2.5 rounded-lg border text-xs transition-all ${
-                              isOficial
-                                ? "border-primary bg-primary/5 ring-1 ring-primary"
-                                : "border-border/80 bg-background hover:bg-muted/40"
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-1">
-                              <div>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="font-bold text-foreground text-xs">{v.provedor}</span>
-                                  {isOficial && (
-                                    <Badge variant="default" className="text-[9px] px-1 py-0 h-4 bg-emerald-600">
-                                      Oficial
-                                    </Badge>
-                                  )}
-                                </div>
-                                <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{v.modelo}</p>
-                              </div>
-
-                              <div className="flex items-center gap-1">
-                                <span className="text-[9px] text-muted-foreground">
-                                  {v.data ? format(new Date(v.data), "dd/MM HH:mm") : ""}
-                                </span>
-                                {/* BOTÃO DE LIXEIRA PARA APAGAR VERSÃO */}
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleApagarVersao(v.id || String(i));
-                                  }}
-                                  className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 ml-1"
-                                  title="Apagar esta versão"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </div>
-
-                            <div className="mt-2 flex items-center justify-between pt-1.5 border-t border-border/40 text-[10px] text-muted-foreground">
-                              <span>{v.html ? `${(v.html.length / 1024).toFixed(1)} KB` : "Vazia"}</span>
-                              {!isOficial ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleSelecionarVersaoAtiva(v)}
-                                  className="text-primary font-semibold hover:underline"
-                                >
-                                  Definir como Oficial ➔
-                                </button>
-                              ) : (
-                                <span className="text-emerald-600 font-semibold flex items-center gap-0.5">
-                                  <CheckCircle2 className="h-3 w-3" /> Versão Ativa
-                                </span>
-                              )}
-                            </div>
+                      versoes.map((v, i) => (
+                        <div
+                          key={v.id}
+                          className={`p-2.5 rounded-lg border transition-all text-xs flex flex-col gap-1.5 ${
+                            v.html === siteHtml
+                              ? "border-primary bg-primary/5 shadow-xs"
+                              : "border-border bg-card hover:bg-muted/30"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-semibold text-foreground truncate">
+                              #{versoes.length - i} · {v.provedor}
+                            </span>
+                            {v.html === siteHtml && (
+                              <Badge className="text-[9px] px-1.5 py-0 h-4 bg-primary text-primary-foreground">
+                                Atual
+                              </Badge>
+                            )}
                           </div>
-                        );
-                      })
+                          <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                            <span>{v.modelo}</span>
+                            <span>{v.data ? format(new Date(v.data), "dd/MM HH:mm") : ""}</span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 pt-1 border-t border-border/50 justify-end">
+                            {v.html !== siteHtml && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleSelecionarVersaoAtiva(v)}
+                                className="h-6 text-[10px] px-2"
+                              >
+                                Restaurar
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleApagarVersao(v.id)}
+                              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                              title="Excluir esta versão"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
                     )}
                   </div>
                 </TabsContent>
@@ -1657,209 +1417,208 @@ Pilares de Conteúdo:
           )}
 
           {/* ========================================== */}
-          {/* COLUNA DIREITA: VISUALIZAÇÃO & TOOLBAR */}
+          {/* COLUNA DIREITA: VISUALIZADOR DO SITE (PREVIEW) */}
           {/* ========================================== */}
-          <main className="flex-1 min-w-0 w-full space-y-3 flex flex-col">
-            {/* TOOLBAR SUPERIOR DO SITE */}
-            <div className="flex flex-wrap items-center justify-between gap-2.5 p-2.5 rounded-xl border border-border/80 bg-card">
-              {/* LADO ESQUERDO: TOGGLE BARRA LATERAL + SELETOR DISPOSITIVO */}
+          <main className="flex-1 w-full min-w-0 space-y-3 flex flex-col">
+            {/* BARRA DE FERRAMENTAS DO PREVIEW */}
+            <div className="flex flex-wrap items-center justify-between gap-2 bg-card border border-border/80 rounded-xl p-2.5 shadow-xs">
               <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setPainelEsquerdoAberto(!painelEsquerdoAberto)}
-                  className="h-8 text-xs gap-1.5"
-                  title={painelEsquerdoAberto ? "Ocultar painel lateral" : "Mostrar painel lateral"}
-                >
-                  {painelEsquerdoAberto ? (
-                    <>
-                      <PanelLeftClose className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">Recolher</span>
-                    </>
-                  ) : (
-                    <>
-                      <PanelLeftOpen className="h-3.5 w-3.5 text-primary" />
-                      <span className="font-semibold text-primary">Painel do Estúdio</span>
-                    </>
-                  )}
-                </Button>
-
-                {/* CONTROLES DE DISPOSITIVO */}
-                <div className="flex items-center bg-muted p-0.5 rounded-lg border">
+                {/* Seletor de Dispositivo */}
+                <div className="flex items-center bg-muted/60 p-0.5 rounded-lg border border-border/60">
                   <Button
                     size="sm"
                     variant={dispositivo === "desktop" ? "default" : "ghost"}
                     onClick={() => setDispositivo("desktop")}
-                    className="h-7 px-2 text-xs gap-1"
-                    title="Visualização Desktop"
+                    className="h-7 px-2.5 text-xs gap-1"
+                    title="Desktop (100% largura)"
                   >
                     <Monitor className="h-3.5 w-3.5" />
-                    <span className="hidden md:inline">Desktop</span>
+                    <span className="hidden sm:inline">Desktop</span>
                   </Button>
                   <Button
                     size="sm"
                     variant={dispositivo === "tablet" ? "default" : "ghost"}
                     onClick={() => setDispositivo("tablet")}
-                    className="h-7 px-2 text-xs gap-1"
-                    title="Visualização Tablet (768px)"
+                    className="h-7 px-2.5 text-xs gap-1"
+                    title="Tablet (768px)"
                   >
                     <Tablet className="h-3.5 w-3.5" />
-                    <span className="hidden md:inline">Tablet</span>
+                    <span className="hidden sm:inline">Tablet</span>
                   </Button>
                   <Button
                     size="sm"
                     variant={dispositivo === "mobile" ? "default" : "ghost"}
                     onClick={() => setDispositivo("mobile")}
-                    className="h-7 px-2 text-xs gap-1"
-                    title="Visualização Mobile (375px)"
+                    className="h-7 px-2.5 text-xs gap-1"
+                    title="Mobile (375px)"
                   >
                     <Smartphone className="h-3.5 w-3.5" />
-                    <span className="hidden md:inline">Mobile</span>
+                    <span className="hidden sm:inline">Mobile</span>
                   </Button>
                 </div>
+
+                {/* Status da Versão Atual */}
+                {siteHtml && (
+                  <Badge variant="outline" className="text-[11px] gap-1 font-normal border-border text-muted-foreground hidden sm:flex">
+                    <CheckCircle className="h-3 w-3 text-emerald-500" />
+                    <span>{siteHtml.length.toLocaleString()} caracteres</span>
+                  </Badge>
+                )}
               </div>
 
-              {/* LADO DIREITO: AÇÕES E EXPORTAÇÃO */}
+              {/* Botões de Ação do Preview */}
               <div className="flex items-center gap-1.5 flex-wrap">
-                {/* BOTÃO NOVA ABA */}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleAbrirNovaAba}
-                  disabled={!siteHtml}
-                  className="h-8 text-xs gap-1 text-muted-foreground hover:text-foreground"
-                  title="Abrir em Nova Aba do Navegador"
-                >
-                  <ExternalLink className="h-3.5 w-3.5 text-primary" />
-                  <span className="hidden sm:inline">Nova Aba</span>
-                </Button>
+                {versoes.length > 1 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setModalComparadorOpen(true)}
+                    className="h-7 text-xs gap-1"
+                    title="Comparar versões lado a lado"
+                  >
+                    <Columns className="h-3.5 w-3.5 text-blue-500" />
+                    <span className="hidden md:inline">Comparar Versões</span>
+                  </Button>
+                )}
 
-                {/* BOTÃO COMPARAR VERSÕES EM MODAL */}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setModalComparadorOpen(true)}
-                  disabled={versoes.length < 2}
-                  className="h-8 text-xs gap-1.5"
-                  title={versoes.length < 2 ? "Gere pelo menos 2 versões para comparar lado a lado" : "Comparar Versões"}
-                >
-                  <Columns className="h-3.5 w-3.5 text-primary" />
-                  <span className="hidden sm:inline">Comparar</span>
-                  {versoes.length >= 2 && (
-                    <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4">
-                      {versoes.length}
-                    </Badge>
-                  )}
-                </Button>
-
-                {/* CÓDIGO HTML */}
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => setModalCodigoOpen(true)}
                   disabled={!siteHtml}
-                  className="h-8 text-xs gap-1"
-                  title="Ver Código HTML5"
+                  className="h-7 text-xs gap-1"
+                  title="Ver código-fonte HTML completo"
                 >
                   <Code2 className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Código</span>
+                  <span className="hidden sm:inline">Ver Código</span>
                 </Button>
 
-                {/* BAIXAR HTML */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleAbrirNovaAba}
+                  disabled={!siteHtml}
+                  className="h-7 text-xs gap-1"
+                  title="Abrir site em uma nova aba completa"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Nova Aba</span>
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setFullscreenOpen(true)}
+                  disabled={!siteHtml}
+                  className="h-7 text-xs gap-1"
+                  title="Visualizar em tela cheia"
+                >
+                  <Maximize2 className="h-3.5 w-3.5" />
+                </Button>
+
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={handleBaixarHtml}
                   disabled={!siteHtml}
-                  className="h-8 text-xs gap-1"
-                  title="Baixar arquivo HTML puro"
+                  className="h-7 text-xs gap-1"
+                  title="Baixar arquivo index.html"
                 >
                   <Download className="h-3.5 w-3.5" />
-                  <span className="hidden md:inline">HTML</span>
+                  <span className="hidden md:inline">Baixar HTML</span>
                 </Button>
 
-                {/* BAIXAR ZIP */}
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={handleBaixarZip}
                   disabled={!siteHtml}
-                  className="h-8 text-xs gap-1 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
-                  title="Baixar ZIP completo com README e configs"
+                  className="h-7 text-xs gap-1 bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20"
+                  title="Baixar projeto compactado em ZIP com instruções e index.html"
                 >
                   <Archive className="h-3.5 w-3.5" />
-                  <span className="hidden md:inline">ZIP</span>
+                  <span className="hidden md:inline">Baixar ZIP</span>
                 </Button>
 
-                {/* GITHUB */}
                 <Button
                   size="sm"
+                  variant="outline"
                   onClick={() => setModalGithubOpen(true)}
                   disabled={!siteHtml}
-                  className="h-8 text-xs gap-1 bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
+                  className="h-7 text-xs gap-1"
+                  title="Exportar código para repositório GitHub"
                 >
                   <Github className="h-3.5 w-3.5" />
-                  <span className="hidden md:inline">GitHub</span>
-                </Button>
-
-                {/* TELA CHEIA */}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setFullscreenOpen(true)}
-                  disabled={!siteHtml}
-                  className="h-8 w-8 p-0"
-                  title="Visualizar em Tela Cheia"
-                >
-                  <Maximize2 className="h-4 w-4" />
+                  <span className="hidden lg:inline">GitHub</span>
                 </Button>
               </div>
             </div>
 
-            {/* ÁREA CENTRAL DO IFRAME RESPONSIVO */}
-            {siteHtml ? (
-              <div className="flex-1 flex justify-center bg-stone-950 p-3 sm:p-5 rounded-xl border border-stone-800 shadow-xl overflow-hidden min-h-[580px]">
-                <div
-                  style={{
-                    width: dispositivo === "desktop" ? "100%" : dispositivo === "tablet" ? "768px" : "375px",
-                    height: "100%",
-                    minHeight: "560px",
-                    transition: "width 0.3s ease",
-                  }}
-                  className="rounded-lg overflow-hidden border border-stone-800 bg-white"
-                >
-                  <iframe
-                    title="Live Preview do Site GSAP"
-                    srcDoc={siteHtml}
-                    className="w-full h-full min-h-[560px] border-0"
-                    sandbox="allow-scripts allow-same-origin allow-popups"
-                  />
-                </div>
-              </div>
-            ) : (
-              <Card className="border-border flex-1 flex items-center justify-center min-h-[540px]">
-                <CardContent className="p-12 text-center space-y-4 max-w-lg">
-                  <div className="size-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto">
+            {/* CONTAINER DO IFRAME RESPONSIVO */}
+            <div className="flex-1 bg-muted/40 rounded-xl border border-border/80 p-2 sm:p-4 flex items-center justify-center min-h-[580px] overflow-hidden">
+              {!siteHtml ? (
+                <div className="text-center p-8 max-w-md space-y-4">
+                  <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto shadow-inner">
                     <Globe className="h-8 w-8" />
                   </div>
                   <div className="space-y-1">
-                    <h3 className="text-base font-bold text-foreground">Nenhum site gerado para esta empresa ainda</h3>
+                    <h3 className="text-base font-bold text-foreground">Nenhum site gerado ainda</h3>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Selecione o modelo de IA no painel à esquerda, confirme as diretrizes Anti-IA Bespoke e clique em <strong>"Gerar Novo Site"</strong> para criar um projeto cinematográfico One-Page com GSAP, Lenis, SplitType e tokens visuais shadcn/ui.
+                      Selecione um agente de IA no painel ao lado e clique em{" "}
+                      <strong className="text-foreground">"Gerar Novo Site"</strong> para criar a primeira versão
+                      cinematográfica da landing page.
                     </p>
                   </div>
                   <Button
                     onClick={() => handleGerarSite()}
                     disabled={gerandoSite}
                     size="sm"
-                    className="gap-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-primary text-white"
+                    className="text-xs gap-1.5 bg-gradient-to-r from-blue-600 to-primary text-white"
                   >
-                    {gerandoSite ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                    <span>Gerar Primeiro Site Agora</span>
+                    {gerandoSite ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5" />
+                    )}
+                    <span>Gerar Agora com {agenteSelecionado.nome}</span>
                   </Button>
-                </CardContent>
-              </Card>
-            )}
+                </div>
+              ) : (
+                <div
+                  className={`transition-all duration-300 h-full flex flex-col bg-background rounded-lg shadow-lg border border-border overflow-hidden ${
+                    dispositivo === "mobile"
+                      ? "w-[375px] max-w-full"
+                      : dispositivo === "tablet"
+                      ? "w-[768px] max-w-full"
+                      : "w-full"
+                  }`}
+                  style={{ minHeight: "680px", height: "calc(100vh - 270px)" }}
+                >
+                  {/* BARRA SUPERIOR SIMULADA DE NAVEGADOR */}
+                  <div className="h-7 bg-muted/80 border-b border-border/60 px-3 flex items-center justify-between gap-2 shrink-0 select-none">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2.5 h-2.5 rounded-full bg-red-400/80" />
+                      <div className="w-2.5 h-2.5 rounded-full bg-amber-400/80" />
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-400/80" />
+                    </div>
+                    <div className="flex-1 max-w-xs mx-auto bg-background/80 rounded px-2 py-0.5 text-[10px] text-muted-foreground truncate text-center border border-border/40 font-mono">
+                      https://{String(empresa.nome || "site").toLowerCase().replace(/[^a-z0-9]/g, "")}.com.br
+                    </div>
+                    <div className="text-[10px] text-muted-foreground font-mono">
+                      {dispositivo === "desktop" ? "100%" : dispositivo === "tablet" ? "768px" : "375px"}
+                    </div>
+                  </div>
+
+                  {/* IFRAME COM O CÓDIGO HTML GERADO */}
+                  <iframe
+                    title={`Preview - ${empresa.nome}`}
+                    srcDoc={siteHtml}
+                    className="w-full flex-1 border-0 bg-white"
+                    sandbox="allow-scripts allow-same-origin allow-popups"
+                  />
+                </div>
+              )}
+            </div>
           </main>
         </div>
       )}
@@ -1899,60 +1658,6 @@ Pilares de Conteúdo:
               toast.success(`Logo definido como a marca oficial de ${empresa.nome} no Estúdio!`);
             }}
           />
-        </div>
-      )}
-
-      {/* CONTEÚDO DA ABA 3: PROMPTS & BRIEFINGS TEXTUAIS */}
-      {abaAtiva === "prompts" && (
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-2">
-            {TIPOS_PROMPTS.map((tp) => (
-              <Button
-                key={tp.value}
-                variant={tipoPrompt === tp.value ? "default" : "outline"}
-                size="sm"
-                onClick={() => setTipoPrompt(tp.value)}
-                className="text-xs"
-              >
-                {tp.label}
-              </Button>
-            ))}
-          </div>
-
-          <Card className="border-border">
-            <CardHeader className="pb-3 border-b">
-              <CardTitle className="text-xs font-bold uppercase flex items-center justify-between">
-                <span>Briefing: {TIPOS_PROMPTS.find((t) => t.value === tipoPrompt)?.label}</span>
-                <Badge variant="outline" className="text-[10px] font-normal uppercase">
-                  {empresa.nome} ({empresa.cidade})
-                </Badge>
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Pronto para ser copiado e utilizado em qualquer LLM externa ou ferramenta de desenvolvimento.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-4">
-              <div className="relative">
-                <Textarea
-                  value={gerarPromptTexto(tipoPrompt)}
-                  readOnly
-                  rows={16}
-                  className="font-mono text-xs leading-relaxed bg-muted/20"
-                />
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(gerarPromptTexto(tipoPrompt));
-                    toast.success("Briefing copiado para a área de transferência!");
-                  }}
-                  className="absolute top-3 right-3 text-xs gap-1 shadow-xs"
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                  Copiar Briefing
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       )}
 
@@ -2051,12 +1756,15 @@ Pilares de Conteúdo:
         </DialogContent>
       </Dialog>
 
-      {/* MODAL DE GESTÃO DE SKILLS DE IA */}
-      <ModalGerenciarSkills
-        open={modalSkillsOpen}
-        onOpenChange={setModalSkillsOpen}
-        skills={skills}
-        onSkillsChange={handleSkillsChange}
+      {/* MODAL DE PROMPT PADRÃO MESTRE */}
+      <ModalPromptPadrao
+        open={modalPromptPadraoOpen}
+        onOpenChange={setModalPromptPadraoOpen}
+        promptAtual={promptPadrao}
+        onSalvar={(novoPrompt) => {
+          setPromptPadrao(novoPrompt);
+          savePromptPadrao(novoPrompt);
+        }}
       />
 
       {/* MODAL DE CONTEÚDO E ESTRUTURA DO SITE */}
@@ -2072,17 +1780,14 @@ Pilares de Conteúdo:
         }}
       />
 
-      {/* MODAL PARA VISUALIZAR & REFINAR PROMPT DA IA */}
+      {/* MODAL PARA VISUALIZAR & REFINAR PROMPT FINAL DA IA */}
       <ModalRefinarPromptIa
         open={modalPromptOpen}
         onOpenChange={setModalPromptOpen}
         empresaNome={empresa.nome}
         agenteNome={agenteSelecionado.nome}
         modeloNome={agenteSelecionado.modelo}
-        usarAntiIaBespoke={usarAntiIaBespoke}
-        skillsAtivasCount={skills.filter((s) => s.ativa).length}
-        motorScroll={motorScroll}
-        conteudoSite={empresa.siteConteudoCustomizado}
+        initialPromptFinal={promptMontado.promptFinal}
         initialPromptSystem={promptMontado.promptSystem}
         initialPromptUser={promptMontado.promptUser}
         onConfirmarEGerar={(customizado) => handleGerarSite(customizado)}
