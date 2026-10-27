@@ -47,8 +47,9 @@ export interface GerarSiteInput {
   modeloPreferencial?: string;
   usarAntiIaBespoke?: boolean;
   usarSkillsClaude?: boolean;
-  motorScroll?: "gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional";
+  motorScroll?: "nenhum" | "gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional";
   skillsAdicionais?: Array<{ id: string; nome: string; prompt: string }>;
+  siteConteudoCustomizado?: string;
   customPromptOverride?: {
     promptSystem?: string;
     promptUser?: string;
@@ -101,7 +102,7 @@ export interface RefinarSiteInput {
   modeloPreferencial?: string;
   usarAntiIaBespoke?: boolean;
   usarSkillsClaude?: boolean;
-  motorScroll?: "gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional";
+  motorScroll?: "nenhum" | "gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional";
   skillsAdicionais?: Array<{ id: string; nome: string; prompt: string }>;
   logoBase64?: string;
   logoNomeArquivo?: string;
@@ -452,10 +453,10 @@ export function construirSiteEditorialAntiIa(
     instrucoesDesignMd?: string;
     diagnostico?: any;
     relatorio?: any;
-    motorScroll?: "gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional";
+    motorScroll?: "nenhum" | "gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional";
   },
 ): string {
-  const motor = opcoes?.motorScroll || "gsap_lenis_split";
+  const motor = opcoes?.motorScroll || "nenhum";
   const whatsappNum = (empresa.whatsapp || empresa.telefone || "54999999999").replace(/\D/g, "");
   const whatsappLink = `https://wa.me/55${whatsappNum}?text=${encodeURIComponent(
     `Olá ${empresa.nome}! Conheci o trabalho de vocês e gostaria de solicitar um orçamento para o meu projeto.`,
@@ -1319,6 +1320,7 @@ export const gerarSiteCompletoIA_ServerFn = createServerFn({ method: "POST" })
         usarSkillsClaude: data.usarSkillsClaude,
         motorScroll: data.motorScroll,
         skillsAdicionais: data.skillsAdicionais,
+        siteConteudoCustomizado: data.siteConteudoCustomizado,
         logoBase64: data.logoBase64,
         logoNomeArquivo: data.logoNomeArquivo,
         instrucoesDesignMd: data.instrucoesDesignMd,
@@ -1529,6 +1531,195 @@ Aplique esta alteração no código HTML mantendo todo o restante do site funcio
     return {
       html: generatedHtml,
       respostaAssistente: respostaTexto,
+      provider: providerUsed,
+      model: modelUsed,
+      geradoEm: new Date().toISOString(),
+    };
+  });
+
+export interface GerarConteudoSiteInput {
+  empresa: EmpresaCtx;
+  diagnostico?: any;
+  dossier360?: any;
+  relatorio?: any;
+  customKeys?: {
+    groq?: string;
+    gemini?: string;
+    openrouter?: string;
+    cerebras?: string;
+    lovable?: string;
+    ollamaBaseUrl?: string;
+    openai?: string;
+    anthropic?: string;
+    perplexity?: string;
+  };
+  provedorPreferencial?: string;
+  modeloPreferencial?: string;
+}
+
+export interface GerarConteudoSiteOutput {
+  conteudoFormatado: string;
+  provider: string;
+  model: string;
+  geradoEm: string;
+}
+
+export function gerarConteudoSiteFallback(empresa: EmpresaCtx, diagnostico?: any, dossier360?: any): string {
+  const nome = empresa.nome || "Empresa";
+  const segmento = empresa.segmento || "Serviços Especializados";
+  const cidade = empresa.cidade || "Serra Gaúcha";
+  const diferenciais =
+    dossier360?.diferenciais && Array.isArray(dossier360.diferenciais) && dossier360.diferenciais.length > 0
+      ? dossier360.diferenciais.slice(0, 3)
+      : ["Atendimento consultivo e pontual", "Garantia formal de qualidade técnica", "Materiais nobres de alta durabilidade"];
+  const servicos = empresa.areaAtuacao
+    ? empresa.areaAtuacao.split(/[,;\n]/).map((s: string) => s.trim()).filter(Boolean).slice(0, 4)
+    : [`Soluções completas em ${segmento}`, "Projetos sob medida de alto padrão", "Consultoria e execução técnica especializada"];
+
+  return `# Estrutura de Seções e Conteúdo do Site: ${nome}
+
+## 1. ARQUITETURA E ESTRUTURA DE SEÇÕES RECOMENDADA
+1. **Cabeçalho (Navbar Sticky)**: Logotipo oficial, links de ancoragem (#hero, #solucoes, #diferenciais, #sobre, #faq, #contato) e botão de ação rápida para WhatsApp.
+2. **Hero Section (Abertura de Alto Impacto)**: Título principal de autoridade focado na transformação, proposta única de valor em ${cidade}, micro-prova social e duplo CTA.
+3. **Métricas & Prova Social Rápida**: Faixa com números de destaque (anos de atuação, projetos entregues com sucesso, índice de satisfação).
+4. **Catálogo de Especialidades & Soluções**: Seção em grid editorial com detalhamento dos principais serviços prestados, destacando benefícios tangíveis.
+5. **Dores Diagnosticadas & Solução Definitiva**: Argumentos que resolvem a falta de clareza do mercado e transmitem total segurança ao cliente.
+6. **Diferenciais Técnicos & Garantias**: Destaque para normas técnicas, conformidade de materiais e atendimento dedicado.
+7. **Sobre Nós & Conexão Regional**: História autêntica, valores e compromisso com o desenvolvimento de ${cidade} e região.
+8. **Quebra de Objeções (FAQ Estratégico)**: Respostas diretas às principais dúvidas e inseguranças levantadas pelo público-alvo no Dossiê 360.
+9. **Rodapé & Fechamento de Alta Conversão**: Canal direto de atendimento com link contextualizado para o WhatsApp e dados de localização.
+
+---
+
+## 2. CONTEÚDO E COPYS COMPLETAS DE CADA SEÇÃO
+
+### Seção 1: Hero de Alto Impacto
+- **H1 (Headline Principal)**: Excelência e Precisão em ${segmento} para ${cidade} e Região
+- **Subtítulo (Proposta de Valor)**: Transformamos projetos em realidade com padrão técnico rigoroso, pontualidade inegociável e atendimento personalizado do início ao fim.
+- **CTA Principal**: Solicitar Atendimento Exclusivo via WhatsApp
+- **CTA Secundário**: Conhecer Nossas Especialidades
+- **Micro-Prova de Confiança**: Mais de 10 anos de experiência comprovada com clientes satisfeitos na Serra Gaúcha.
+
+### Seção 2: Métricas de Autoridade
+- **Métrica 1**: +500 projetos executados com excelência.
+- **Métrica 2**: 98% de satisfação e recomendação técnica.
+- **Métrica 3**: 100% de cumprimento rigoroso de prazos acordados.
+
+### Seção 3: Catálogo de Especialidades & Soluções
+${servicos.map((s: string, i: number) => `#### Especialidade 0${i + 1}: ${s}
+- **Descrição**: Soluções estruturadas para atender às demandas mais exigentes, com acabamento impecável e respeito absoluto às normas técnicas.
+- **Benefício Direto**: Máxima durabilidade, redução de custos imprevistos e tranquilidade operacional para o cliente.`).join("\n\n")}
+
+### Seção 4: Diferenciais Técnicos e Garantias
+${diferenciais.map((d: any) => `- **${typeof d === "string" ? d : d.titulo || "Qualidade Comprovada"}**: Garantimos transparência total e acompanhamento técnico em cada etapa do projeto.`).join("\n")}
+
+### Seção 5: Sobre Nós & Autoridade em ${cidade}
+- **Título**: Tradição, Rigor Técnico e Compromisso com a Nossa Região
+- **Texto**: Fundada para suprir a necessidade de serviços de alto nível em ${cidade}, a ${nome} combina experiência prática e processos modernos para entregar resultados consistentes e duradouros. Cada projeto é tratado de forma única, com acompanhamento próximo e atenção minuciosa aos detalhes.
+
+### Seção 6: Quebra de Objeções (FAQ Estratégico)
+- **Pergunta 1**: Como funciona o processo de orçamento e início dos trabalhos?
+  - **Resposta**: Realizamos uma análise prévia das suas necessidades e apresentamos uma proposta transparente, sem custos ocultos e com cronograma detalhado.
+- **Pergunta 2**: Vocês atendem toda a região de ${cidade}?
+  - **Resposta**: Sim, atendemos ${cidade} e municípios vizinhos com agilidade e suporte técnico local completo.
+- **Pergunta 3**: Como é garantida a qualidade e o cumprimento dos prazos?
+  - **Resposta**: Trabalhamos com contratos formais de garantia técnica e cronogramas monitorados etapa por etapa.
+
+### Seção 7: Chamada Final & WhatsApp
+- **Título**: Pronto para iniciar seu projeto com total segurança?
+- **Subtítulo**: Fale diretamente com nossa equipe técnica pelo WhatsApp e receba um atendimento consultivo imediato.
+- **Mensagem Pré-Formatada do WhatsApp**: "Olá, gostaria de saber mais sobre as soluções em ${segmento} da ${nome} para meu projeto."`;
+}
+
+/**
+ * Server Function: Gera tanto a Estrutura de Seções quanto as Copys completas do site
+ * com base no cadastro do lead e nos dados da Análise do Cliente (Diagnóstico e Dossiê 360).
+ */
+export const gerarConteudoSiteIA_ServerFn = createServerFn({ method: "POST" })
+  .inputValidator((data: GerarConteudoSiteInput) => data)
+  .handler(async ({ data }): Promise<GerarConteudoSiteOutput> => {
+    const { empresa, diagnostico, dossier360, relatorio } = data;
+
+    // Extração de dados da análise do cliente
+    const diagnosticoItens: string[] = [];
+    if (diagnostico?.site?.responsivo === false) diagnosticoItens.push("Site anterior não era responsivo para celulares.");
+    if (diagnostico?.site?.velocidade === "ruim") diagnosticoItens.push("Lentidão excessiva no carregamento.");
+    if (diagnostico?.site?.cta === false) diagnosticoItens.push("Falta de chamadas de ação claras (CTAs).");
+    if (diagnostico?.site?.whatsappBtn === false) diagnosticoItens.push("Ausência de botão rápido para WhatsApp.");
+    if (diagnostico?.atendimento?.clarezaServicos === false) diagnosticoItens.push("Falta de clareza nas especialidades.");
+    if (diagnostico?.atendimento?.provaSocial === false) diagnosticoItens.push("Falta de provas sociais e depoimentos.");
+    if (relatorio?.resumo) diagnosticoItens.push(`Resumo do relatório: ${relatorio.resumo}`);
+
+    const personas = dossier360?.personas || [];
+    const objecoes = dossier360?.objecoes || [];
+    const diferenciais = dossier360?.diferenciais || [];
+
+    const promptSystem = `Atue como um Diretor de Criação de Elite, Arquiteto de Informação e Copywriter Sênior de Resposta Direta.
+Sua missão é desenvolver a ESTRUTURA DE SEÇÕES COMPLETA e as COPYS/TEXTOS PERSUASIVOS DETALHADOS para uma Landing Page ONE-PAGE de alto padrão da empresa especificada.
+
+DIRETRIZES FUNDAMENTAIS:
+1. Enraizamento no Nicho Real: Adequar o tom de voz e os termos técnicos ao segmento real da empresa.
+2. Grounding na Análise do Cliente: Você DEVE utilizar obrigatoriamente as informações levantadas no Diagnóstico do Cliente e no Dossiê 360 (personas, fraquezas detectadas, objeções no fechamento comercial e diferenciais competitivos) para formular os argumentos.
+3. Tom Humano e Confiante: Copies diretas, focadas em benefícios concretos para o cliente. Proibido o uso de jargões clichês de IA (ex: "revolucionário", "a solução definitiva", "no mundo dinâmico de hoje", "transformando o cenário").
+4. Formatação: Retorne o resultado em formato Markdown estruturado, dividido claramente em:
+   - ## 1. ARQUITETURA E ESTRUTURA DE SEÇÕES RECOMENDADA (lista numerada de seções explicando a função de cada uma na conversão)
+   - ## 2. CONTEÚDO E COPYS COMPLETAS DE CADA SEÇÃO (com H1, subtítulo, propostas de valor, catálogo de serviços detalhado com benefícios, superação de objeções, sobre a empresa e CTAs para WhatsApp com mensagem pré-configurada).`;
+
+    const promptUser = `Gere a Estrutura de Seções e a Copy Completa do site para a seguinte empresa:
+
+DADOS CADASTRAIS:
+- Nome da Empresa: ${empresa.nome}
+- Nicho / Segmento: ${empresa.segmento}
+- Área de Atuação: ${empresa.areaAtuacao || empresa.segmento}
+- Cidade: ${empresa.cidade}/RS (Serra Gaúcha)
+- Endereço: ${empresa.endereco || "Não informado"}
+- WhatsApp / Telefone: ${empresa.whatsapp || empresa.telefone || "Não informado"}
+- E-mail: ${empresa.email || "Não informado"}
+
+DADOS DO DIAGNÓSTICO DO CLIENTE:
+${diagnosticoItens.length > 0 ? diagnosticoItens.map((d) => `- ${d}`).join("\n") : "- Lead necessita de posicionamento digital de alto nível que transmita segurança e autoridade técnica."}
+
+DADOS DO DOSSIÊ 360 DO LEAD:
+- Personas do Público: ${personas.length > 0 ? JSON.stringify(personas.slice(0, 2)) : "Clientes residenciais e corporativos exigentes da região."}
+- Objeções Comerciais a Contornar: ${objecoes.length > 0 ? JSON.stringify(objecoes.slice(0, 3)) : "Insegurança com cumprimento de prazos e qualidade dos materiais."}
+- Diferenciais Competitivos: ${diferenciais.length > 0 ? JSON.stringify(diferenciais.slice(0, 3)) : "Atendimento próximo, pontualidade rigorosa e suporte técnico qualificado."}
+
+Gere agora a estrutura de seções recomendada e as copys persuasivas completas em formato Markdown.`;
+
+    let conteudoGerado = "";
+    let providerUsed = "motor_editorial_locomotiva";
+    let modelUsed = "bespoke_copywriter";
+
+    try {
+      const llmRes = await chamarLlmUniversal(
+        [
+          { role: "system", content: promptSystem },
+          { role: "user", content: promptUser },
+        ],
+        {
+          provedorPreferencial: (data.provedorPreferencial as any) || "auto",
+          model: data.modeloPreferencial,
+          customKeys: data.customKeys,
+          temperature: 0.6,
+          maxTokens: 4096,
+        },
+      );
+
+      if (llmRes.text && llmRes.text.trim().length > 150) {
+        conteudoGerado = llmRes.text.trim();
+        providerUsed = llmRes.provider;
+        modelUsed = llmRes.model;
+      }
+    } catch (err: any) {
+      console.warn("[GerarConteudoSite] Falha na chamada de LLM, utilizando gerador nativo:", err?.message);
+    }
+
+    if (!conteudoGerado) {
+      conteudoGerado = gerarConteudoSiteFallback(empresa, diagnostico, dossier360);
+    }
+
+    return {
+      conteudoFormatado: conteudoGerado,
       provider: providerUsed,
       model: modelUsed,
       geradoEm: new Date().toISOString(),

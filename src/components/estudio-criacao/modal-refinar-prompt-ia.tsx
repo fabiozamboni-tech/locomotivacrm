@@ -30,7 +30,8 @@ interface ModalRefinarPromptIaProps {
   modeloNome: string;
   usarAntiIaBespoke: boolean;
   skillsAtivasCount: number;
-  motorScroll?: "gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional";
+  motorScroll?: "nenhum" | "gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional";
+  conteudoSite?: string;
   initialPromptSystem: string;
   initialPromptUser: string;
   onConfirmarEGerar: (promptCustomizado: {
@@ -49,12 +50,13 @@ export function ModalRefinarPromptIa({
   usarAntiIaBespoke,
   skillsAtivasCount,
   motorScroll,
+  conteudoSite,
   initialPromptSystem,
   initialPromptUser,
   onConfirmarEGerar,
   gerando,
 }: ModalRefinarPromptIaProps) {
-  const [tabAtiva, setTabAtiva] = useState<"system" | "user" | "unificado">("system");
+  const [tabAtiva, setTabAtiva] = useState<"system" | "user" | "conteudo" | "unificado">("system");
   const [promptSystem, setPromptSystem] = useState(initialPromptSystem);
   const [promptUser, setPromptUser] = useState(initialPromptUser);
 
@@ -130,7 +132,9 @@ export function ModalRefinarPromptIa({
                     ? "ScrollCraft (Apple Canvas)"
                     : motorScroll === "scrollcraft_dimensional"
                     ? "Scroll-Craft Dimensional"
-                    : "GSAP Editorial"}
+                    : motorScroll === "gsap_lenis_split"
+                    ? "GSAP Editorial"
+                    : "Nenhum (Rolagem Nativa)"}
                 </Badge>
               )}
             </div>
@@ -140,12 +144,18 @@ export function ModalRefinarPromptIa({
         <div className="flex-1 overflow-y-auto p-5 space-y-3">
           <Tabs value={tabAtiva} onValueChange={(v) => setTabAtiva(v as any)} className="w-full">
             <div className="flex items-center justify-between gap-2 border-b border-border pb-2">
-              <TabsList className="grid grid-cols-3 h-8 w-[380px]">
+              <TabsList className="grid grid-cols-4 h-8 w-[490px]">
                 <TabsTrigger value="system" className="text-xs">
                   Prompt do Sistema
                 </TabsTrigger>
                 <TabsTrigger value="user" className="text-xs">
                   Prompt do Usuário
+                </TabsTrigger>
+                <TabsTrigger value="conteudo" className="text-xs flex items-center gap-1">
+                  <span>Conteúdo & Copy</span>
+                  {conteudoSite && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  )}
                 </TabsTrigger>
                 <TabsTrigger value="unificado" className="text-xs">
                   Visão Geral
@@ -177,7 +187,9 @@ export function ModalRefinarPromptIa({
                         ? promptSystem
                         : tabAtiva === "user"
                           ? promptUser
-                          : promptUnificado,
+                          : tabAtiva === "conteudo"
+                            ? (conteudoSite || "Nenhum conteúdo salvo no botão Conteúdo ainda.")
+                            : promptUnificado,
                     )
                   }
                   className="h-7 text-xs gap-1"
@@ -221,6 +233,41 @@ export function ModalRefinarPromptIa({
                 className="w-full font-mono text-xs leading-relaxed bg-background/90 p-3 rounded-lg border border-border resize-y"
                 placeholder="Insira as especificações do nicho e dados do cliente..."
               />
+            </TabsContent>
+
+            {/* TAB: CONTEÚDO E COPY DO SITE (BOTÃO CONTEÚDO) */}
+            <TabsContent value="conteudo" className="mt-3 space-y-2">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>
+                  Estrutura de seções e copys persuasivas geradas e salvas no botão &quot;Conteúdo&quot;.
+                </span>
+                <span className="font-mono text-[11px]">
+                  {conteudoSite ? `${conteudoSite.length} caracteres` : "Sem conteúdo salvo"}
+                </span>
+              </div>
+              {conteudoSite ? (
+                <div className="space-y-2">
+                  <div className="p-2.5 rounded-md border border-amber-500/30 bg-amber-500/10 text-xs text-amber-800 dark:text-amber-300">
+                    <p className="font-semibold flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span>Este conteúdo está injetado diretamente no Prompt do Usuário!</span>
+                    </p>
+                    <p className="text-[11px] mt-0.5 opacity-90">
+                      A IA geradora utilizará obrigatoriamente estes textos, títulos, especialidades e CTAs ao gerar o código da página.
+                    </p>
+                  </div>
+                  <pre className="w-full max-h-[360px] overflow-auto font-mono text-xs leading-relaxed bg-background/90 p-3.5 rounded-lg border border-border resize-y whitespace-pre-wrap select-text">
+                    {conteudoSite}
+                  </pre>
+                </div>
+              ) : (
+                <div className="p-8 text-center rounded-lg border border-dashed border-border flex flex-col items-center justify-center">
+                  <p className="text-xs font-medium text-foreground">Nenhuma copy customizada definida ainda.</p>
+                  <p className="text-[11px] text-muted-foreground max-w-sm mt-1">
+                    Você pode utilizar o botão &quot;Conteúdo&quot; no painel principal para gerar e salvar a arquitetura de seções e as copys com base na Análise do Cliente.
+                  </p>
+                </div>
+              )}
             </TabsContent>
 
             {/* TAB: VISÃO UNIFICADA */}

@@ -167,7 +167,9 @@ export interface Empresa {
   estudioChatMensagens?: EstudioChatMessage[];
   estudioUsarAntiIaBespoke?: boolean;
   estudioUsarSkillsClaude?: boolean;
-  estudioMotorScroll?: "gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional";
+  estudioMotorScroll?: "nenhum" | "gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional";
+  siteConteudoCustomizado?: string;
+  siteConteudoGeradoEm?: string;
   estudioLogosGerados?: Array<{
     id: string;
     url: string;

@@ -92,6 +92,7 @@ import {
 import { montarPromptSiteCompleto } from "@/lib/site-generator-prompt";
 import { ModalGerenciarSkills } from "@/components/estudio-criacao/modal-gerenciar-skills";
 import { ModalRefinarPromptIa } from "@/components/estudio-criacao/modal-refinar-prompt-ia";
+import { ModalConteudoSite } from "@/components/estudio-criacao/modal-conteudo-site";
 import { GeradorIdentidadeVisual } from "@/components/estudio-criacao/gerador-identidade-visual";
 import { checarCotaDiaria, registrarConsumoDiario } from "@/lib/ai-quota-guard";
 
@@ -163,9 +164,9 @@ function EstudioCriacaoPage() {
     empresa?.estudioUsarSkillsClaude ?? true,
   );
 
-  // Arquitetura & Motor de Rolagem (Padrão GSAP, ScrollCraft Canvas singhharsh1708, ou Scroll-Craft Dimensional nateherkai)
-  const [motorScroll, setMotorScroll] = useState<"gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional">(
-    empresa?.estudioMotorScroll || "gsap_lenis_split",
+  // Arquitetura & Motor de Rolagem (Nenhum, GSAP, ScrollCraft Canvas singhharsh1708, ou Scroll-Craft Dimensional nateherkai)
+  const [motorScroll, setMotorScroll] = useState<"nenhum" | "gsap_lenis_split" | "scrollcraft_canvas" | "scrollcraft_dimensional">(
+    empresa?.estudioMotorScroll || "nenhum",
   );
 
   // Cor primária ativa selecionada na paleta cromática
@@ -175,6 +176,7 @@ function EstudioCriacaoPage() {
   const [skills, setSkills] = useState<CustomSkill[]>(() => loadSkillsLocais());
   const [modalSkillsOpen, setModalSkillsOpen] = useState(false);
   const [modalPromptOpen, setModalPromptOpen] = useState(false);
+  const [modalConteudoOpen, setModalConteudoOpen] = useState(false);
 
   // Agente de IA selecionado
   const [agenteSelecionado, setAgenteSelecionado] = useState<AgenteIaOption>(AGENTES_IA_CATALOGO[0]);
@@ -229,7 +231,7 @@ function EstudioCriacaoPage() {
       setChatMensagens(empresa.estudioChatMensagens || []);
       setUsarAntiIaBespoke(empresa.estudioUsarAntiIaBespoke ?? true);
       setUsarSkillsClaude(empresa.estudioUsarSkillsClaude ?? true);
-      setMotorScroll(empresa.estudioMotorScroll || "gsap_lenis_split");
+      setMotorScroll(empresa.estudioMotorScroll || "nenhum");
     }
   }, [
     empresa?.id,
@@ -241,6 +243,7 @@ function EstudioCriacaoPage() {
     empresa?.estudioUsarAntiIaBespoke,
     empresa?.estudioUsarSkillsClaude,
     empresa?.estudioMotorScroll,
+    empresa?.siteConteudoCustomizado,
   ]);
 
   // Auto-scroll do chat ao receber nova mensagem
@@ -342,22 +345,30 @@ function EstudioCriacaoPage() {
 
   const promptMontado = React.useMemo(() => {
     if (!empresa) return { promptSystem: "", promptUser: "" };
-    const claudeSkill = skills.find((s) => s.id === "claude-frontend-design");
-    const claudeAtivo = claudeSkill ? claudeSkill.ativa : usarSkillsClaude;
     return montarPromptSiteCompleto({
       empresa: toCtx(empresa),
       diagnostico: empresa.diagnostico,
       dossier360: empresa.dossier360,
       relatorio: empresa.relatorioLead,
       usarAntiIaBespoke,
-      usarSkillsClaude: claudeAtivo,
+      usarSkillsClaude,
       motorScroll,
-      skillsAdicionais: skills.filter((s) => s.ativa && s.id !== "claude-frontend-design"),
+      skillsAdicionais: skills.filter((s) => s.ativa),
+      siteConteudoCustomizado: empresa.siteConteudoCustomizado,
       logoBase64: logoAnexo?.dataUrl,
       logoNomeArquivo: logoAnexo?.nome,
       instrucoesDesignMd: designMdAnexo?.conteudo,
     });
-  }, [empresa, usarAntiIaBespoke, usarSkillsClaude, motorScroll, skills, logoAnexo, designMdAnexo]);
+  }, [
+    empresa,
+    usarAntiIaBespoke,
+    usarSkillsClaude,
+    motorScroll,
+    skills,
+    logoAnexo,
+    designMdAnexo,
+    empresa?.siteConteudoCustomizado,
+  ]);
 
   // 1. GERAR NOVO SITE COMPLETO (DO ZERO OU COM PROMPT CUSTOMIZADO)
   const handleGerarSite = async (customPromptOverride?: { promptSystem: string; promptUser: string }) => {
@@ -407,18 +418,16 @@ function EstudioCriacaoPage() {
         perplexity: apiSettings.perplexity?.key,
       };
 
-      const claudeSkill = skills.find((s) => s.id === "claude-frontend-design");
-      const claudeAtivo = claudeSkill ? claudeSkill.ativa : usarSkillsClaude;
-
       const res = await gerarSiteFn({
         data: {
           empresa: toCtx(empresa),
           provedorPreferencial: agenteSelecionado.provider,
           modeloPreferencial: agenteSelecionado.modelo,
           usarAntiIaBespoke,
-          usarSkillsClaude: claudeAtivo,
+          usarSkillsClaude,
           motorScroll,
-          skillsAdicionais: skills.filter((s) => s.ativa && s.id !== "claude-frontend-design"),
+          skillsAdicionais: skills.filter((s) => s.ativa),
+          siteConteudoCustomizado: empresa.siteConteudoCustomizado,
           customPromptOverride,
           customKeys,
           diagnostico: empresa.diagnostico,
@@ -1154,7 +1163,9 @@ Pilares de Conteúdo:
                         ? "Apple Canvas"
                         : motorScroll === "scrollcraft_dimensional"
                         ? "Dimensional"
-                        : "GSAP Lenis"}
+                        : motorScroll === "gsap_lenis_split"
+                        ? "GSAP Lenis"
+                        : "Nenhum"}
                     </Badge>
                   </div>
                   <Select
@@ -1167,7 +1178,9 @@ Pilares de Conteúdo:
                           ? "Motor ScrollCraft Canvas ativado (estilo Apple / singhharsh1708)."
                           : val === "scrollcraft_dimensional"
                           ? "Motor Scroll-Craft Dimensional ativado (scrollytelling nateherkai)."
-                          : "Motor GSAP + Lenis + SplitType ativado (padrão editorial).",
+                          : val === "gsap_lenis_split"
+                          ? "Motor GSAP + Lenis + SplitType ativado (padrão editorial)."
+                          : "Motor de rolagem desativado (Rolagem Nativa).",
                       );
                     }}
                   >
@@ -1175,6 +1188,12 @@ Pilares de Conteúdo:
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="nenhum" className="text-xs">
+                        <div className="space-y-0.5">
+                          <p className="font-semibold">Nenhum</p>
+                          <p className="text-[10px] text-muted-foreground">Rolagem nativa do navegador sem bibliotecas externas</p>
+                        </div>
+                      </SelectItem>
                       <SelectItem value="gsap_lenis_split" className="text-xs">
                         <div className="space-y-0.5">
                           <p className="font-semibold">GSAP + Lenis + SplitType (Padrão Editorial)</p>
@@ -1366,18 +1385,36 @@ Pilares de Conteúdo:
                     </span>
                   </Button>
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setModalPromptOpen(true)}
-                    disabled={gerandoSite || refinandoSite}
-                    className="w-full text-xs h-8 gap-1.5 border-primary/30 text-primary hover:bg-primary/5"
-                    title="Visualizar e refinar o prompt da IA antes de enviar"
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                    <span>Visualizar & Refinar Prompt da IA</span>
-                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setModalConteudoOpen(true)}
+                      disabled={gerandoSite || refinandoSite}
+                      className="text-xs h-8 gap-1.5 border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 font-medium"
+                      title="Definir estrutura de seções e copys do site"
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      <span>Conteúdo</span>
+                      {empresa?.siteConteudoCustomizado && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 ml-0.5" title="Conteúdo customizado salvo" />
+                      )}
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setModalPromptOpen(true)}
+                      disabled={gerandoSite || refinandoSite}
+                      className="text-xs h-8 gap-1.5 border-primary/30 text-primary hover:bg-primary/5"
+                      title="Visualizar e refinar o prompt da IA antes de enviar"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      <span>Visualizar & Refinar</span>
+                    </Button>
+                  </div>
                 </div>
               </div>
 
@@ -2022,6 +2059,19 @@ Pilares de Conteúdo:
         onSkillsChange={handleSkillsChange}
       />
 
+      {/* MODAL DE CONTEÚDO E ESTRUTURA DO SITE */}
+      <ModalConteudoSite
+        open={modalConteudoOpen}
+        onOpenChange={setModalConteudoOpen}
+        empresa={empresa}
+        onSalvarConteudo={(novoConteudo) => {
+          updateEmpresa(empresa.id, {
+            siteConteudoCustomizado: novoConteudo,
+            siteConteudoGeradoEm: new Date().toISOString(),
+          });
+        }}
+      />
+
       {/* MODAL PARA VISUALIZAR & REFINAR PROMPT DA IA */}
       <ModalRefinarPromptIa
         open={modalPromptOpen}
@@ -2032,6 +2082,7 @@ Pilares de Conteúdo:
         usarAntiIaBespoke={usarAntiIaBespoke}
         skillsAtivasCount={skills.filter((s) => s.ativa).length}
         motorScroll={motorScroll}
+        conteudoSite={empresa.siteConteudoCustomizado}
         initialPromptSystem={promptMontado.promptSystem}
         initialPromptUser={promptMontado.promptUser}
         onConfirmarEGerar={(customizado) => handleGerarSite(customizado)}
