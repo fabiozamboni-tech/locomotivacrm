@@ -14,6 +14,8 @@ import {
   saveComunicacaoSettings,
   savePromptPadraoConfig,
   restaurarVersaoPromptPadrao,
+  savePromptConteudoConfig,
+  restaurarVersaoPromptConteudo,
   resetDatabaseToDefaults,
   getDatabaseInfo,
   type EmpresaExcluida,
@@ -25,6 +27,7 @@ import type { Empresa } from "./mock-data";
 import type { ScoreWeights } from "./scoring";
 import type { ComunicacaoSettings } from "./comunicacao-settings";
 import type { PromptPadraoConfig } from "./prompt-padrao-config";
+import type { PromptConteudoConfig } from "./prompt-conteudo-config";
 
 // -----------------------------------------------------------------------------
 // SERVER FUNCTIONS PARA PERSISTÊNCIA EM BANCO DE DADOS
@@ -130,4 +133,22 @@ export const restaurarVersaoPromptPadrao_ServerFn = createServerFn({ method: "PO
   .inputValidator((data: { versaoId: string; motivo?: string }) => data)
   .handler(async ({ data }): Promise<PromptPadraoConfig> => {
     return await restaurarVersaoPromptPadrao(data.versaoId, data.motivo);
+  });
+
+export const getPromptConteudoConfig_ServerFn = createServerFn({ method: "GET" })
+  .handler(async (): Promise<PromptConteudoConfig> => {
+    const state = await getDbState();
+    return state.promptConteudoConfig as PromptConteudoConfig;
+  });
+
+export const savePromptConteudoConfig_ServerFn = createServerFn({ method: "POST" })
+  .inputValidator((data: { prompt: string; motivo?: string; autor?: string }) => data)
+  .handler(async ({ data }): Promise<PromptConteudoConfig> => {
+    return await savePromptConteudoConfig(data.prompt, data.motivo, data.autor);
+  });
+
+export const restaurarVersaoPromptConteudo_ServerFn = createServerFn({ method: "POST" })
+  .inputValidator((data: { versaoId: string; motivo?: string }) => data)
+  .handler(async ({ data }): Promise<PromptConteudoConfig> => {
+    return await restaurarVersaoPromptConteudo(data.versaoId, data.motivo);
   });

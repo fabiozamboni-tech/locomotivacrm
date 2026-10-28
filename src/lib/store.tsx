@@ -25,6 +25,8 @@ import {
   resetDatabase_ServerFn,
   savePromptPadraoConfig_ServerFn,
   restaurarVersaoPromptPadrao_ServerFn,
+  savePromptConteudoConfig_ServerFn,
+  restaurarVersaoPromptConteudo_ServerFn,
 } from "./database.functions";
 import type { DatabaseInfo } from "./server-db";
 import {
@@ -33,6 +35,12 @@ import {
   LS_PROMPT_PADRAO_CONFIG,
   LS_PROMPT_PADRAO,
 } from "./prompt-padrao-config";
+import {
+  type PromptConteudoConfig,
+  getDefaultPromptConteudoConfig,
+  LS_PROMPT_CONTEUDO_CONFIG,
+  LS_PROMPT_CONTEUDO,
+} from "./prompt-conteudo-config";
 
 export interface EmpresaExcluida {
   id: string;
@@ -131,6 +139,10 @@ interface StoreValue {
   promptPadraoConfig: PromptPadraoConfig;
   salvarPromptPadrao: (novoPrompt: string, motivo?: string, autor?: string) => Promise<PromptPadraoConfig>;
   restaurarVersaoPromptPadrao: (versaoId: string, motivo?: string) => Promise<PromptPadraoConfig>;
+  // Configuração e Histórico das Instruções Base de Conteúdo (IA)
+  promptConteudoConfig: PromptConteudoConfig;
+  salvarPromptConteudo: (novoPrompt: string, motivo?: string, autor?: string) => Promise<PromptConteudoConfig>;
+  restaurarVersaoPromptConteudo: (versaoId: string, motivo?: string) => Promise<PromptConteudoConfig>;
 }
 
 const StoreCtx = createContext<StoreValue | null>(null);
@@ -258,6 +270,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
     return getDefaultPromptPadraoConfig();
   });
+  const [promptConteudoConfig, setPromptConteudoConfig] = useState<PromptConteudoConfig>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const raw = window.localStorage.getItem(LS_PROMPT_CONTEUDO_CONFIG);
+        if (raw) return JSON.parse(raw) as PromptConteudoConfig;
+      } catch { /* noop */ }
+    }
+    return getDefaultPromptConteudoConfig();
+  });
 
   // Sincronização centralizada com o banco
   const syncWithDatabase = useCallback(async () => {
@@ -295,6 +316,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (dbState.promptPadraoConfig) {
           setPromptPadraoConfig(dbState.promptPadraoConfig);
         }
+        if (dbState.promptConteudoConfig) {
+          setPromptConteudoConfig(dbState.promptConteudoConfig);
+        }
 
         // Atualiza cache offline do localStorage
         try {
@@ -305,6 +329,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           if (dbState.promptPadraoConfig) {
             window.localStorage.setItem(LS_PROMPT_PADRAO_CONFIG, JSON.stringify(dbState.promptPadraoConfig));
             window.localStorage.setItem(LS_PROMPT_PADRAO, dbState.promptPadraoConfig.promptAtual);
+          }
+          if (dbState.promptConteudoConfig) {
+            window.localStorage.setItem(LS_PROMPT_CONTEUDO_CONFIG, JSON.stringify(dbState.promptConteudoConfig));
+            window.localStorage.setItem(LS_PROMPT_CONTEUDO, dbState.promptConteudoConfig.promptAtual);
           }
         } catch { /* noop */ }
       }
@@ -698,9 +726,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setInstagramProfilesDb([]);
         const defPrompt = defState.promptPadraoConfig || getDefaultPromptPadraoConfig();
         setPromptPadraoConfig(defPrompt);
+        const defConteudoPrompt = defState.promptConteudoConfig || getDefaultPromptConteudoConfig();
+        setPromptConteudoConfig(defConteudoPrompt);
         try {
           window.localStorage.setItem(LS_PROMPT_PADRAO_CONFIG, JSON.stringify(defPrompt));
           window.localStorage.setItem(LS_PROMPT_PADRAO, defPrompt.promptAtual);
+          window.localStorage.setItem(LS_PROMPT_CONTEUDO_CONFIG, JSON.stringify(defConteudoPrompt));
+          window.localStorage.setItem(LS_PROMPT_CONTEUDO, defConteudoPrompt.promptAtual);
         } catch { /* noop */ }
         setDbSyncStatus("synced");
         setLastSyncTime(new Date());
@@ -749,6 +781,54 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return res;
       } catch (err) {
         console.error("Erro ao restaurar versao de prompt padrao:", err);
+        setDbSyncStatus("error");
+        throw err;
+      }
+    },
+    []
+  );
+
+  const salvarPromptConteudo = useCallback(
+    async (novoPrompt: string, motivo?: string, autor = "Configurações"): Promise<PromptConteudoConfig> => {
+      setDbSyncStatus("syncing");
+      try {
+        const res = await savePromptConteudoConfig_ServerFn({
+          data: { prompt: novoPrompt, motivo, autor },
+        });
+        setPromptConteudoConfig(res);
+        try {
+          window.localStorage.setItem(LS_PROMPT_CONTEUDO_CONFIG, JSON.stringify(res));
+          window.localStorage.setItem(LS_PROMPT_CONTEUDO, res.promptAtual);
+        } catch { /* noop */ }
+        setDbSyncStatus("synced");
+        setLastSyncTime(new Date());
+        return res;
+      } catch (err) {
+        console.error("Erro ao salvar prompt de conteudo no banco:", err);
+        setDbSyncStatus("error");
+        throw err;
+      }
+    },
+    []
+  );
+
+  const restaurarVersaoPromptConteudo = useCallback(
+    async (versaoId: string, motivo?: string): Promise<PromptConteudoConfig> => {
+      setDbSyncStatus("syncing");
+      try {
+        const res = await restaurarVersaoPromptConteudo_ServerFn({
+          data: { versaoId, motivo },
+        });
+        setPromptConteudoConfig(res);
+        try {
+          window.localStorage.setItem(LS_PROMPT_CONTEUDO_CONFIG, JSON.stringify(res));
+          window.localStorage.setItem(LS_PROMPT_CONTEUDO, res.promptAtual);
+        } catch { /* noop */ }
+        setDbSyncStatus("synced");
+        setLastSyncTime(new Date());
+        return res;
+      } catch (err) {
+        console.error("Erro ao restaurar versao de prompt de conteudo:", err);
         setDbSyncStatus("error");
         throw err;
       }
@@ -1025,6 +1105,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       promptPadraoConfig,
       salvarPromptPadrao,
       restaurarVersaoPromptPadrao,
+      promptConteudoConfig,
+      salvarPromptConteudo,
+      restaurarVersaoPromptConteudo,
     }),
     [
       empresas,
@@ -1041,6 +1124,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       promptPadraoConfig,
       salvarPromptPadrao,
       restaurarVersaoPromptPadrao,
+      promptConteudoConfig,
+      salvarPromptConteudo,
+      restaurarVersaoPromptConteudo,
       updateEmpresa,
       setStage,
       addHistorico,

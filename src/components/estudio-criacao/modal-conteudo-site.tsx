@@ -30,6 +30,7 @@ import { toCtx } from "@/lib/ai.functions";
 import { getApiSettings } from "@/lib/api-settings";
 import type { Empresa } from "@/lib/mock-data";
 import { useNavigate } from "@tanstack/react-router";
+import { useStore } from "@/lib/store";
 
 interface ModalConteudoSiteProps {
   open: boolean;
@@ -45,6 +46,7 @@ export function ModalConteudoSite({
   onSalvarConteudo,
 }: ModalConteudoSiteProps) {
   const navigate = useNavigate();
+  const { promptConteudoConfig } = useStore();
   const gerarConteudoFn = useServerFn(gerarConteudoSiteIA_ServerFn);
 
   const [conteudo, setConteudo] = useState<string>(empresa.siteConteudoCustomizado || "");
@@ -91,6 +93,7 @@ export function ModalConteudoSite({
           dossier360: empresa.dossier360,
           relatorio: empresa.relatorioLead,
           customKeys,
+          promptBaseOverride: promptConteudoConfig?.promptAtual,
         },
       });
 
@@ -151,6 +154,9 @@ export function ModalConteudoSite({
             </div>
 
             <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-[10px] text-muted-foreground font-mono hidden sm:inline-flex items-center gap-1">
+                <span>Instruções IA v{promptConteudoConfig?.historico?.[0]?.versao || 1}</span>
+              </Badge>
               <Button
                 type="button"
                 variant="outline"

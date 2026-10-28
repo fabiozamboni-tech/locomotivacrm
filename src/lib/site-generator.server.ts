@@ -9,6 +9,8 @@ import { chamarLlmUniversal } from "./llm-provider.server";
 import { PROMPT_BLOCO_SKILLS_CLAUDE } from "./skills-claude-prompt";
 import { gerarUrlPollinationsFlux } from "./image-generator.server";
 import { montarPromptSiteCompleto } from "./site-generator-prompt";
+import { getDbState } from "./server-db";
+import { PROMPT_CONTEUDO_BASE } from "./prompt-conteudo-config";
 
 export interface PesquisaWebSiteResult {
   query: string;
@@ -1541,6 +1543,7 @@ export interface GerarConteudoSiteInput {
   diagnostico?: any;
   dossier360?: any;
   relatorio?: any;
+  promptBaseOverride?: string;
   customKeys?: {
     groq?: string;
     gemini?: string;
@@ -1653,16 +1656,15 @@ export const gerarConteudoSiteIA_ServerFn = createServerFn({ method: "POST" })
     const objecoes = dossier360?.objecoes || [];
     const diferenciais = dossier360?.diferenciais || [];
 
-    const promptSystem = `Atue como um Diretor de Criação de Elite, Arquiteto de Informação e Copywriter Sênior de Resposta Direta.
-Sua missão é desenvolver a ESTRUTURA DE SEÇÕES COMPLETA e as COPYS/TEXTOS PERSUASIVOS DETALHADOS para uma Landing Page ONE-PAGE de alto padrão da empresa especificada.
-
-DIRETRIZES FUNDAMENTAIS:
-1. Enraizamento no Nicho Real: Adequar o tom de voz e os termos técnicos ao segmento real da empresa.
-2. Grounding na Análise do Cliente: Você DEVE utilizar obrigatoriamente as informações levantadas no Diagnóstico do Cliente e no Dossiê 360 (personas, fraquezas detectadas, objeções no fechamento comercial e diferenciais competitivos) para formular os argumentos.
-3. Tom Humano e Confiante: Copies diretas, focadas em benefícios concretos para o cliente. Proibido o uso de jargões clichês de IA (ex: "revolucionário", "a solução definitiva", "no mundo dinâmico de hoje", "transformando o cenário").
-4. Formatação: Retorne o resultado em formato Markdown estruturado, dividido claramente em:
-   - ## 1. ARQUITETURA E ESTRUTURA DE SEÇÕES RECOMENDADA (lista numerada de seções explicando a função de cada uma na conversão)
-   - ## 2. CONTEÚDO E COPYS COMPLETAS DE CADA SEÇÃO (com H1, subtítulo, propostas de valor, catálogo de serviços detalhado com benefícios, superação de objeções, sobre a empresa e CTAs para WhatsApp com mensagem pré-configurada).`;
+    let promptSystem = data.promptBaseOverride;
+    if (!promptSystem || promptSystem.trim().length === 0) {
+      try {
+        const dbState = await getDbState();
+        promptSystem = dbState.promptConteudoConfig?.promptAtual || PROMPT_CONTEUDO_BASE;
+      } catch {
+        promptSystem = PROMPT_CONTEUDO_BASE;
+      }
+    }
 
     const promptUser = `Gere a Estrutura de Seções e a Copy Completa do site para a seguinte empresa:
 

@@ -64,6 +64,10 @@ import {
   type PromptPadraoHistoricoItem,
 } from "@/lib/prompt-padrao-config";
 import {
+  PROMPT_CONTEUDO_BASE,
+  type PromptConteudoHistoricoItem,
+} from "@/lib/prompt-conteudo-config";
+import {
   AlertTriangle,
   Database,
   RotateCcw,
@@ -99,6 +103,7 @@ import {
   Save,
   History,
   FileCode,
+  FileText,
 } from "lucide-react";
 
 export const Route = createFileRoute("/configuracoes")({
@@ -137,6 +142,9 @@ function ConfiguracoesPage() {
     promptPadraoConfig,
     salvarPromptPadrao,
     restaurarVersaoPromptPadrao,
+    promptConteudoConfig,
+    salvarPromptConteudo,
+    restaurarVersaoPromptConteudo,
   } = useStore();
   const testConn = useServerFn(testApiConnection);
 
@@ -201,6 +209,80 @@ function ConfiguracoesPage() {
       toast.error("Erro ao restaurar versão do histórico: " + (err?.message || "Erro desconhecido"));
     } finally {
       setSalvandoPrompt(false);
+    }
+  };
+
+  // Estados locais para a aba de Instruções Base de Conteúdo & Copy (IA)
+  const [promptConteudoTexto, setPromptConteudoTexto] = useState(
+    promptConteudoConfig?.promptAtual || PROMPT_CONTEUDO_BASE
+  );
+  const [promptConteudoMotivo, setPromptConteudoMotivo] = useState("");
+  const [salvandoPromptConteudo, setSalvandoPromptConteudo] = useState(false);
+  const [modalVersaoConteudoPreview, setModalVersaoConteudoPreview] = useState<PromptConteudoHistoricoItem | null>(
+    null
+  );
+
+  useEffect(() => {
+    if (promptConteudoConfig?.promptAtual) {
+      setPromptConteudoTexto(promptConteudoConfig.promptAtual);
+    }
+  }, [promptConteudoConfig?.promptAtual]);
+
+  const handleSalvarPromptConteudo = async () => {
+    if (!promptConteudoTexto.trim()) {
+      toast.error("As instruções de conteúdo não podem ficar vazias.");
+      return;
+    }
+    try {
+      setSalvandoPromptConteudo(true);
+      await salvarPromptConteudo(
+        promptConteudoTexto.trim(),
+        promptConteudoMotivo.trim() || undefined,
+        "Configurações"
+      );
+      setPromptConteudoMotivo("");
+      toast.success("Instruções de Conteúdo salvas no banco de dados e adicionadas ao histórico!");
+    } catch (err: any) {
+      toast.error("Erro ao salvar instruções de conteúdo: " + (err?.message || "Erro desconhecido"));
+    } finally {
+      setSalvandoPromptConteudo(false);
+    }
+  };
+
+  const handleRestaurarPadraoFabricaConteudo = async () => {
+    if (!confirm("Deseja restaurar as instruções de conteúdo de fábrica do sistema? Uma nova versão será gravada no histórico.")) {
+      return;
+    }
+    try {
+      setSalvandoPromptConteudo(true);
+      await salvarPromptConteudo(
+        PROMPT_CONTEUDO_BASE,
+        "Restauração para o Padrão de Fábrica",
+        "Configurações"
+      );
+      setPromptConteudoTexto(PROMPT_CONTEUDO_BASE);
+      setPromptConteudoMotivo("");
+      toast.success("Instruções de Conteúdo restauradas para o padrão de fábrica!");
+    } catch (err: any) {
+      toast.error("Erro ao restaurar padrão: " + (err?.message || "Erro desconhecido"));
+    } finally {
+      setSalvandoPromptConteudo(false);
+    }
+  };
+
+  const handleRestaurarVersaoHistoricoConteudo = async (versao: PromptConteudoHistoricoItem) => {
+    if (!confirm(`Deseja restaurar a versão v${versao.versao} de ${versao.data ? format(new Date(versao.data), "dd/MM/yyyy HH:mm") : ""} como a versão ativa?`)) {
+      return;
+    }
+    try {
+      setSalvandoPromptConteudo(true);
+      await restaurarVersaoPromptConteudo(versao.id);
+      setModalVersaoConteudoPreview(null);
+      toast.success(`Versão v${versao.versao} restaurada como ativa no banco de dados!`);
+    } catch (err: any) {
+      toast.error("Erro ao restaurar versão do histórico: " + (err?.message || "Erro desconhecido"));
+    } finally {
+      setSalvandoPromptConteudo(false);
     }
   };
 
@@ -559,6 +641,10 @@ function ConfiguracoesPage() {
           <TabsTrigger value="prompt_padrao" className="text-xs py-1.5 px-3 flex items-center gap-1.5">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
             Prompt Padrão (Estúdio)
+          </TabsTrigger>
+          <TabsTrigger value="prompt_conteudo" className="text-xs py-1.5 px-3 flex items-center gap-1.5">
+            <FileText className="h-3.5 w-3.5 text-amber-500" />
+            Instruções de Conteúdo (IA)
           </TabsTrigger>
           <TabsTrigger value="scoring" className="text-xs py-1.5 px-3 flex items-center gap-1.5">
             <Sliders className="h-3.5 w-3.5 text-amber-500" />
@@ -2861,6 +2947,236 @@ volumes:
         </TabsContent>
 
         {/* ------------------------------------------------------------------- */}
+        {/* ABA: INSTRUÇÕES DE CONTEÚDO (IA) */}
+        {/* ------------------------------------------------------------------- */}
+        <TabsContent value="prompt_conteudo" className="space-y-4 mt-0">
+          <Card className="border-border/60 shadow-xs">
+            <CardHeader className="pb-3 border-b">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                    <FileText className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <CardTitle className="text-base font-bold">Instruções Base de Conteúdo & Copy (IA)</CardTitle>
+                      <Badge className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 text-[10px]">
+                        v{promptConteudoConfig?.historico?.[0]?.versao || 1} Ativa
+                      </Badge>
+                      <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                        Sincronizado no Banco
+                      </Badge>
+                    </div>
+                    <CardDescription className="text-xs mt-0.5">
+                      Instruções mestre enviadas à Inteligência Artificial ao clicar em "Regenerar com IA" no modal de Conteúdo do Estúdio de Criação. Qualquer alteração aqui é gravada no banco de dados e adicionada ao histórico de versões.
+                    </CardDescription>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 self-end sm:self-auto flex-wrap">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      navigator.clipboard.writeText(promptConteudoTexto);
+                      toast.success("Instruções de conteúdo copiadas para a área de transferência!");
+                    }}
+                    className="h-8 text-xs gap-1"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    Copiar
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRestaurarPadraoFabricaConteudo}
+                    disabled={salvandoPromptConteudo}
+                    className="h-8 text-xs gap-1 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Restaurar Padrão de Fábrica
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-4 pt-4">
+              {/* STATUS & ESTATÍSTICAS */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-muted-foreground bg-muted/30 px-3 py-2 rounded-lg border">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span><strong>{promptConteudoTexto.length.toLocaleString()}</strong> caracteres</span>
+                  <span>•</span>
+                  <span><strong>{promptConteudoTexto.split("\n").length}</strong> linhas</span>
+                  <span>•</span>
+                  <span>Versão ativa: <strong>v{promptConteudoConfig?.historico?.[0]?.versao || 1}</strong></span>
+                </div>
+                {promptConteudoConfig?.atualizadoEm && (
+                  <span className="text-[11px]">
+                    Última alteração: {format(new Date(promptConteudoConfig.atualizadoEm), "dd/MM/yyyy 'às' HH:mm")}
+                  </span>
+                )}
+              </div>
+
+              {/* ÁREA DE TEXTO DAS INSTRUÇÕES */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                  <span>Instruções de Geração e Diretrizes de Copy para IA:</span>
+                  <span className="text-[11px] text-muted-foreground font-normal">
+                    Formato Markdown estruturado
+                  </span>
+                </label>
+                <Textarea
+                  value={promptConteudoTexto}
+                  onChange={(e) => setPromptConteudoTexto(e.target.value)}
+                  rows={16}
+                  placeholder="Escreva as diretrizes para a IA redigir o conteúdo..."
+                  className="font-mono text-xs leading-relaxed bg-muted/15 resize-y focus:bg-background"
+                />
+              </div>
+
+              {/* MOTIVO DA ALTERAÇÃO & BOTÃO SALVAR */}
+              <div className="p-3 bg-muted/20 rounded-xl border border-border/80 flex flex-col sm:flex-row items-stretch sm:items-end justify-between gap-3">
+                <div className="flex-1 space-y-1">
+                  <label className="text-xs font-semibold text-foreground block">
+                    Motivo / Resumo desta alteração (opcional para o histórico):
+                  </label>
+                  <Input
+                    value={promptConteudoMotivo}
+                    onChange={(e) => setPromptConteudoMotivo(e.target.value)}
+                    placeholder="Ex: Refinamento de tom de voz, inclusão de novas seções ou regras de autoridade..."
+                    className="text-xs h-9 bg-background"
+                  />
+                </div>
+
+                <Button
+                  type="button"
+                  onClick={handleSalvarPromptConteudo}
+                  disabled={salvandoPromptConteudo}
+                  className="h-9 text-xs gap-1.5 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white hover:opacity-90 shadow-xs font-semibold shrink-0"
+                >
+                  {salvandoPromptConteudo ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Save className="h-3.5 w-3.5" />
+                  )}
+                  <span>{salvandoPromptConteudo ? "Salvando no Banco..." : "Salvar no Banco de Dados"}</span>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* CARD DE HISTÓRICO DE VERSÕES */}
+          <Card className="border-border/60 shadow-xs">
+            <CardHeader className="pb-3 border-b">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                    <History className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-bold flex items-center gap-2">
+                      <span>Histórico de Alterações das Instruções</span>
+                      <Badge variant="secondary" className="text-[10px]">
+                        {(promptConteudoConfig?.historico || []).length} versão(ões)
+                      </Badge>
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Linha do tempo de todas as versões registradas. Você pode inspecionar ou restaurar qualquer versão anterior.
+                    </CardDescription>
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="pt-4">
+              <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
+                {(promptConteudoConfig?.historico || []).length === 0 ? (
+                  <div className="text-center p-6 text-muted-foreground text-xs border border-dashed rounded-lg">
+                    Nenhum histórico anterior registrado ainda.
+                  </div>
+                ) : (
+                  (promptConteudoConfig?.historico || []).map((h, idx) => {
+                    const isAtiva = idx === 0;
+                    return (
+                      <div
+                        key={h.id}
+                        className={`p-3 rounded-xl border transition-all text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                          isAtiva
+                            ? "border-amber-500/40 bg-amber-500/5 shadow-xs"
+                            : "border-border/70 bg-card hover:bg-muted/20"
+                        }`}
+                      >
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge
+                              className={`text-[10px] ${
+                                isAtiva
+                                  ? "bg-amber-600 text-white font-bold"
+                                  : "bg-muted text-foreground border font-medium"
+                              }`}
+                            >
+                              v{h.versao} {isAtiva && "(Versão Ativa)"}
+                            </Badge>
+                            <span className="text-[11px] text-muted-foreground font-mono">
+                              {h.data ? format(new Date(h.data), "dd/MM/yyyy 'às' HH:mm:ss") : "Data não disponível"}
+                            </span>
+                            {h.autor && (
+                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 text-muted-foreground">
+                                {h.autor}
+                              </Badge>
+                            )}
+                            <span className="text-[10px] text-muted-foreground/80">
+                              • {h.caracteres?.toLocaleString() || h.prompt?.length || 0} caracteres
+                            </span>
+                          </div>
+
+                          <p className="text-xs font-semibold text-foreground truncate">
+                            {h.motivo || "Sem descrição"}
+                          </p>
+
+                          <p className="text-[11px] text-muted-foreground line-clamp-1 font-mono">
+                            {h.prompt.slice(0, 140)}...
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setModalVersaoConteudoPreview(h)}
+                            className="h-7 text-xs gap-1"
+                          >
+                            <Eye className="h-3 w-3" />
+                            <span>Visualizar</span>
+                          </Button>
+
+                          {!isAtiva && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRestaurarVersaoHistoricoConteudo(h)}
+                              disabled={salvandoPromptConteudo}
+                              className="h-7 text-xs gap-1 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                              <span>Restaurar</span>
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------------------------- */}
         {/* ABA: CRITÉRIOS DE SCORE & BANCO */}
         {/* ------------------------------------------------------------------- */}
         <TabsContent value="scoring" className="space-y-4 mt-0">
@@ -3118,6 +3434,83 @@ volumes:
                   }
                 }}
                 disabled={salvandoPrompt}
+                className="text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Restaurar esta Versão como Ativa
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL DE VISUALIZAÇÃO DE VERSÃO HISTÓRICA DE INSTRUÇÕES DE CONTEÚDO */}
+      <Dialog
+        open={Boolean(modalVersaoConteudoPreview)}
+        onOpenChange={(open) => !open && setModalVersaoConteudoPreview(null)}
+      >
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-6">
+          <DialogHeader className="pb-3 border-b flex flex-row items-center justify-between">
+            <div>
+              <DialogTitle className="text-sm font-bold flex items-center gap-2">
+                <FileText className="h-4 w-4 text-amber-500" />
+                <span>Instruções de Conteúdo — Versão v{modalVersaoConteudoPreview?.versao}</span>
+                <Badge variant="outline" className="text-[10px]">
+                  {modalVersaoConteudoPreview?.caracteres?.toLocaleString()} caracteres
+                </Badge>
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                Gravado em{" "}
+                {modalVersaoConteudoPreview?.data
+                  ? format(new Date(modalVersaoConteudoPreview.data), "dd/MM/yyyy 'às' HH:mm:ss")
+                  : ""}{" "}
+                por {modalVersaoConteudoPreview?.autor || "Sistema"}.
+                {modalVersaoConteudoPreview?.motivo && ` Motivo: "${modalVersaoConteudoPreview.motivo}".`}
+              </DialogDescription>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto bg-muted/20 rounded-lg p-4 font-mono text-[11px] text-muted-foreground whitespace-pre-wrap leading-relaxed">
+            {modalVersaoConteudoPreview?.prompt}
+          </div>
+
+          <div className="flex items-center justify-between pt-3 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (modalVersaoConteudoPreview) {
+                  navigator.clipboard.writeText(modalVersaoConteudoPreview.prompt);
+                  toast.success(`Versão v${modalVersaoConteudoPreview.versao} copiada!`);
+                }
+              }}
+              className="text-xs gap-1"
+            >
+              <Copy className="h-3.5 w-3.5" />
+              Copiar Conteúdo
+            </Button>
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setModalVersaoConteudoPreview(null)}
+                className="text-xs"
+              >
+                Fechar
+              </Button>
+
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  if (modalVersaoConteudoPreview) {
+                    handleRestaurarVersaoHistoricoConteudo(modalVersaoConteudoPreview);
+                  }
+                }}
+                disabled={salvandoPromptConteudo}
                 className="text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
               >
                 <RotateCcw className="h-3.5 w-3.5" />

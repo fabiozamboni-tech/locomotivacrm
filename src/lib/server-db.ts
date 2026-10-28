@@ -15,6 +15,11 @@ import {
   type PromptPadraoHistoricoItem,
   getDefaultPromptPadraoConfig,
 } from "./prompt-padrao-config";
+import {
+  type PromptConteudoConfig,
+  type PromptConteudoHistoricoItem,
+  getDefaultPromptConteudoConfig,
+} from "./prompt-conteudo-config";
 
 export interface EmpresaExcluida {
   id: string;
@@ -59,6 +64,7 @@ export interface CrmDatabaseState {
   comunicacaoSettings: ComunicacaoSettings;
   apiSettings?: Partial<ApiSettingsMap>;
   promptPadraoConfig?: PromptPadraoConfig;
+  promptConteudoConfig?: PromptConteudoConfig;
 }
 
 export interface DatabaseInfo {
@@ -134,6 +140,7 @@ function getDefaultState(): CrmDatabaseState {
       whatsapp: DEFAULT_WHATSAPP_SETTINGS,
     },
     promptPadraoConfig: getDefaultPromptPadraoConfig(),
+    promptConteudoConfig: getDefaultPromptConteudoConfig(),
   };
 }
 
@@ -171,6 +178,7 @@ async function readFromDisk(): Promise<CrmDatabaseState> {
         : defaultState.comunicacaoSettings,
       apiSettings: parsed.apiSettings,
       promptPadraoConfig: parsed.promptPadraoConfig || defaultState.promptPadraoConfig,
+      promptConteudoConfig: parsed.promptConteudoConfig || defaultState.promptConteudoConfig,
     };
   } catch (err: any) {
     if (err.code === "ENOENT") {
@@ -237,6 +245,11 @@ export async function getDbState(): Promise<CrmDatabaseState> {
           (config as any)?.prompt_padrao_config ||
           defaultState.promptPadraoConfig ||
           getDefaultPromptPadraoConfig();
+        const promptConteudoConfig: PromptConteudoConfig =
+          ((config?.api_settings as any)?.promptConteudoConfig as PromptConteudoConfig) ||
+          (config as any)?.prompt_conteudo_config ||
+          defaultState.promptConteudoConfig ||
+          getDefaultPromptConteudoConfig();
 
         const empresas: Empresa[] = (empresasRes.data || []).map((row) => {
           const raw = (row.dados && typeof row.dados === "object" ? row.dados : {}) as Partial<Empresa>;
@@ -287,6 +300,7 @@ export async function getDbState(): Promise<CrmDatabaseState> {
           comunicacaoSettings,
           apiSettings,
           promptPadraoConfig,
+          promptConteudoConfig,
         };
 
         memoryStateCache = state;
@@ -736,6 +750,81 @@ export async function restaurarVersaoPromptPadrao(
   }
 
   return await savePromptPadraoConfig(
+    versaoDesejada.prompt,
+    motivo || `Restauração da versão v${versaoDesejada.versao} (${versaoDesejada.motivo || "sem descrição"})`,
+    "Restauração de Histórico"
+  );
+}
+
+export async function savePromptConteudoConfig(
+  novoPrompt: string,
+  motivo?: string,
+  autor = "Configurações"
+): Promise<PromptConteudoConfig> {
+  const currentState = memoryStateCache || (await getDbState());
+  const configAtual = currentState.promptConteudoConfig || getDefaultPromptConteudoConfig();
+  const historicoAnterior = configAtual.historico || [];
+  const maiorVersao = historicoAnterior.reduce((max, h) => Math.max(max, h.versao || 0), 0);
+  const proximaVersao = maiorVersao + 1;
+  const agora = new Date().toISOString();
+
+  const novoItem: PromptConteudoHistoricoItem = {
+    id: `v${proximaVersao}_${Date.now()}`,
+    versao: proximaVersao,
+    data: agora,
+    prompt: novoPrompt.trim(),
+    autor: autor,
+    motivo: motivo?.trim() || `Atualização de versão ${proximaVersao}`,
+    caracteres: novoPrompt.trim().length,
+  };
+
+  const updatedConfig: PromptConteudoConfig = {
+    promptAtual: novoPrompt.trim(),
+    atualizadoEm: agora,
+    historico: [novoItem, ...historicoAnterior],
+  };
+
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      const currentApiSettings = (currentState.apiSettings as any) || {};
+      await supabase.from("crm_configuracoes").upsert(
+        {
+          id: "global",
+          api_settings: {
+            ...currentApiSettings,
+            promptConteudoConfig: updatedConfig,
+          } as any,
+          updated_at: agora,
+        },
+        { onConflict: "id" }
+      );
+    } catch (err: any) {
+      console.warn("[ServerDB] Erro ao salvar prompt de conteúdo no Supabase:", err.message);
+    }
+  }
+
+  await queueWrite((state) => ({
+    ...state,
+    promptConteudoConfig: updatedConfig,
+  }));
+
+  return updatedConfig;
+}
+
+export async function restaurarVersaoPromptConteudo(
+  versaoId: string,
+  motivo?: string
+): Promise<PromptConteudoConfig> {
+  const currentState = memoryStateCache || (await getDbState());
+  const configAtual = currentState.promptConteudoConfig || getDefaultPromptConteudoConfig();
+  const versaoDesejada = configAtual.historico.find((h) => h.id === versaoId);
+
+  if (!versaoDesejada) {
+    throw new Error(`Versão de histórico ${versaoId} não encontrada.`);
+  }
+
+  return await savePromptConteudoConfig(
     versaoDesejada.prompt,
     motivo || `Restauração da versão v${versaoDesejada.versao} (${versaoDesejada.motivo || "sem descrição"})`,
     "Restauração de Histórico"
