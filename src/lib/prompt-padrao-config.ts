@@ -71,7 +71,43 @@ Atue como um Desenvolvedor Frontend Sênior e UI/UX Designer de Elite. Sua miss�
 - Todas as imagens fotográficas do site DEVEM utilizar o gerador de imagens por IA 
 - O prompt para criação da imagem DEVE ser escrito em inglês fotográfico rico e cinematográfico especificando o nicho, e estilo de iluminação natural/arquitetônica (ex: 'luxurious modern showroom, architectural photography 8k, cinematic lighting').`;
 
+export interface PromptPadraoHistoricoItem {
+  id: string;
+  versao: number;
+  data: string;
+  prompt: string;
+  autor?: string;
+  motivo?: string;
+  caracteres: number;
+}
+
+export interface PromptPadraoConfig {
+  promptAtual: string;
+  historico: PromptPadraoHistoricoItem[];
+  atualizadoEm: string;
+}
+
+export function getDefaultPromptPadraoConfig(): PromptPadraoConfig {
+  const agora = new Date().toISOString();
+  return {
+    promptAtual: PROMPT_PADRAO_BASE,
+    atualizadoEm: agora,
+    historico: [
+      {
+        id: "v1_padrao_mestre",
+        versao: 1,
+        data: agora,
+        prompt: PROMPT_PADRAO_BASE,
+        autor: "Sistema (Padrão Mestre)",
+        motivo: "Versão inicial padrão de fábrica",
+        caracteres: PROMPT_PADRAO_BASE.length,
+      },
+    ],
+  };
+}
+
 export const LS_PROMPT_PADRAO = "radar.estudio.prompt_padrao.v1";
+export const LS_PROMPT_PADRAO_CONFIG = "radar.estudio.prompt_padrao_config.v1";
 
 export function loadPromptPadrao(empresaCustomizado?: string): string {
   if (empresaCustomizado && empresaCustomizado.trim().length > 0) {
@@ -79,6 +115,13 @@ export function loadPromptPadrao(empresaCustomizado?: string): string {
   }
   if (typeof window === "undefined") return PROMPT_PADRAO_BASE;
   try {
+    const configRaw = window.localStorage.getItem(LS_PROMPT_PADRAO_CONFIG);
+    if (configRaw) {
+      const parsed = JSON.parse(configRaw) as Partial<PromptPadraoConfig>;
+      if (parsed?.promptAtual && parsed.promptAtual.trim().length > 0) {
+        return parsed.promptAtual.trim();
+      }
+    }
     const salvo = window.localStorage.getItem(LS_PROMPT_PADRAO);
     if (salvo && salvo.trim().length > 0) return salvo.trim();
   } catch {

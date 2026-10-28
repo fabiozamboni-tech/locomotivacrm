@@ -58,6 +58,11 @@ import {
 } from "@/components/ui/select";
 import { DEFAULT_WEIGHTS, type ScoreWeights } from "@/lib/scoring";
 import { toast } from "sonner";
+import { format } from "date-fns";
+import {
+  PROMPT_PADRAO_BASE,
+  type PromptPadraoHistoricoItem,
+} from "@/lib/prompt-padrao-config";
 import {
   AlertTriangle,
   Database,
@@ -91,6 +96,9 @@ import {
   Check,
   BookOpen,
   Terminal,
+  Save,
+  History,
+  FileCode,
 } from "lucide-react";
 
 export const Route = createFileRoute("/configuracoes")({
@@ -126,10 +134,75 @@ function ConfiguracoesPage() {
     databaseInfo,
     syncNow,
     kanbanColumns,
+    promptPadraoConfig,
+    salvarPromptPadrao,
+    restaurarVersaoPromptPadrao,
   } = useStore();
   const testConn = useServerFn(testApiConnection);
 
   const [sincronizandoManual, setSincronizandoManual] = useState(false);
+
+  // Estados locais para a aba de Prompt Padrão
+  const [promptTexto, setPromptTexto] = useState(promptPadraoConfig?.promptAtual || PROMPT_PADRAO_BASE);
+  const [promptMotivo, setPromptMotivo] = useState("");
+  const [salvandoPrompt, setSalvandoPrompt] = useState(false);
+  const [modalVersaoPreview, setModalVersaoPreview] = useState<PromptPadraoHistoricoItem | null>(null);
+
+  useEffect(() => {
+    if (promptPadraoConfig?.promptAtual) {
+      setPromptTexto(promptPadraoConfig.promptAtual);
+    }
+  }, [promptPadraoConfig?.promptAtual]);
+
+  const handleSalvarPrompt = async () => {
+    if (!promptTexto.trim()) {
+      toast.error("O prompt padrão não pode ficar vazio.");
+      return;
+    }
+    try {
+      setSalvandoPrompt(true);
+      await salvarPromptPadrao(promptTexto.trim(), promptMotivo.trim() || undefined, "Configurações");
+      setPromptMotivo("");
+      toast.success("Prompt Padrão salvo com sucesso no banco de dados e adicionado ao histórico!");
+    } catch (err: any) {
+      toast.error("Erro ao salvar prompt padrão: " + (err?.message || "Erro desconhecido"));
+    } finally {
+      setSalvandoPrompt(false);
+    }
+  };
+
+  const handleRestaurarPadraoFabrica = async () => {
+    if (!confirm("Deseja restaurar o prompt padrão de fábrica original do sistema? Uma nova versão será gravada no histórico.")) {
+      return;
+    }
+    try {
+      setSalvandoPrompt(true);
+      await salvarPromptPadrao(PROMPT_PADRAO_BASE, "Restauração para o Padrão de Fábrica", "Configurações");
+      setPromptTexto(PROMPT_PADRAO_BASE);
+      setPromptMotivo("");
+      toast.success("Prompt Padrão restaurado para a versão de fábrica com sucesso!");
+    } catch (err: any) {
+      toast.error("Erro ao restaurar padrão: " + (err?.message || "Erro desconhecido"));
+    } finally {
+      setSalvandoPrompt(false);
+    }
+  };
+
+  const handleRestaurarVersaoHistorico = async (versao: PromptPadraoHistoricoItem) => {
+    if (!confirm(`Deseja restaurar a versão v${versao.versao} de ${versao.data ? format(new Date(versao.data), "dd/MM/yyyy HH:mm") : ""} como a versão ativa?`)) {
+      return;
+    }
+    try {
+      setSalvandoPrompt(true);
+      await restaurarVersaoPromptPadrao(versao.id);
+      setModalVersaoPreview(null);
+      toast.success(`Versão v${versao.versao} restaurada como ativa no banco de dados!`);
+    } catch (err: any) {
+      toast.error("Erro ao restaurar versão do histórico: " + (err?.message || "Erro desconhecido"));
+    } finally {
+      setSalvandoPrompt(false);
+    }
+  };
 
   const handleForcarSincronizacao = async () => {
     try {
@@ -482,6 +555,10 @@ function ConfiguracoesPage() {
           <TabsTrigger value="apis" className="text-xs py-1.5 px-3 flex items-center gap-1.5">
             <Server className="h-3.5 w-3.5 text-indigo-500" />
             APIs de Pesquisa & Enriquecimento
+          </TabsTrigger>
+          <TabsTrigger value="prompt_padrao" className="text-xs py-1.5 px-3 flex items-center gap-1.5">
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
+            Prompt Padrão (Estúdio)
           </TabsTrigger>
           <TabsTrigger value="scoring" className="text-xs py-1.5 px-3 flex items-center gap-1.5">
             <Sliders className="h-3.5 w-3.5 text-amber-500" />
@@ -2554,7 +2631,237 @@ volumes:
         </TabsContent>
 
         {/* ------------------------------------------------------------------- */}
-        {/* ABA 4: CRITÉRIOS DE SCORE & BANCO */}
+        {/* ABA: PROMPT PADRÃO DO ESTÚDIO & HISTÓRICO */}
+        {/* ------------------------------------------------------------------- */}
+        <TabsContent value="prompt_padrao" className="space-y-4 mt-0">
+          <Card className="border-border/60 shadow-xs">
+            <CardHeader className="pb-3 border-b">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                    <Sparkles className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <CardTitle className="text-base font-bold">Prompt Padrão Mestre (Estúdio de Criação)</CardTitle>
+                      <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-[10px]">
+                        v{promptPadraoConfig?.historico?.[0]?.versao || 1} Ativa
+                      </Badge>
+                      <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                        Sincronizado no Banco
+                      </Badge>
+                    </div>
+                    <CardDescription className="text-xs mt-0.5">
+                      Este é o template base carregado ao clicar em "Prompt Padrão" no Estúdio de Criação. Qualquer alteração aqui é gravada no banco de dados e adicionada ao histórico de versões.
+                    </CardDescription>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 self-end sm:self-auto flex-wrap">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      navigator.clipboard.writeText(promptTexto);
+                      toast.success("Prompt copiado para a área de transferência!");
+                    }}
+                    className="h-8 text-xs gap-1"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    Copiar
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRestaurarPadraoFabrica}
+                    disabled={salvandoPrompt}
+                    className="h-8 text-xs gap-1 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Restaurar Padrão de Fábrica
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-4 pt-4">
+              {/* STATUS & ESTATÍSTICAS */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-muted-foreground bg-muted/30 px-3 py-2 rounded-lg border">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span><strong>{promptTexto.length.toLocaleString()}</strong> caracteres</span>
+                  <span>•</span>
+                  <span><strong>{promptTexto.split("\n").length}</strong> linhas</span>
+                  <span>•</span>
+                  <span>Versão ativa: <strong>v{promptPadraoConfig?.historico?.[0]?.versao || 1}</strong></span>
+                </div>
+                {promptPadraoConfig?.atualizadoEm && (
+                  <span className="text-[11px]">
+                    Última alteração: {format(new Date(promptPadraoConfig.atualizadoEm), "dd/MM/yyyy 'às' HH:mm")}
+                  </span>
+                )}
+              </div>
+
+              {/* ÁREA DE TEXTO DO PROMPT */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                  <span>Diretrizes e Regras do Prompt Base:</span>
+                  <span className="text-[11px] text-muted-foreground font-normal">
+                    Formato Markdown estruturado
+                  </span>
+                </label>
+                <Textarea
+                  value={promptTexto}
+                  onChange={(e) => setPromptTexto(e.target.value)}
+                  rows={16}
+                  placeholder="Escreva as diretrizes do prompt mestre..."
+                  className="font-mono text-xs leading-relaxed bg-muted/15 resize-y focus:bg-background"
+                />
+              </div>
+
+              {/* MOTIVO DA ALTERAÇÃO & BOTÃO SALVAR */}
+              <div className="p-3 bg-muted/20 rounded-xl border border-border/80 flex flex-col sm:flex-row items-stretch sm:items-end justify-between gap-3">
+                <div className="flex-1 space-y-1">
+                  <label className="text-xs font-semibold text-foreground block">
+                    Motivo / Resumo desta alteração (opcional para o histórico):
+                  </label>
+                  <Input
+                    value={promptMotivo}
+                    onChange={(e) => setPromptMotivo(e.target.value)}
+                    placeholder="Ex: Refinamento de regras de motion, tipografia e One-Page..."
+                    className="text-xs h-9 bg-background"
+                  />
+                </div>
+
+                <Button
+                  type="button"
+                  onClick={handleSalvarPrompt}
+                  disabled={salvandoPrompt}
+                  className="h-9 text-xs gap-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-primary text-white hover:opacity-90 shadow-xs font-semibold shrink-0"
+                >
+                  {salvandoPrompt ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Save className="h-3.5 w-3.5" />
+                  )}
+                  <span>{salvandoPrompt ? "Salvando no Banco..." : "Salvar no Banco de Dados"}</span>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* CARD DE HISTÓRICO DE VERSÕES */}
+          <Card className="border-border/60 shadow-xs">
+            <CardHeader className="pb-3 border-b">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-600">
+                    <History className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-bold flex items-center gap-2">
+                      <span>Histórico de Alterações e Versões</span>
+                      <Badge variant="secondary" className="text-[10px]">
+                        {(promptPadraoConfig?.historico || []).length} versão(ões)
+                      </Badge>
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Linha do tempo de todas as versões registradas. Você pode inspecionar ou restaurar qualquer versão antiga.
+                    </CardDescription>
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="pt-4">
+              <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
+                {(promptPadraoConfig?.historico || []).length === 0 ? (
+                  <div className="text-center p-6 text-muted-foreground text-xs border border-dashed rounded-lg">
+                    Nenhum histórico anterior registrado ainda.
+                  </div>
+                ) : (
+                  (promptPadraoConfig?.historico || []).map((h, idx) => {
+                    const isAtiva = idx === 0;
+                    return (
+                      <div
+                        key={h.id}
+                        className={`p-3 rounded-xl border transition-all text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                          isAtiva
+                            ? "border-primary/40 bg-primary/5 shadow-xs"
+                            : "border-border/70 bg-card hover:bg-muted/20"
+                        }`}
+                      >
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge
+                              className={`text-[10px] ${
+                                isAtiva
+                                  ? "bg-primary text-primary-foreground font-bold"
+                                  : "bg-muted text-foreground border font-medium"
+                              }`}
+                            >
+                              v{h.versao} {isAtiva && "(Versão Ativa)"}
+                            </Badge>
+                            <span className="text-[11px] text-muted-foreground font-mono">
+                              {h.data ? format(new Date(h.data), "dd/MM/yyyy 'às' HH:mm:ss") : "Data não disponível"}
+                            </span>
+                            {h.autor && (
+                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 text-muted-foreground">
+                                {h.autor}
+                              </Badge>
+                            )}
+                            <span className="text-[10px] text-muted-foreground/80">
+                              • {h.caracteres?.toLocaleString() || h.prompt?.length || 0} caracteres
+                            </span>
+                          </div>
+
+                          <p className="text-xs font-semibold text-foreground truncate">
+                            {h.motivo || "Sem descrição"}
+                          </p>
+
+                          <p className="text-[11px] text-muted-foreground line-clamp-1 font-mono">
+                            {h.prompt.slice(0, 140)}...
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setModalVersaoPreview(h)}
+                            className="h-7 text-xs gap-1"
+                          >
+                            <Eye className="h-3 w-3" />
+                            <span>Visualizar</span>
+                          </Button>
+
+                          {!isAtiva && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRestaurarVersaoHistorico(h)}
+                              disabled={salvandoPrompt}
+                              className="h-7 text-xs gap-1 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                              <span>Restaurar</span>
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------------------------- */}
+        {/* ABA: CRITÉRIOS DE SCORE & BANCO */}
         {/* ------------------------------------------------------------------- */}
         <TabsContent value="scoring" className="space-y-4 mt-0">
           <Card className="border-border/60">
@@ -2750,6 +3057,76 @@ volumes:
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* MODAL DE VISUALIZAÇÃO DE VERSÃO HISTÓRICA DO PROMPT */}
+      <Dialog open={Boolean(modalVersaoPreview)} onOpenChange={(open) => !open && setModalVersaoPreview(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-6">
+          <DialogHeader className="pb-3 border-b flex flex-row items-center justify-between">
+            <div>
+              <DialogTitle className="text-sm font-bold flex items-center gap-2">
+                <FileCode className="h-4 w-4 text-primary" />
+                <span>Prompt Padrão — Versão v{modalVersaoPreview?.versao}</span>
+                <Badge variant="outline" className="text-[10px]">
+                  {modalVersaoPreview?.caracteres?.toLocaleString()} caracteres
+                </Badge>
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                Gravado em {modalVersaoPreview?.data ? format(new Date(modalVersaoPreview.data), "dd/MM/yyyy 'às' HH:mm:ss") : ""} por {modalVersaoPreview?.autor || "Sistema"}.
+                {modalVersaoPreview?.motivo && ` Motivo: "${modalVersaoPreview.motivo}".`}
+              </DialogDescription>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto bg-muted/20 rounded-lg p-4 font-mono text-[11px] text-muted-foreground whitespace-pre-wrap leading-relaxed">
+            {modalVersaoPreview?.prompt}
+          </div>
+
+          <div className="flex items-center justify-between pt-3 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (modalVersaoPreview) {
+                  navigator.clipboard.writeText(modalVersaoPreview.prompt);
+                  toast.success(`Versão v${modalVersaoPreview.versao} copiada!`);
+                }
+              }}
+              className="text-xs gap-1"
+            >
+              <Copy className="h-3.5 w-3.5" />
+              Copiar Conteúdo
+            </Button>
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setModalVersaoPreview(null)}
+                className="text-xs"
+              >
+                Fechar
+              </Button>
+
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  if (modalVersaoPreview) {
+                    handleRestaurarVersaoHistorico(modalVersaoPreview);
+                  }
+                }}
+                disabled={salvandoPrompt}
+                className="text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Restaurar esta Versão como Ativa
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

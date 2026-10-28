@@ -10,6 +10,11 @@ import {
   type ComunicacaoSettings,
 } from "./comunicacao-settings";
 import { type ApiSettingsMap } from "./api-settings";
+import {
+  type PromptPadraoConfig,
+  type PromptPadraoHistoricoItem,
+  getDefaultPromptPadraoConfig,
+} from "./prompt-padrao-config";
 
 export interface EmpresaExcluida {
   id: string;
@@ -53,6 +58,7 @@ export interface CrmDatabaseState {
   weights: ScoreWeights;
   comunicacaoSettings: ComunicacaoSettings;
   apiSettings?: Partial<ApiSettingsMap>;
+  promptPadraoConfig?: PromptPadraoConfig;
 }
 
 export interface DatabaseInfo {
@@ -127,6 +133,7 @@ function getDefaultState(): CrmDatabaseState {
       email: DEFAULT_EMAIL_SETTINGS,
       whatsapp: DEFAULT_WHATSAPP_SETTINGS,
     },
+    promptPadraoConfig: getDefaultPromptPadraoConfig(),
   };
 }
 
@@ -163,6 +170,7 @@ async function readFromDisk(): Promise<CrmDatabaseState> {
           }
         : defaultState.comunicacaoSettings,
       apiSettings: parsed.apiSettings,
+      promptPadraoConfig: parsed.promptPadraoConfig || defaultState.promptPadraoConfig,
     };
   } catch (err: any) {
     if (err.code === "ENOENT") {
@@ -224,6 +232,11 @@ export async function getDbState(): Promise<CrmDatabaseState> {
         const comunicacaoSettings: ComunicacaoSettings =
           (config?.comunicacao_settings as unknown as ComunicacaoSettings) || defaultState.comunicacaoSettings;
         const apiSettings = (config?.api_settings as unknown as Partial<ApiSettingsMap>) || undefined;
+        const promptPadraoConfig: PromptPadraoConfig =
+          ((config?.api_settings as any)?.promptPadraoConfig as PromptPadraoConfig) ||
+          (config as any)?.prompt_padrao_config ||
+          defaultState.promptPadraoConfig ||
+          getDefaultPromptPadraoConfig();
 
         const empresas: Empresa[] = (empresasRes.data || []).map((row) => {
           const raw = (row.dados && typeof row.dados === "object" ? row.dados : {}) as Partial<Empresa>;
@@ -273,6 +286,7 @@ export async function getDbState(): Promise<CrmDatabaseState> {
           weights,
           comunicacaoSettings,
           apiSettings,
+          promptPadraoConfig,
         };
 
         memoryStateCache = state;
@@ -651,6 +665,81 @@ export async function saveComunicacaoSettings(
   }));
 
   return result;
+}
+
+export async function savePromptPadraoConfig(
+  novoPrompt: string,
+  motivo?: string,
+  autor = "Configurações"
+): Promise<PromptPadraoConfig> {
+  const currentState = memoryStateCache || (await getDbState());
+  const configAtual = currentState.promptPadraoConfig || getDefaultPromptPadraoConfig();
+  const historicoAnterior = configAtual.historico || [];
+  const maiorVersao = historicoAnterior.reduce((max, h) => Math.max(max, h.versao || 0), 0);
+  const proximaVersao = maiorVersao + 1;
+  const agora = new Date().toISOString();
+
+  const novoItem: PromptPadraoHistoricoItem = {
+    id: `v${proximaVersao}_${Date.now()}`,
+    versao: proximaVersao,
+    data: agora,
+    prompt: novoPrompt.trim(),
+    autor: autor,
+    motivo: motivo?.trim() || `Atualização de versão ${proximaVersao}`,
+    caracteres: novoPrompt.trim().length,
+  };
+
+  const updatedConfig: PromptPadraoConfig = {
+    promptAtual: novoPrompt.trim(),
+    atualizadoEm: agora,
+    historico: [novoItem, ...historicoAnterior],
+  };
+
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      const currentApiSettings = (currentState.apiSettings as any) || {};
+      await supabase.from("crm_configuracoes").upsert(
+        {
+          id: "global",
+          api_settings: {
+            ...currentApiSettings,
+            promptPadraoConfig: updatedConfig,
+          } as any,
+          updated_at: agora,
+        },
+        { onConflict: "id" }
+      );
+    } catch (err: any) {
+      console.warn("[ServerDB] Erro ao salvar prompt padrao no Supabase:", err.message);
+    }
+  }
+
+  await queueWrite((state) => ({
+    ...state,
+    promptPadraoConfig: updatedConfig,
+  }));
+
+  return updatedConfig;
+}
+
+export async function restaurarVersaoPromptPadrao(
+  versaoId: string,
+  motivo?: string
+): Promise<PromptPadraoConfig> {
+  const currentState = memoryStateCache || (await getDbState());
+  const configAtual = currentState.promptPadraoConfig || getDefaultPromptPadraoConfig();
+  const versaoDesejada = configAtual.historico.find((h) => h.id === versaoId);
+
+  if (!versaoDesejada) {
+    throw new Error(`Versão de histórico ${versaoId} não encontrada.`);
+  }
+
+  return await savePromptPadraoConfig(
+    versaoDesejada.prompt,
+    motivo || `Restauração da versão v${versaoDesejada.versao} (${versaoDesejada.motivo || "sem descrição"})`,
+    "Restauração de Histórico"
+  );
 }
 
 export async function resetDatabaseToDefaults(): Promise<CrmDatabaseState> {

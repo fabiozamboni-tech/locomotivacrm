@@ -104,7 +104,15 @@ const SUGESTOES_CHAT = [
 function EstudioCriacaoPage() {
   const search = Route.useSearch() as { empresa?: string; tab?: "site" | "paleta" };
   const navigate = useNavigate();
-  const { empresas, empresasAtivas: storeEmpresasAtivas, updateEmpresa, addHistorico, isEmpresaExcluida } = useStore();
+  const {
+    empresas,
+    empresasAtivas: storeEmpresasAtivas,
+    updateEmpresa,
+    addHistorico,
+    isEmpresaExcluida,
+    promptPadraoConfig,
+    salvarPromptPadrao,
+  } = useStore();
 
   const empresasAtivas = React.useMemo(
     () =>
@@ -140,9 +148,17 @@ function EstudioCriacaoPage() {
   // Sub-aba dentro do painel esquerdo: Chat, Imagens por IA ou Histórico
   const [abaPainelEsquerdo, setAbaPainelEsquerdo] = useState<"chat" | "imagens" | "historico">("chat");
 
-  // Prompt Padrão configurável
-  const [promptPadrao, setPromptPadrao] = useState<string>(() => loadPromptPadrao());
+  // Prompt Padrão configurável sincronizado com o banco de dados
+  const [promptPadrao, setPromptPadrao] = useState<string>(
+    () => promptPadraoConfig?.promptAtual || loadPromptPadrao()
+  );
   const [modalPromptPadraoOpen, setModalPromptPadraoOpen] = useState(false);
+
+  useEffect(() => {
+    if (promptPadraoConfig?.promptAtual) {
+      setPromptPadrao(promptPadraoConfig.promptAtual);
+    }
+  }, [promptPadraoConfig?.promptAtual]);
 
   // Cor primária ativa selecionada na paleta cromática
   const [corPrimariaHex, setCorPrimariaHex] = useState<string>("#722F37");
@@ -1761,9 +1777,10 @@ function EstudioCriacaoPage() {
         open={modalPromptPadraoOpen}
         onOpenChange={setModalPromptPadraoOpen}
         promptAtual={promptPadrao}
-        onSalvar={(novoPrompt) => {
+        versaoAtual={promptPadraoConfig?.historico?.[0]?.versao}
+        onSalvar={async (novoPrompt, motivo) => {
           setPromptPadrao(novoPrompt);
-          savePromptPadrao(novoPrompt);
+          await salvarPromptPadrao(novoPrompt, motivo || "Alterado via Estúdio de Criação", "Estúdio de Criação");
         }}
       />
 

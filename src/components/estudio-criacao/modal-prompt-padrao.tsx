@@ -7,9 +7,10 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Sliders, Copy, RotateCcw, Save } from "lucide-react";
+import { Sliders, Copy, RotateCcw, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { PROMPT_PADRAO_BASE } from "@/lib/prompt-padrao-config";
 
@@ -17,20 +18,25 @@ interface ModalPromptPadraoProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   promptAtual: string;
-  onSalvar: (novoPrompt: string) => void;
+  versaoAtual?: number;
+  onSalvar: (novoPrompt: string, motivo?: string) => Promise<void> | void;
 }
 
 export function ModalPromptPadrao({
   open,
   onOpenChange,
   promptAtual,
+  versaoAtual,
   onSalvar,
 }: ModalPromptPadraoProps) {
   const [texto, setTexto] = useState(promptAtual || PROMPT_PADRAO_BASE);
+  const [motivo, setMotivo] = useState("");
+  const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
     if (open) {
       setTexto(promptAtual || PROMPT_PADRAO_BASE);
+      setMotivo("");
     }
   }, [open, promptAtual]);
 
@@ -44,10 +50,21 @@ export function ModalPromptPadrao({
     toast.success("Prompt copiado para a área de transferência!");
   };
 
-  const handleSalvar = () => {
-    onSalvar(texto.trim());
-    toast.success("Prompt Padrão salvo com sucesso!");
-    onOpenChange(false);
+  const handleSalvar = async () => {
+    if (!texto.trim()) {
+      toast.error("O prompt padrão não pode ficar vazio.");
+      return;
+    }
+    try {
+      setSalvando(true);
+      await onSalvar(texto.trim(), motivo.trim() || undefined);
+      toast.success("Prompt Padrão salvo com sucesso no banco de dados e adicionado ao histórico!");
+      onOpenChange(false);
+    } catch (err: any) {
+      toast.error("Erro ao salvar prompt: " + (err?.message || "Erro desconhecido"));
+    } finally {
+      setSalvando(false);
+    }
   };
 
   const foiModificado = texto.trim() !== PROMPT_PADRAO_BASE.trim();
@@ -63,6 +80,11 @@ export function ModalPromptPadrao({
                   <Sliders className="h-5 w-5 text-primary" />
                   <span>Prompt Padrão (Engenharia, Design & Regras de Código)</span>
                 </DialogTitle>
+                {versaoAtual && (
+                  <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-[10px]">
+                    v{versaoAtual} (Banco)
+                  </Badge>
+                )}
                 {foiModificado ? (
                   <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-500/30 bg-amber-500/10">
                     Customizado
@@ -83,6 +105,7 @@ export function ModalPromptPadrao({
                 variant="outline"
                 size="sm"
                 onClick={handleRestaurar}
+                disabled={salvando}
                 className="h-8 text-xs gap-1"
                 title="Restaurar prompt padrão de fábrica"
               >
@@ -106,15 +129,24 @@ export function ModalPromptPadrao({
         <div className="flex-1 overflow-hidden p-5 flex flex-col min-h-0 space-y-2">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>Você pode editar e salvar qualquer regra abaixo livremente:</span>
-            <span className="font-mono text-[11px]">{texto.length} caracteres</span>
+            <span className="font-mono text-[11px]">{texto.length.toLocaleString()} caracteres</span>
           </div>
 
           <Textarea
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
-            className="flex-1 font-mono text-xs leading-relaxed resize-none p-3.5 bg-background border border-border/80 focus-visible:ring-1 focus-visible:ring-primary rounded-md min-h-[380px] h-[55vh]"
+            className="flex-1 font-mono text-xs leading-relaxed resize-none p-3.5 bg-background border border-border/80 focus-visible:ring-1 focus-visible:ring-primary rounded-md min-h-[340px] h-[48vh]"
             placeholder="Insira as regras do prompt padrão..."
           />
+
+          <div className="pt-1">
+            <Input
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              placeholder="Motivo da alteração no histórico (opcional, ex: Ajuste de tipografia e hero)..."
+              className="text-xs h-8 bg-muted/20"
+            />
+          </div>
         </div>
 
         <div className="p-4 border-t border-border/80 bg-muted/20 flex items-center justify-between gap-3">
@@ -123,6 +155,7 @@ export function ModalPromptPadrao({
             variant="ghost"
             size="sm"
             onClick={() => onOpenChange(false)}
+            disabled={salvando}
             className="text-xs h-8"
           >
             Cancelar
@@ -133,10 +166,15 @@ export function ModalPromptPadrao({
             variant="default"
             size="sm"
             onClick={handleSalvar}
-            className="text-xs h-8 gap-1.5 font-medium"
+            disabled={salvando}
+            className="text-xs h-8 gap-1.5 font-medium bg-gradient-to-r from-blue-600 via-indigo-600 to-primary text-white"
           >
-            <Save className="h-3.5 w-3.5" />
-            <span>Salvar Prompt Padrão</span>
+            {salvando ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Save className="h-3.5 w-3.5" />
+            )}
+            <span>{salvando ? "Salvando no Banco..." : "Salvar no Banco de Dados"}</span>
           </Button>
         </div>
       </DialogContent>

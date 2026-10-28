@@ -12,6 +12,8 @@ import {
   clearInstagramProfiles,
   saveWeights,
   saveComunicacaoSettings,
+  savePromptPadraoConfig,
+  restaurarVersaoPromptPadrao,
   resetDatabaseToDefaults,
   getDatabaseInfo,
   type EmpresaExcluida,
@@ -22,6 +24,7 @@ import {
 import type { Empresa } from "./mock-data";
 import type { ScoreWeights } from "./scoring";
 import type { ComunicacaoSettings } from "./comunicacao-settings";
+import type { PromptPadraoConfig } from "./prompt-padrao-config";
 
 // -----------------------------------------------------------------------------
 // SERVER FUNCTIONS PARA PERSISTÊNCIA EM BANCO DE DADOS
@@ -109,4 +112,22 @@ export const getDatabaseInfo_ServerFn = createServerFn({ method: "GET" })
 export const resetDatabase_ServerFn = createServerFn({ method: "POST" })
   .handler(async (): Promise<CrmDatabaseState> => {
     return await resetDatabaseToDefaults();
+  });
+
+export const getPromptPadraoConfig_ServerFn = createServerFn({ method: "GET" })
+  .handler(async (): Promise<PromptPadraoConfig> => {
+    const state = await getDbState();
+    return state.promptPadraoConfig as PromptPadraoConfig;
+  });
+
+export const savePromptPadraoConfig_ServerFn = createServerFn({ method: "POST" })
+  .inputValidator((data: { prompt: string; motivo?: string; autor?: string }) => data)
+  .handler(async ({ data }): Promise<PromptPadraoConfig> => {
+    return await savePromptPadraoConfig(data.prompt, data.motivo, data.autor);
+  });
+
+export const restaurarVersaoPromptPadrao_ServerFn = createServerFn({ method: "POST" })
+  .inputValidator((data: { versaoId: string; motivo?: string }) => data)
+  .handler(async ({ data }): Promise<PromptPadraoConfig> => {
+    return await restaurarVersaoPromptPadrao(data.versaoId, data.motivo);
   });

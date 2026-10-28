@@ -23,8 +23,16 @@ import {
   saveWeights_ServerFn,
   getDatabaseInfo_ServerFn,
   resetDatabase_ServerFn,
+  savePromptPadraoConfig_ServerFn,
+  restaurarVersaoPromptPadrao_ServerFn,
 } from "./database.functions";
 import type { DatabaseInfo } from "./server-db";
+import {
+  type PromptPadraoConfig,
+  getDefaultPromptPadraoConfig,
+  LS_PROMPT_PADRAO_CONFIG,
+  LS_PROMPT_PADRAO,
+} from "./prompt-padrao-config";
 
 export interface EmpresaExcluida {
   id: string;
@@ -119,6 +127,10 @@ interface StoreValue {
   lastSyncTime: Date | null;
   databaseInfo: DatabaseInfo | null;
   syncNow: () => Promise<void>;
+  // Configuração e Histórico do Prompt Padrão
+  promptPadraoConfig: PromptPadraoConfig;
+  salvarPromptPadrao: (novoPrompt: string, motivo?: string, autor?: string) => Promise<PromptPadraoConfig>;
+  restaurarVersaoPromptPadrao: (versaoId: string, motivo?: string) => Promise<PromptPadraoConfig>;
 }
 
 const StoreCtx = createContext<StoreValue | null>(null);
@@ -237,6 +249,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [dbSyncStatus, setDbSyncStatus] = useState<DbSyncStatus>("idle");
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [databaseInfo, setDatabaseInfo] = useState<DatabaseInfo | null>(null);
+  const [promptPadraoConfig, setPromptPadraoConfig] = useState<PromptPadraoConfig>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const raw = window.localStorage.getItem(LS_PROMPT_PADRAO_CONFIG);
+        if (raw) return JSON.parse(raw) as PromptPadraoConfig;
+      } catch { /* noop */ }
+    }
+    return getDefaultPromptPadraoConfig();
+  });
 
   // Sincronização centralizada com o banco
   const syncWithDatabase = useCallback(async () => {
@@ -271,12 +292,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setEmpresasExcluidas(dbState.empresasExcluidas || []);
         setInstagramProfilesDb(dbState.instagramProfilesDb || []);
 
+        if (dbState.promptPadraoConfig) {
+          setPromptPadraoConfig(dbState.promptPadraoConfig);
+        }
+
         // Atualiza cache offline do localStorage
         try {
           window.localStorage.setItem(LS_KEY, JSON.stringify(finalEmpresas));
           window.localStorage.setItem(LS_WEIGHTS, JSON.stringify(effectiveWeights));
           window.localStorage.setItem(LS_EXCLUIDOS, JSON.stringify(dbState.empresasExcluidas || []));
           window.localStorage.setItem(LS_INSTAGRAM_DB, JSON.stringify(dbState.instagramProfilesDb || []));
+          if (dbState.promptPadraoConfig) {
+            window.localStorage.setItem(LS_PROMPT_PADRAO_CONFIG, JSON.stringify(dbState.promptPadraoConfig));
+            window.localStorage.setItem(LS_PROMPT_PADRAO, dbState.promptPadraoConfig.promptAtual);
+          }
         } catch { /* noop */ }
       }
 
@@ -667,11 +696,65 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setWeightsState(defState.weights || DEFAULT_WEIGHTS);
         setEmpresasExcluidas([]);
         setInstagramProfilesDb([]);
+        const defPrompt = defState.promptPadraoConfig || getDefaultPromptPadraoConfig();
+        setPromptPadraoConfig(defPrompt);
+        try {
+          window.localStorage.setItem(LS_PROMPT_PADRAO_CONFIG, JSON.stringify(defPrompt));
+          window.localStorage.setItem(LS_PROMPT_PADRAO, defPrompt.promptAtual);
+        } catch { /* noop */ }
         setDbSyncStatus("synced");
         setLastSyncTime(new Date());
       })
       .catch((err) => console.error("Erro ao resetar banco:", err));
   }, []);
+
+  const salvarPromptPadrao = useCallback(
+    async (novoPrompt: string, motivo?: string, autor = "Configurações"): Promise<PromptPadraoConfig> => {
+      setDbSyncStatus("syncing");
+      try {
+        const res = await savePromptPadraoConfig_ServerFn({
+          data: { prompt: novoPrompt, motivo, autor },
+        });
+        setPromptPadraoConfig(res);
+        try {
+          window.localStorage.setItem(LS_PROMPT_PADRAO_CONFIG, JSON.stringify(res));
+          window.localStorage.setItem(LS_PROMPT_PADRAO, res.promptAtual);
+        } catch { /* noop */ }
+        setDbSyncStatus("synced");
+        setLastSyncTime(new Date());
+        return res;
+      } catch (err) {
+        console.error("Erro ao salvar prompt padrao no banco:", err);
+        setDbSyncStatus("error");
+        throw err;
+      }
+    },
+    []
+  );
+
+  const restaurarVersaoPromptPadrao = useCallback(
+    async (versaoId: string, motivo?: string): Promise<PromptPadraoConfig> => {
+      setDbSyncStatus("syncing");
+      try {
+        const res = await restaurarVersaoPromptPadrao_ServerFn({
+          data: { versaoId, motivo },
+        });
+        setPromptPadraoConfig(res);
+        try {
+          window.localStorage.setItem(LS_PROMPT_PADRAO_CONFIG, JSON.stringify(res));
+          window.localStorage.setItem(LS_PROMPT_PADRAO, res.promptAtual);
+        } catch { /* noop */ }
+        setDbSyncStatus("synced");
+        setLastSyncTime(new Date());
+        return res;
+      } catch (err) {
+        console.error("Erro ao restaurar versao de prompt padrao:", err);
+        setDbSyncStatus("error");
+        throw err;
+      }
+    },
+    []
+  );
 
   const carregarDemo = useCallback(() => {
     const demo = recalcAll(EMPRESAS_DEMO, weights);
@@ -939,6 +1022,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       lastSyncTime,
       databaseInfo,
       syncNow: syncWithDatabase,
+      promptPadraoConfig,
+      salvarPromptPadrao,
+      restaurarVersaoPromptPadrao,
     }),
     [
       empresas,
@@ -952,6 +1038,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       lastSyncTime,
       databaseInfo,
       syncWithDatabase,
+      promptPadraoConfig,
+      salvarPromptPadrao,
+      restaurarVersaoPromptPadrao,
       updateEmpresa,
       setStage,
       addHistorico,
