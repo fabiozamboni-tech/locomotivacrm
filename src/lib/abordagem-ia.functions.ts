@@ -87,10 +87,18 @@ DIRETRIZES RÍGIDAS DE REDAÇÃO E TOM DE VOZ (PROMPT BASE ANTI-VÍCIO DE I.A.):
    - Cite com naturalidade 1 ou 2 termos reais de busca no Google que os clientes locais utilizam para encontrar o serviço na cidade.
    - Mostre que foi realizado um levantamento sobre como o público local pesquisa na internet por esses serviços na região.
 
-4. OBJETIVO ÚNICO: ABRIR CANAL E ENVIAR O PDF DO LEVANTAMENTO:
+${
+  tom === "padrao_link_site"
+    ? `4. OBJETIVO: APRESENTAR PROPOSTA DE SITE MODERNO E PROTÓTIPO DESENVOLVIDO:
+   - Mencione que a empresa é uma referência no seu segmento e que há uma oportunidade de fortalecer ainda mais sua presença digital.
+   - Note e adapte conforme a situação atual (${empresa.site && empresa.statusSite !== "sem_site" ? "o site atual poderia ser melhor aproveitado para apresentar os serviços e facilitar o contato com clientes" : "a empresa ainda não conta com um site próprio para apresentar seus serviços e oferecer um canal direto de contato aos clientes"}).
+   - Destaque que foi desenvolvida uma proposta de site moderno, rápido e alinhado ao perfil da empresa, com foco em valorizar o negócio, apresentar os serviços e facilitar o contato com potenciais clientes.
+   - Finalize perguntando educadamente com quem falar por aqui (ou por e-mail) para apresentar a proposta e mostrar o protótipo que desenvolveram especialmente para a empresa.`
+    : `4. OBJETIVO ÚNICO: ABRIR CANAL E ENVIAR O PDF DO LEVANTAMENTO:
    - Não tente vender nada na primeira mensagem, não mencione preços e não force reuniões de uma hora.
    - O intuito exclusivo é abrir um canal amigável de conversa e pedir autorização para enviar o documento em PDF gerado na apresentação de slides (Levantamento sobre a presença digital e comunicação da empresa na região).
-   - Fechamento leve e educado pedindo permissão para o envio do arquivo. Exemplo: "Reunimos esses dados em um documento resumido em PDF com esse levantamento. Posso te enviar por aqui para você dar uma olhada quando tiver um momento?"
+   - Fechamento leve e educado pedindo permissão para o envio do arquivo. Exemplo: "Reunimos esses dados em um documento resumido em PDF com esse levantamento. Posso te enviar por aqui para você dar uma olhada quando tiver um momento?"`
+}
 
 5. ESPECIFICAÇÃO DO CANAL: ${canal.toUpperCase()}
    - Se WhatsApp: texto conciso (máximo 6 a 9 linhas bem espaçadas), fácil de ler no celular, parágrafos curtos, sem emojis e sem travessões.
@@ -113,7 +121,11 @@ Retorne APENAS o texto pronto para envio. Se for e-mail, inclua "ASSUNTO: [assun
 ${data.diagnosticoResumo ? `- Resumo do Diagnóstico: "${data.diagnosticoResumo}"` : ""}
 ${instrucaoCustomizada ? `- Instrução Específica do Usuário: "${instrucaoCustomizada}"` : ""}
 
-Escreva agora o texto de primeiro contato aplicando rigorosamente todas as regras: humanizado, sem bajulação, sem emojis, sem travessões, citando as buscas reais e propondo o envio do PDF do levantamento.`;
+Escreva agora o texto de primeiro contato aplicando rigorosamente todas as regras: humanizado, sem bajulação, sem emojis, sem travessões${
+  tom === "padrao_link_site"
+    ? ", com foco na proposta de site moderno e protótipo desenvolvido especialmente para a empresa."
+    : ", citando as buscas reais e propondo o envio do PDF do levantamento."
+}`;
 
     try {
       const res = await chamarLlmUniversal(

@@ -1,8 +1,14 @@
 import type { EmpresaCtx } from "./ai.functions";
-import { resolverVariaveisTemplate, TEMPLATE_PADRAO_FABIO, obterSaudacaoHora } from "./abordagem-templates";
+import {
+  resolverVariaveisTemplate,
+  TEMPLATE_PADRAO_FABIO,
+  TEMPLATE_PADRAO_LINK_SITE,
+  obterSaudacaoHora,
+} from "./abordagem-templates";
 
 export type TomAbordagemId =
   | "padrao"
+  | "padrao_link_site"
   | "primeiro_contato_pdf"
   | "amigavel_elogio"
   | "consultivo_parceiro"
@@ -36,6 +42,16 @@ export const TONS_ABORDAGEM: TomAbordagemItem[] = [
     tagline: "Tom Padrão Oficial",
     canalRecomendado: "WhatsApp & E-mail",
     badgeCls: "bg-primary/10 text-primary border-primary/30",
+  },
+  {
+    id: "padrao_link_site",
+    nome: "Padrão com link para site",
+    subtitulo: "Apresenta proposta de site moderno e protótipo desenvolvido especialmente para a empresa",
+    descricao: "Olá, tudo bem? Apresenta Fábio da Locomotiva, aborda a presença digital da empresa (adaptando se já tem ou não site) e propõe mostrar a proposta e protótipo.",
+    icone: "Globe",
+    tagline: "Proposta de Site & Protótipo",
+    canalRecomendado: "WhatsApp, E-mail & Direct",
+    badgeCls: "bg-blue-500/10 text-blue-600 border-blue-500/30",
   },
   {
     id: "primeiro_contato_pdf",
@@ -220,6 +236,50 @@ export function gerarTextoProntoPorTom(
         return {
           ganchoAbertura: `Levantamento de presença digital e posicionamento da ${nome}`,
           dicaEnvio: "Apresentação consultiva para envio junto ao PDF oficial.",
+          texto: textoResolvido,
+        };
+    }
+  }
+
+  // =========================================================================
+  // TOM: PADRÃO COM LINK PARA SITE (PROPOSTA & PROTÓTIPO DE SITE)
+  // =========================================================================
+  if (tom === "padrao_link_site") {
+    const textoResolvido = resolverVariaveisTemplate(TEMPLATE_PADRAO_LINK_SITE.conteudo, empresa);
+    switch (canal) {
+      case "whatsapp":
+        return {
+          ganchoAbertura: `Proposta de site moderno e protótipo para ${nome}`,
+          dicaEnvio: "Tom padrão com proposta de site moderno e protótipo desenvolvido para a empresa.",
+          texto: textoResolvido,
+        };
+
+      case "instagram":
+        return {
+          ganchoAbertura: `Proposta de site moderno e protótipo para ${nome}`,
+          dicaEnvio: "Direct no Instagram com apresentação e proposta de protótipo de site.",
+          texto: textoResolvido,
+        };
+
+      case "email":
+        return {
+          assunto: `Proposta de site moderno e presença digital — ${nome}`,
+          ganchoAbertura: `Proposta de site moderno e presença digital para ${nome}`,
+          dicaEnvio: "E-mail de apresentação consultiva com proposta de site e protótipo.",
+          texto: textoResolvido,
+        };
+
+      case "ligacaoReuniao":
+        return {
+          ganchoAbertura: `Olá, tudo bem? Me chamo Fábio, sou da Locomotiva Comunicação.`,
+          dicaEnvio: "Roteiro de ligação rápido apresentando a proposta de site e protótipo.",
+          texto: textoResolvido,
+        };
+
+      case "propostaValor360":
+        return {
+          ganchoAbertura: `Proposta de site moderno e posicionamento digital para ${nome}`,
+          dicaEnvio: "Proposta consultiva de presença digital e protótipo de site.",
           texto: textoResolvido,
         };
     }

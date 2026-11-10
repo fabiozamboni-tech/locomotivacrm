@@ -8,6 +8,21 @@ export interface TagVariavel {
 
 export const TAGS_VARIAVEIS_DISPONIVEIS: TagVariavel[] = [
   {
+    tag: "[Nome do Lead]",
+    descricao: "Nome do lead ou empresa prospectada",
+    exemplo: "Marcenaria Silva",
+  },
+  {
+    tag: "[Negócio do Lead]",
+    descricao: "Nicho, segmento ou especialidade do lead",
+    exemplo: "móveis sob medida",
+  },
+  {
+    tag: "[se tiver site: ... / se não tiver site: ...]",
+    descricao: "Condicional automática que varia o texto se a empresa já tem site ou não",
+    exemplo: "se tiver site: frase A / se não tiver site: frase B",
+  },
+  {
     tag: "[boa tarde/bom dia/boa noite]",
     descricao: "Saudação dinâmica baseada na hora atual (manhã, tarde ou noite)",
     exemplo: "bom dia / boa tarde / boa noite",
@@ -81,8 +96,27 @@ Qualquer dúvida estou a disposição
 Abraços`,
 };
 
+export const TEMPLATE_PADRAO_LINK_SITE: AbordagemTemplate = {
+  id: "padrao_link_site",
+  titulo: "Padrão com link para site",
+  descricao: "Abordagem apresentando proposta e protótipo de site moderno, adaptando caso já possua ou não site próprio.",
+  canal: "todos",
+  isPadrao: true,
+  criadoEm: "2026-11-10T00:00:00.000Z",
+  conteudo: `Olá, tudo bem? Me chamo Fábio, sou da Locomotiva Comunicação.
+
+Vi que a [Nome do Lead] é uma referência em [Negócio do Lead] e acredito que exista uma oportunidade de fortalecer ainda mais sua presença digital. Notei que [se tiver site: o site atual poderia ser melhor aproveitado para apresentar os serviços e facilitar o contato com clientes / se não tiver site: a empresa ainda não conta com um site próprio para apresentar seus serviços e oferecer um canal direto de contato aos clientes].
+
+Pensando nisso, desenvolvemos uma proposta de site moderno, rápido e alinhado ao perfil da [Nome da Empresa], com foco em valorizar o negócio, apresentar seus serviços e facilitar o contato com potenciais clientes.
+
+Com quem eu poderia falar por aqui (ou por e-mail) para apresentar essa proposta e mostrar o protótipo que desenvolvemos especialmente para a empresa?
+
+Obrigado pela atenção!`,
+};
+
 export const TEMPLATES_INICIAIS: AbordagemTemplate[] = [
   TEMPLATE_PADRAO_FABIO,
+  TEMPLATE_PADRAO_LINK_SITE,
   {
     id: "contato_direto_whats",
     titulo: "Abordagem Rápida & Direta (WhatsApp)",
@@ -131,13 +165,27 @@ export function loadAbordagemTemplates(): AbordagemTemplate[] {
     if (!raw) return TEMPLATES_INICIAIS;
     const parsed = JSON.parse(raw) as AbordagemTemplate[];
     if (!Array.isArray(parsed) || parsed.length === 0) return TEMPLATES_INICIAIS;
-    
+
+    let result = [...parsed];
+
     // Garante que o template padrão esteja sempre presente no início
-    const temPadrao = parsed.some((t) => t.id === TEMPLATE_PADRAO_FABIO.id);
+    const temPadrao = result.some((t) => t.id === TEMPLATE_PADRAO_FABIO.id);
     if (!temPadrao) {
-      return [TEMPLATE_PADRAO_FABIO, ...parsed];
+      result = [TEMPLATE_PADRAO_FABIO, ...result];
     }
-    return parsed;
+
+    // Garante que o template Padrão com link para site esteja sempre presente
+    const temLinkSite = result.some((t) => t.id === TEMPLATE_PADRAO_LINK_SITE.id);
+    if (!temLinkSite) {
+      const idxPadrao = result.findIndex((t) => t.id === TEMPLATE_PADRAO_FABIO.id);
+      if (idxPadrao !== -1) {
+        result.splice(idxPadrao + 1, 0, TEMPLATE_PADRAO_LINK_SITE);
+      } else {
+        result = [TEMPLATE_PADRAO_LINK_SITE, ...result];
+      }
+    }
+
+    return result;
   } catch (err) {
     console.error("Erro ao carregar templates de abordagem:", err);
     return TEMPLATES_INICIAIS;
@@ -198,21 +246,50 @@ export function resolverVariaveisTemplate(
     termosLevantados = `"${servicoCliente} em ${cidade}"`;
   }
 
-  return conteudoTemplate
-    // [boa tarde/bom dia/boa noite] e variações
-    .replace(/\[\s*(?:boa tarde\/bom dia\/boa noite|bom dia\/boa tarde\/boa noite|sauda[çc][aã]o)\s*\]/gi, saudacao)
-    // [Área de Atuação]
-    .replace(/\[\s*(?:[Ááa]rea de [Aa]tua[çc][ãa]o|segmento)\s*\]/gi, areaAtuacao)
-    // [CIDADE]
-    .replace(/\[\s*(?:CIDADE|cidade)\s*\]/gi, cidade)
-    // [SERVIÇO DO CLIENTE]
-    .replace(/\[\s*(?:SERVI[ÇC]O DO CLIENTE|servi[çc]o do cliente|servi[çc]o)\s*\]/gi, servicoCliente)
-    // [TERMOS DE BUSCA LEVANTADOS]
-    .replace(/\[\s*(?:TERMOS DE BUSCA LEVANTADOS|termos de busca levantados|termos de busca|palavras[- ]chave)\s*\]/gi, termosLevantados)
-    // [NOME DA EMPRESA]
-    .replace(/\[\s*(?:NOME DA EMPRESA|nome da empresa|empresa)\s*\]/gi, nomeEmpresa)
-    // [SEU NOME]
-    .replace(/\[\s*(?:SEU NOME|seu nome|consultor)\s*\]/gi, "Fábio")
-    // [AGENCIA]
-    .replace(/\[\s*(?:AGENCIA|agencia|agência)\s*\]/gi, "Locomotiva Comunicação");
+  // Verifica se a empresa tem site ativo e válido
+  const temSite = Boolean(
+    empresa.site &&
+      empresa.site.trim().length > 3 &&
+      empresa.statusSite !== "sem_site" &&
+      !empresa.site.toLowerCase().includes("não possui") &&
+      !empresa.site.toLowerCase().includes("nao possui"),
+  );
+
+  return (
+    conteudoTemplate
+      // Condicionais de site: [se tiver site: ... / se não tiver site: ...]
+      .replace(
+        /\[\s*se tiver site:\s*([\s\S]*?)\s*\/\s*se n[ãa]o tiver site:\s*([\s\S]*?)\s*\]/gi,
+        (_match, comSite, semSite) => (temSite ? comSite.trim() : semSite.trim()),
+      )
+      .replace(
+        /\[\s*se n[ãa]o tiver site:\s*([\s\S]*?)\s*\/\s*se tiver site:\s*([\s\S]*?)\s*\]/gi,
+        (_match, semSite, comSite) => (temSite ? comSite.trim() : semSite.trim()),
+      )
+      // [boa tarde/bom dia/boa noite] e variações
+      .replace(/\[\s*(?:boa tarde\/bom dia\/boa noite|bom dia\/boa tarde\/boa noite|sauda[çc][aã]o)\s*\]/gi, saudacao)
+      // [Área de Atuação]
+      .replace(/\[\s*(?:[Ááa]rea de [Aa]tua[çc][ãa]o|segmento)\s*\]/gi, areaAtuacao)
+      // [CIDADE]
+      .replace(/\[\s*(?:CIDADE|cidade)\s*\]/gi, cidade)
+      // [SERVIÇO DO CLIENTE] ou [Negócio do Lead]
+      .replace(
+        /\[\s*(?:SERVI[ÇC]O DO CLIENTE|servi[çc]o do cliente|servi[çc]o|neg[oó]cio do lead|neg[oó]cio)\s*\]/gi,
+        servicoCliente,
+      )
+      // [TERMOS DE BUSCA LEVANTADOS]
+      .replace(
+        /\[\s*(?:TERMOS DE BUSCA LEVANTADOS|termos de busca levantados|termos de busca|palavras[- ]chave)\s*\]/gi,
+        termosLevantados,
+      )
+      // [NOME DA EMPRESA] ou [Nome do Lead]
+      .replace(
+        /\[\s*(?:NOME DA EMPRESA|nome da empresa|nome do lead|lead|empresa)\s*\]/gi,
+        nomeEmpresa,
+      )
+      // [SEU NOME]
+      .replace(/\[\s*(?:SEU NOME|seu nome|consultor)\s*\]/gi, "Fábio")
+      // [AGENCIA]
+      .replace(/\[\s*(?:AGENCIA|agencia|agência)\s*\]/gi, "Locomotiva Comunicação")
+  );
 }
